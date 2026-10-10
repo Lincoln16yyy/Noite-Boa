@@ -9,6 +9,7 @@ import Historico from './pages/Historico';
 import Dashboard from './pages/Dashboard';
 import Configuracoes from './pages/Configuracoes';
 import Amigos from './pages/Amigos';
+import Sons from './pages/Sons';
 import ProtectedRoute from './auth/ProtectedRoute';
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/historico" element={<Historico />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/amigos" element={<Amigos />} />
+            <Route path="/sons" element={<Sons />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
           </Route>
         </Route>
