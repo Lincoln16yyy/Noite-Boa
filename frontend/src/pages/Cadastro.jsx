@@ -97,6 +97,9 @@ export default function Cadastro() {
         </button>
       </form>
       {error && <p role="alert" style={{ color: 'var(--color-erro-texto)' }}>{error}</p>}
+      <p style={{ fontSize: '14px' }}>
+        Leia como cuidamos dos seus dados na <Link to="/privacidade">Política de Privacidade</Link>.
+      </p>
       <p>
         Já tem conta? <Link to="/login">Entrar</Link>
       </p>

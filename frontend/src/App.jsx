@@ -3,6 +3,7 @@ import Layout from './layout/Layout';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Cadastro from './pages/Cadastro';
+import Privacidade from './pages/Privacidade';
 import Registrar from './pages/Registrar';
 import Historico from './pages/Historico';
 import Dashboard from './pages/Dashboard';
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Cadastro />} />
+          <Route path="/privacidade" element={<Privacidade />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/registrar" element={<Registrar />} />
             <Route path="/historico" element={<Historico />} />

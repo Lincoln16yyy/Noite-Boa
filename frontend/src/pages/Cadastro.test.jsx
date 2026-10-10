@@ -55,6 +55,14 @@ describe('tela de Cadastro', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('exibe o link da política de privacidade', () => {
+    window.history.pushState({}, '', '/cadastro');
+    render(<App />);
+
+    const link = screen.getByRole('link', { name: /política de privacidade/i });
+    expect(link).toHaveAttribute('href', '/privacidade');
+  });
+
   it('mostra o erro de e-mail duplicado vindo da API', async () => {
     window.history.pushState({}, '', '/cadastro');
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
