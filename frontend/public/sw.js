@@ -57,6 +57,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // API: rede
 
+  // áudios de relaxamento (issue #91): carregamento sob demanda direto pela rede nativa.
+  // Nunca entram no cache ou precache do SW (evita estourar cota e erro 206 no Cache.put).
+  if (url.pathname.startsWith('/audio/')) return;
+
   // SPA: rede primeiro, offline devolve o index.html
   if (request.mode === 'navigate') {
     event.respondWith(
