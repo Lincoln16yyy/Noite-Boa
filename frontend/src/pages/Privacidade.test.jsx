@@ -27,6 +27,28 @@ describe('Página de Política de Privacidade', () => {
     expect(screen.getAllByText(/Neon/).length).toBeGreaterThan(0);
   });
 
+  it('mostra o responsável e o canal de contato de privacidade confirmados', () => {
+    render(<App />);
+    // responsável: projeto pessoal, sem empresa
+    expect(screen.getByText(/projeto pessoal/i)).toBeInTheDocument();
+    // canal de contato é link de e-mail nos dois pontos (seções 1 e 10)
+    const emails = screen.getAllByRole('link', { name: 'lincolngustavo819@gmail.com' });
+    expect(emails.length).toBeGreaterThanOrEqual(2);
+    for (const link of emails) {
+      expect(link).toHaveAttribute('href', 'mailto:lincolngustavo819@gmail.com');
+    }
+    // nenhum marcador de pendência sobrou na página
+    expect(screen.queryByText(/pendência desta edição/i)).not.toBeInTheDocument();
+  });
+
+  it('não promete aceitação automática de novas versões da política', () => {
+    render(<App />);
+    expect(
+      screen.queryByText(/continuar usando o aplicativo.*aceita a versão nova/i),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /alterações nesta política/i })).toBeInTheDocument();
+  });
+
   it('chega na página pelo link do cadastro', () => {
     window.history.pushState({}, '', '/cadastro');
     render(<App />);

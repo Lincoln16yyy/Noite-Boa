@@ -5,18 +5,6 @@ const conteudo = {
   gap: '1rem',
 };
 
-/** Pendência da issue #36: trecho que depende de decisão do responsável. */
-const pendStyle = {
-  background: '#FFF3CD',
-  border: '1px solid #E6C75C',
-  borderRadius: '6px',
-  padding: '0.05rem 0.35rem',
-};
-
-function Pend({ children }) {
-  return <span style={pendStyle}>{children}</span>;
-}
-
 export default function Privacidade() {
   return (
     <article style={conteudo}>
@@ -31,11 +19,12 @@ export default function Privacidade() {
 
       <h2>1. Quem é responsável pelo serviço</h2>
       <p>
-        Responsável pelo Noite Boa: <Pend>a definir (pendência desta edição)</Pend>.
+        O Noite Boa é um projeto pessoal, sob responsabilidade do desenvolvedor do projeto. Não há
+        empresa por trás do aplicativo.
       </p>
       <p>
         Para assuntos de privacidade, o canal de contato é:{' '}
-        <Pend>canal a definir (pendência desta edição)</Pend>.
+        <a href="mailto:lincolngustavo819@gmail.com">lincolngustavo819@gmail.com</a>.
       </p>
 
       <h2>2. Quais dados coletamos</h2>
@@ -117,7 +106,8 @@ export default function Privacidade() {
         Enquanto sua conta existir — não há prazo automático de descarte enquanto você usa o
         serviço. Os registros técnicos de diagnóstico ficam nas plataformas de hospedagem pelo tempo
         que elas mantêm; são usados apenas para corrigir problemas, não para perfilamento. Quando
-        você exclui a conta, apagamos seus dados na hora, como explicado na seção 8.
+        você pede a exclusão da conta, seus dados são removidos do serviço, como explicado na
+        seção 8.
       </p>
 
       <h2>7. Seus direitos (LGPD)</h2>
@@ -142,23 +132,31 @@ export default function Privacidade() {
 
       <h2>8. Como excluir a conta</h2>
       <p>
-        Peça pelo canal de contato desta página. Ao confirmar, apagamos definitivamente seu e-mail,
-        nome, registros de sono, meta e amizades — tudo é removido do banco de dados, e o acesso
-        antigo à conta deixa de funcionar. Depois da exclusão, não é possível recuperar os dados.
+        Peça pelo canal de contato desta página. Quando processamos seu pedido, removemos no mesmo
+        momento sua conta e tudo que está ligada a ela — e-mail, nome, registros de sono, meta e
+        amizades são apagados do banco do serviço. O acesso antigo à conta deixa de funcionar na
+        hora: qualquer pedido com o token antigo é recusado.
+      </p>
+      <p>
+        Depois da exclusão, você não recupera os dados pelo aplicativo. Uma ressalva honesta: o
+        banco de dados é mantido pela plataforma externa (Neon), que pode guardar cópias de
+        segurança automáticas por um período que não depende do aplicativo e que não controlamos.
       </p>
 
       <h2>9. Alterações nesta política</h2>
       <p>
-        Quando esta política mudar, publicaremos a nova versão nesta mesma página e atualizaremos a
+        Quando esta política mudar, publicamos a nova versão nesta mesma página e atualizamos a
         data no topo. Não enviamos avisos por e-mail neste momento — por isso vale conferir esta
-        página de vez em quando. Continuar usando o aplicativo depois de uma mudança significa que
-        você aceita a versão nova.
+        página de vez em quando. A versão vigente é sempre a que está publicada aqui com a data
+        mais recente. Se uma mudança exigir uma escolha nova sua, conforme a LGPD (por exemplo,
+        um compartilhamento opcional diferente), pediremos antes de aplicar.
       </p>
 
       <h2>10. Como entrar em contato</h2>
       <p>
-        Sobre privacidade e sobre seus dados:{' '}
-        <Pend>canal de contato a definir (pendência desta edição)</Pend>.
+        Sobre privacidade e sobre seus dados, escreva para{' '}
+        <a href="mailto:lincolngustavo819@gmail.com">lincolngustavo819@gmail.com</a>. Atendemos
+        pedidos de acesso, correção, eliminação e as demais situações da seção 7.
       </p>
 
       <p style={{ fontSize: '14px', color: '#555' }}>
