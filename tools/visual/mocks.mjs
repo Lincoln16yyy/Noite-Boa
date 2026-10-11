@@ -57,5 +57,6 @@ export const telas = [
   ['amigos', '/amigos', true],
   ['sons', '/sons', true],
   ['configuracoes', '/configuracoes', true],
+  ['home-conta-excluida', '/?deleted=true', false],
   ['privacidade', '/privacidade', false],
 ];

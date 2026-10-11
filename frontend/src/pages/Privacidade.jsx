@@ -132,15 +132,18 @@ export default function Privacidade() {
 
       <h2>8. Como excluir a conta</h2>
       <p>
-        Peça pelo canal de contato desta página. Quando processamos seu pedido, removemos no mesmo
-        momento sua conta e tudo que está ligada a ela — e-mail, nome, registros de sono, meta e
-        amizades são apagados do banco do serviço. O acesso antigo à conta deixa de funcionar na
-        hora: qualquer pedido com o token antigo é recusado.
+        Você mesmo exclui a conta pelo aplicativo, em Configurações → Excluir conta. Para
+        confirmar, digite seu e-mail ou a palavra EXCLUIR — a exclusão é imediata e definitiva:
+        sua conta e tudo que está ligada a ela — e-mail, nome, registros de sono, meta e amizades
+        são apagados do banco do serviço. O acesso antigo à conta deixa de funcionar na hora:
+        qualquer pedido com o token antigo é recusado.
       </p>
       <p>
-        Depois da exclusão, você não recupera os dados pelo aplicativo. Uma ressalva honesta: o
-        banco de dados é mantido pela plataforma externa (Neon), que pode guardar cópias de
-        segurança automáticas por um período que não depende do aplicativo e que não controlamos.
+        Se preferir ou não conseguir usar o aplicativo, escreva para o canal de contato da seção
+        10 e processamos o pedido por aqui. Depois da exclusão, você não recupera os dados pelo
+        aplicativo. Uma ressalva honesta: o banco de dados é mantido pela plataforma externa
+        (Neon), que pode guardar cópias de segurança automáticas por um período que não depende do
+        aplicativo e que não controlamos.
       </p>
 
       <h2>9. Alterações nesta política</h2>

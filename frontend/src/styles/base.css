@@ -101,6 +101,28 @@ header nav a {
   outline-offset: 2px;
 }
 
+/* Botão destrutivo (excluir conta) — fundo Erro, texto branco.
+   Desabilitado legível: sem opacity global, borda e texto Erro sobre o fundo claro. */
+.btn-danger {
+  background: var(--color-erro);
+  color: #ffffff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #cf3f45;
+}
+
+.btn-danger:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-danger:disabled {
+  opacity: 1;
+  background: transparent;
+  border: 2px solid var(--color-erro);
+  color: var(--color-erro-texto);
+}
+
 /* Campo de formulário */
 .field {
   width: 100%;
