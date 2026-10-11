@@ -84,13 +84,31 @@ public class StatsService {
         int targetMinutesForDebt = sleepGoalRepository.findById(user.getId())
             .map(br.dev.noiteboa.goal.SleepGoal::getTargetMinutes)
             .orElse(TARGET_MINUTES);
+        
+        // Calcular dívida de sono:
+        // - Considerar apenas dias desde o primeiro registro de sono (ou hoje-6, o que for mais recente) até ontem
+        // - Dias sem registro dentro do intervalo contam como dívida cheia
+        // - Se não há nenhum registro, dívida é 0
         long debtMinutes = 0;
         LocalDate today = LocalDate.now(zone);
-        for (int i = 0; i < 7; i++) {
-            LocalDate d = today.minusDays(i);
-            long slept = minutesSleptByDate.getOrDefault(d, 0L);
-            debtMinutes += Math.max(0, targetMinutesForDebt - slept);
-        }
+        LocalDate yesterday = today.minusDays(1);
+        
+        if (!logs.isEmpty()) {
+            // Encontrar a data do primeiro registro de sono (data local do início do sono)
+            LocalDate firstSleepDate = logs.stream()
+                .map(l -> l.getSleepStart().atZoneSameInstant(zone).toLocalDate())
+                .min(LocalDate::compareTo)
+                .orElse(yesterday);
+            
+            // Data inicial do intervalo: o mais recente entre (hoje - 6 dias) e a data do primeiro sono
+            LocalDate startDate = firstSleepDate.isAfter(today.minusDays(6)) ? firstSleepDate : today.minusDays(6);
+            
+            // Calcular dívida para cada dia no intervalo [startDate, yesterday]
+            for (LocalDate d = startDate; !d.isAfter(yesterday); d = d.plusDays(1)) {
+                long slept = minutesSleptByDate.getOrDefault(d, 0L);
+                debtMinutes += Math.max(0, targetMinutesForDebt - slept);
+            }
+        } // se logs vazio, debtMinutes permanece 0
 
         List<DayStats> daily = new ArrayList<>();
         for (Map.Entry<LocalDate, Long> e : minutesSleptByDate.entrySet()) {
