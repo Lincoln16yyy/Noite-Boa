@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
+import { ThemeProvider } from '../context/ThemeContext';
 import { vi } from 'vitest';
 
 /**
@@ -17,11 +18,11 @@ export function mockMe(user) {
 }
 
 /**
- * Wrapper que provê AuthContext e Router (MemoryRouter) para testes.
+ * Wrapper que provê AuthContext, ThemeContext e Router (MemoryRouter) para testes.
  * O `user` mockado permite simular estados logado/deslogado.
  * Usa MemoryRouter com initialEntries para navegação em testes.
  */
-export function renderWithAuth(ui, { user = null, route = '/', ...options } = {}) {
+export function renderWithAuth(ui, { user = null, route = '/', theme = 'auto', ...options } = {}) {
   // Mock do localStorage para o token
   if (user) {
     localStorage.setItem('token', 'mock-token');
@@ -31,11 +32,21 @@ export function renderWithAuth(ui, { user = null, route = '/', ...options } = {}
 
   const Wrapper = ({ children }) => (
     <MemoryRouter initialEntries={[route]}>
-      <AuthProvider>{children}</AuthProvider>
+      <ThemeProvider initialTheme={theme}>
+        <AuthProvider>{children}</AuthProvider>
+      </ThemeProvider>
     </MemoryRouter>
   );
 
   return render(ui, { wrapper: Wrapper, ...options });
+}
+
+/**
+ * Mocka o tema para testes.
+ */
+export function mockTheme(theme) {
+  // O ThemeProvider lê do localStorage, então mockamos isso
+  localStorage.setItem('noiteboa.theme', theme);
 }
 
 // Re-export para conveniência

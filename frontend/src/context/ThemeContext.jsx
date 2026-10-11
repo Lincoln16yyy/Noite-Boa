@@ -8,13 +8,13 @@ const THEME_KEY = 'noiteboa.theme';
  * Tema atual: 'light' | 'dark' | 'auto'
  * 'auto' segue prefers-color-scheme
  */
-export function ThemeProvider({ children }) {
+export function ThemeProvider({ children, initialTheme = 'auto' }) {
   const [theme, setThemeState] = useState(() => {
     // Inicialização síncrona para evitar flash
     if (typeof window !== 'undefined') {
-      return localStorage.getItem(THEME_KEY) || 'auto';
+      return localStorage.getItem(THEME_KEY) || initialTheme;
     }
-    return 'auto';
+    return initialTheme;
   });
 
   const [resolvedTheme, setResolvedTheme] = useState('light');
