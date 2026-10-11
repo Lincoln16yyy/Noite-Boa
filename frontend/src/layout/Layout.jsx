@@ -53,7 +53,7 @@ export default function Layout() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
         <header style={{ padding: '1rem', background: 'var(--color-noite)' }}>
-          <img src="/logo-horizontal-light.svg" alt="Noite Boa" style={{ height: '40px', width: 'auto' }} />
+          <img src="/logo-horizontal-dark.svg" alt="Noite Boa" style={{ height: '40px', width: 'auto' }} />
         </header>
         <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div role="status" aria-live="polite" style={{ color: 'var(--color-lavanda)' }}>Carregando…</div>
@@ -119,7 +119,7 @@ export default function Layout() {
         role="banner"
       >
         <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem' }} aria-label="Noite Boa - Início">
-          <img src="/logo-horizontal-light.svg" alt="" style={{ height: '36px', width: 'auto' }} />
+          <img src="/logo-horizontal-dark.svg" alt="" style={{ height: '36px', width: 'auto' }} />
         </Link>
 
         <nav aria-label="Navegação principal" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
