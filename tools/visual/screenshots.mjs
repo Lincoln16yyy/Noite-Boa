@@ -38,6 +38,12 @@ for (const [vpNome, vp] of viewports) {
       const u = new URL(req.url());
       if (u.hostname === 'localhost' && u.port === API_PORT) {
         if (req.method() === 'OPTIONS') return req.respond({ status: 204, headers: cors });
+        // A API real exige token: sem Authorization, 401. Sem isso, /me devolve
+        // 200 mesmo deslogado e a tela de login entra em loop de redirecionamento
+        // com o /dashboard (networkidle0 nunca assenta).
+        if (!req.headers().authorization) {
+          return req.respond({ status: 401, contentType: 'application/json', headers: cors, body: '{"detail":"não autenticado"}' });
+        }
         const corpo = mocks[u.pathname.replace(/^\/api/, '')];
         if (corpo !== undefined) {
           return req.respond({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corpo) });
