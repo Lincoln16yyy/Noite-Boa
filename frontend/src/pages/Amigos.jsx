@@ -118,12 +118,13 @@ export default function Amigos() {
     }
   }
 
-  async function trocarPeriodo(novosDias) {
+  async function trocarPeriodo(novosDias, signal) {
     setDias(novosDias);
     try {
-      const resultado = await api.get(`/friends/ranking?days=${novosDias}`);
+      const resultado = await api.get(`/friends/ranking?days=${novosDias}`, { signal });
       setRanking(resultado.ranking);
     } catch (err) {
+      if (err.name === 'AbortError') return; // ignora cancelamento
       setError(err.message);
     }
   }
@@ -298,7 +299,10 @@ export default function Amigos() {
                 key={opcao}
                 type="button"
                 aria-pressed={dias === opcao}
-                onClick={() => trocarPeriodo(opcao)}
+                onClick={() => {
+                  const controller = new AbortController();
+                  trocarPeriodo(opcao, controller.signal);
+                }}
                 style={{
                   ...smallButtonStyle,
                   background: dias === opcao ? '#15142E' : '#FFFFFF',

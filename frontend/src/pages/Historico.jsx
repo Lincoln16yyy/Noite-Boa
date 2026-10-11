@@ -58,11 +58,11 @@ export default function Historico() {
   const [confirmId, setConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const load = useCallback(async (p) => {
+  const load = useCallback(async (p, signal) => {
     setLoading(true);
     setError('');
     try {
-      const data = await api.get(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`);
+      const data = await api.get(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`, { signal });
       const content = data.content ?? [];
       if (content.length === 0 && p > 0) {
         setPage(p - 1); // página ficou vazia após excluir: volta uma
@@ -72,6 +72,7 @@ export default function Historico() {
       setTotalPages(data.totalPages ?? 0);
       setTotalElements(data.totalElements ?? 0);
     } catch (err) {
+      if (err.name === 'AbortError') return; // ignora cancelamento
       setError(err.message);
     } finally {
       setLoading(false);
@@ -79,7 +80,9 @@ export default function Historico() {
   }, []);
 
   useEffect(() => {
-    load(page);
+    const controller = new AbortController();
+    load(page, controller.signal);
+    return () => controller.abort(); // cancela requisição anterior ao trocar de página
   }, [page, load]);
 
   function startEdit(log) {

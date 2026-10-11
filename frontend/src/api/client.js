@@ -38,8 +38,19 @@ async function request(path, options = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
+  // Permite passar signal externo para cancelamento (ex.: AbortController do efeito React)
+  const externalSignal = options.signal;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), requestTimeout);
+
+  // Se houver signal externo, aborta o controller interno quando ele disparar
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort();
+    } else {
+      externalSignal.addEventListener('abort', () => controller.abort());
+    }
+  }
 
   try {
     const response = await fetch(`${BASE_URL}${path}`, {
