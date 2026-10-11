@@ -7,33 +7,77 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  Cell,
 } from 'recharts';
 import { buildDailySeries } from '../lib/dashboard';
 
 /**
  * Gráfico de barras das horas dormidas por dia com a linha da meta.
  * Carregado com React.lazy para não pesar no bundle inicial (Recharts é pesado).
+ * Cores da identidade visual:
+ * - Barras normais: Lavanda (#B9B6FF)
+ * - Barras abaixo da meta: Âmbar (#FFB347)
+ * - Linha da meta tracejada: Luar (#FFE9B5)
  */
 export default function SleepChart({ summary, days, goalHours }) {
+  const data = buildDailySeries(summary, days);
+
+  // Determina cor de cada barra baseado na meta
+  const getBarColor = (hours) => (hours > 0 && hours < goalHours ? 'var(--color-ambar)' : 'var(--color-lavanda)');
+
   return (
     <div
       role="img"
       aria-label={`Gráfico de barras das horas dormidas nos últimos ${days} dias, com a meta de ${goalHours} horas`}
-      style={{ width: '100%', height: '220px' }}
+      style={{ width: '100%', height: '240px' }}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={buildDailySeries(summary, days)} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={days > 7 ? 3 : 0} />
-          <YAxis tick={{ fontSize: 11 }} domain={[0, 'auto']} width={45} />
-          <Tooltip formatter={(value) => [`${value} h`, 'Dormido']} />
+        <BarChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-indigo)" opacity={0.15} />
+          <XAxis
+            dataKey="label"
+            tick={{ fontSize: 12, fill: 'var(--color-lavanda)' }}
+            interval={days > 7 ? 3 : 0}
+            axisLine={{ stroke: 'var(--color-lavanda)', opacity: 0.3 }}
+            tickLine={{ stroke: 'var(--color-lavanda)', opacity: 0.3 }}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: 'var(--color-lavanda)' }}
+            domain={[0, 'auto']}
+            width={45}
+            axisLine={{ stroke: 'var(--color-lavanda)', opacity: 0.3 }}
+            tickLine={{ stroke: 'var(--color-lavanda)', opacity: 0.3 }}
+          />
+          <Tooltip
+            formatter={(value) => [`${value} h`, 'Dormido']}
+            contentStyle={{
+              backgroundColor: 'var(--color-noite)',
+              border: '1px solid var(--color-lavanda)',
+              borderRadius: '12px',
+              boxShadow: 'var(--shadow-card)',
+            }}
+            labelStyle={{ color: 'var(--color-luar)', fontWeight: 700 }}
+            itemStyle={{ color: 'var(--color-luar)' }}
+          />
           <ReferenceLine
             y={goalHours}
-            stroke="#E5484D"
-            strokeDasharray="5 4"
-            label={{ value: `Meta ${goalHours}h`, position: 'insideTopRight', fontSize: 11, fill: 'var(--color-erro-texto)' }}
+            stroke="var(--color-luar)"
+            strokeDasharray="6 4"
+            strokeWidth={2}
+            label={{
+              value: `Meta ${goalHours}h`,
+              position: 'insideTopRight',
+              fontSize: 11,
+              fill: 'var(--color-luar)',
+              fontWeight: 700,
+              offset: -5,
+            }}
           />
-          <Bar dataKey="hours" fill="#15142E" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="hours" radius={[6, 6, 0, 0]}>
+            {data.map((entry, index) => (
+              <Cell key={`bar-${index}`} fill={getBarColor(entry.hours)} />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
