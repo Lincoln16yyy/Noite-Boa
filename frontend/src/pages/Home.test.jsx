@@ -1,15 +1,17 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import App from '../App';
-import { renderWithAuth } from '../test/test-utils';
+import { renderWithAuth, mockMe } from '../test/test-utils';
 
 describe('landing page', () => {
   beforeEach(() => {
     localStorage.clear();
+    mockMe(null); // /me retorna 404 -> usuário não logado
   });
 
-  it('apresenta proposta, como funciona e chamada para cadastro', () => {
+  it('apresenta proposta, como funciona e chamada para cadastro', async () => {
     renderWithAuth(<App />, { route: '/' });
+    await waitFor(() => screen.getByRole('heading', { level: 1, name: 'Durma melhor, no seu ritmo.' }));
 
     // proposta
     expect(
@@ -30,26 +32,30 @@ describe('landing page', () => {
     ).toBeInTheDocument();
   });
 
-  it('botão principal de cadastro leva para /cadastro', () => {
+  it('botão principal de cadastro leva para /cadastro', async () => {
     renderWithAuth(<App />, { route: '/' });
+    await waitFor(() => screen.getByRole('link', { name: 'Criar conta grátis' }));
     fireEvent.click(screen.getByRole('link', { name: 'Criar conta grátis' }));
-    expect(window.location.pathname).toBe('/cadastro');
+    await waitFor(() => expect(window.location.pathname).toBe('/cadastro'));
   });
 
-  it('segunda chamada leva para /cadastro', () => {
+  it('segunda chamada leva para /cadastro', async () => {
     renderWithAuth(<App />, { route: '/' });
+    await waitFor(() => screen.getByRole('link', { name: 'Criar conta' }));
     fireEvent.click(screen.getByRole('link', { name: 'Criar conta' }));
-    expect(window.location.pathname).toBe('/cadastro');
+    await waitFor(() => expect(window.location.pathname).toBe('/cadastro'));
   });
 
-  it('link "Já tenho conta" leva para /login', () => {
+  it('link "Já tenho conta" leva para /login', async () => {
     renderWithAuth(<App />, { route: '/' });
+    await waitFor(() => screen.getByRole('link', { name: 'Já tenho conta' }));
     fireEvent.click(screen.getByRole('link', { name: 'Já tenho conta' }));
-    expect(window.location.pathname).toBe('/login');
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
   });
 
-  it('nome da marca aparece como texto e a marca é decorativa', () => {
+  it('nome da marca aparece como texto e a marca é decorativa', async () => {
     const { container } = renderWithAuth(<App />, { route: '/' });
+    await waitFor(() => screen.getByText('Noite Boa', { selector: 'span' }));
 
     expect(screen.getByText('Noite Boa', { selector: 'span' })).toBeInTheDocument();
 

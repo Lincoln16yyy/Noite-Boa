@@ -36,7 +36,6 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
     if (res?.accessToken) {
-      // api.client já guarda o token no localStorage
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       return res;
     }

@@ -81,7 +81,7 @@ describe('tela de Registrar sono', () => {
       notes: 'dormi bem',
     });
     expect(await screen.findByText(/dormi bem/)).toBeInTheDocument();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3)); // lista inicial, POST, lista atualizada
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4)); // /me + lista inicial + POST + lista atualizada
   });
 
   it('bloqueia acordar antes de dormir', async () => {
