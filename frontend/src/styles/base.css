@@ -9,33 +9,34 @@ body {
   margin: 0;
   min-width: 320px;
   font-family: var(--font-sans);
-  background: var(--color-nevoa);
-  color: var(--color-noite);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Links padrão — Índigo com sublinhado e foco visível (ânima Âmbar) */
+/* Links padrão — Índigo/Lavanda com sublinhado e foco visível (ânima Âmbar) */
 a {
-  color: var(--color-indigo);
+  color: var(--link-color);
   text-decoration: underline;
   text-underline-offset: 2px;
   transition: color 0.15s ease;
 }
 
 a:hover {
-  color: var(--color-noite);
+  color: var(--link-hover);
 }
 
 a:focus-visible {
-  outline: 3px solid var(--color-ambar);
+  outline: 3px solid var(--border-focus);
   outline-offset: 2px;
   border-radius: 2px;
 }
 
-/* Em fundo escuro o índigo fica fraco: usa Luar (15:1 sobre Noite) */
+/* Em fundo escuro o foco usa Âmbar (já definido em --border-focus) */
 header a:focus-visible {
-  outline-color: var(--color-luar);
+  outline-color: var(--border-focus);
 }
 
 /* Links do menu: alvo de toque mínimo de 44px (WCAG 2.5.8) */
@@ -71,8 +72,8 @@ header nav a {
 }
 
 .btn-primary {
-  background: var(--color-ambar);
-  color: var(--color-noite);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -83,20 +84,20 @@ header nav a {
   transform: scale(0.98);
 }
 
-/* Botão fantasma — borda Índigo, texto Índigo, fundo transparente */
+/* Botão fantasma — borda Índigo/Lavanda, texto Índigo/Lavanda, fundo transparente */
 .btn-ghost {
-  background: transparent;
-  color: var(--color-indigo);
-  border: 2px solid var(--color-indigo);
+  background: var(--btn-ghost-bg);
+  color: var(--btn-ghost-text);
+  border: 2px solid var(--btn-ghost-border);
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background: var(--color-indigo);
-  color: var(--color-luar);
+  background: var(--btn-ghost-border);
+  color: var(--btn-primary-text);
 }
 
 .btn-ghost:focus-visible {
-  outline: 3px solid var(--color-ambar);
+  outline: 3px solid var(--border-focus);
   outline-offset: 2px;
 }
 
@@ -107,26 +108,27 @@ header nav a {
   font-family: var(--font-sans);
   font-size: var(--fs-md);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-lavanda);
+  border: 1px solid var(--input-border);
   border-radius: var(--radius-sm);
-  background: #FFFFFF;
+  background: var(--input-bg);
+  color: var(--text-primary);
   box-sizing: border-box;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .field:focus {
   outline: none;
-  border-color: var(--color-indigo);
+  border-color: var(--border-focus);
   box-shadow: 0 0 0 3px rgba(63, 60, 187, 0.25);
 }
 
 .field::placeholder {
-  color: var(--color-lavanda);
+  color: var(--text-muted);
   opacity: 0.6;
 }
 
 .field:disabled {
-  background: var(--color-nevoa);
+  background: var(--bg-tertiary);
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -138,7 +140,7 @@ header nav a {
   gap: var(--space-1);
   font-size: var(--fs-sm);
   font-weight: 700;
-  color: var(--color-noite);
+  color: var(--text-primary);
 }
 
 /* Container de formulário */
@@ -149,10 +151,10 @@ header nav a {
   max-width: 420px;
 }
 
-/* Cartão */
+/* Cartão claro */
 .card {
-  background: var(--color-nevoa);
-  border: 1px solid var(--color-lavanda);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   box-shadow: var(--shadow-card);
@@ -182,21 +184,21 @@ header nav a {
 }
 
 .alert-error {
-  background: #FDE8E8;
-  border: 1px solid var(--color-erro);
-  color: var(--color-erro-texto);
+  background: var(--alert-error-bg);
+  border: 1px solid var(--alert-error-border);
+  color: var(--alert-error-text);
 }
 
 .alert-success {
-  background: #E8F8F1;
-  border: 1px solid var(--color-sucesso);
-  color: var(--color-sucesso-texto);
+  background: var(--alert-success-bg);
+  border: 1px solid var(--alert-success-border);
+  color: var(--alert-success-text);
 }
 
 .alert-info {
-  background: #FFF8E1;
-  border: 1px solid var(--color-ambar);
-  color: #7C6A00;
+  background: var(--alert-info-bg);
+  border: 1px solid var(--alert-info-border);
+  color: var(--alert-info-text);
 }
 
 /* Estados de loading */
@@ -207,7 +209,7 @@ header nav a {
   justify-content: center;
   gap: var(--space-3);
   padding: var(--space-12);
-  color: var(--color-lavanda);
+  color: var(--loading-color);
 }
 
 /* Toggle buttons (para seleção de período) */
@@ -217,35 +219,28 @@ header nav a {
   font-size: var(--fs-md);
   font-weight: 600;
   border-radius: var(--radius-pill);
-  border: 2px solid var(--color-lavanda);
-  background: var(--color-nevoa);
-  color: var(--color-indigo);
+  border: 2px solid var(--toggle-border);
+  background: var(--toggle-bg);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .toggle[aria-pressed="true"] {
-  border-color: var(--color-indigo);
-  background: var(--color-indigo);
-  color: var(--color-luar);
+  border-color: var(--toggle-active-bg);
+  background: var(--toggle-active-bg);
+  color: var(--toggle-active-text);
 }
 
 .toggle:focus-visible {
-  outline: 3px solid var(--color-ambar);
+  outline: 3px solid var(--border-focus);
   outline-offset: 2px;
 }
 
 /* Foco visível para teclado (a11y) - reforçado */
 *:focus-visible {
-  outline: 3px solid var(--color-indigo);
+  outline: 3px solid var(--border-focus);
   outline-offset: 2px;
-}
-
-/* Em fundo escuro o índigo fica fraco: usa Luar (15:1 sobre Noite) */
-header a:focus-visible,
-.card-dark *:focus-visible,
-[style*="var(--color-noite)"] *:focus-visible {
-  outline-color: var(--color-luar);
 }
 
 /* Links do menu: alvo de toque mínimo de 44px (WCAG 2.5.8) */
@@ -254,4 +249,33 @@ header nav a {
   align-items: center;
   min-height: 44px;
   padding: 0 var(--space-1);
+}
+
+/* Toggle de tema */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--toggle-border);
+  background: var(--toggle-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.theme-toggle[aria-pressed="true"] {
+  border-color: var(--toggle-active-bg);
+  background: var(--toggle-active-bg);
+  color: var(--toggle-active-text);
+}
+
+.theme-toggle:focus-visible {
+  outline: 3px solid var(--border-focus);
+  outline-offset: 2px;
 }

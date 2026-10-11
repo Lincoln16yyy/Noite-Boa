@@ -9,6 +9,7 @@ import {
   setLembreteAtivo as salvarLembrete,
   suportaNotificacao,
 } from '../lib/reminder';
+import { useTheme } from '../context/ThemeContext';
 import LoadingWarning from '../components/LoadingWarning';
 
 const TIMEZONES =
@@ -16,34 +17,12 @@ const TIMEZONES =
     ? Intl.supportedValuesOf('timeZone')
     : ['America/Sao_Paulo', 'America/New_York', 'Europe/Lisbon', 'UTC'];
 
-const fieldStyle = {
-  width: '100%',
-  minHeight: '48px',
-  fontSize: '16px',
-  padding: '0.6rem 0.75rem',
-  border: '1px solid #C9C6F0',
-  borderRadius: '10px',
-  background: '#FFFFFF',
-  boxSizing: 'border-box',
-};
-
-const buttonStyle = {
-  minHeight: '48px',
-  fontSize: '16px',
-  fontWeight: 700,
-  borderRadius: '10px',
-  border: 'none',
-  background: '#15142E',
-  color: '#FFE9B5',
-  cursor: 'pointer',
-  width: '100%',
-};
-
 /** "23:00:00" (LocalTime da API) → "23:00" (input type=time) */
 const toTimeInput = (value) => (value ? String(value).slice(0, 5) : '');
 
 export default function Configuracoes() {
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
   const [me, setMe] = useState(null);
   const [hours, setHours] = useState('');
   const [bedtime, setBedtime] = useState('');
@@ -157,21 +136,21 @@ export default function Configuracoes() {
   );
 
   return (
-    <div style={{ maxWidth: '480px' }}>
-      <h1>Configurações</h1>
+    <div className="container">
+      <h1 style={{ fontSize: '2.25rem', fontWeight: 800, marginBottom: '1.5rem' }}>Configurações</h1>
 
-      <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+      <form onSubmit={handleSubmit} noValidate className="form">
         <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
           <legend style={{ fontSize: '18px', fontWeight: 700, marginBottom: '0.6rem' }}>Meta de sono</legend>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+          <label className="label">
             Horas por noite (4 a 12)
             <input
               type="number"
               min={4}
               max={12}
               step={0.5}
-              style={fieldStyle}
+              className="field"
               value={hours}
               onChange={(e) => setHours(e.target.value)}
               required
@@ -179,20 +158,20 @@ export default function Configuracoes() {
           </label>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.75rem' }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <label className="label">
               Horário de dormir
-              <input type="time" style={fieldStyle} value={bedtime} onChange={(e) => setBedtime(e.target.value)} />
+              <input type="time" className="field" value={bedtime} onChange={(e) => setBedtime(e.target.value)} />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <label className="label">
               Horário de acordar
-              <input type="time" style={fieldStyle} value={wakeTime} onChange={(e) => setWakeTime(e.target.value)} />
+              <input type="time" className="field" value={wakeTime} onChange={(e) => setWakeTime(e.target.value)} />
             </label>
           </div>
         </fieldset>
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        <label className="label">
           Fuso horário
-          <select style={fieldStyle} value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+          <select className="field" value={timezone} onChange={(e) => setTimezone(e.target.value)}>
             {TIMEZONES.map((tz) => (
               <option key={tz} value={tz}>
                 {tz}
@@ -201,86 +180,117 @@ export default function Configuracoes() {
           </select>
         </label>
 
-        <button type="submit" style={buttonStyle} disabled={saving}>
+        <button type="submit" className="btn btn-primary" disabled={saving}>
           {saving ? 'Salvando…' : 'Salvar alterações'}
         </button>
       </form>
 
       {error && (
-        <div role="alert" style={{ ...buttonStyle, background: '#FDE8E8', border: '1px solid #F5B8B8', color: 'var(--color-erro-texto)', textAlign: 'left', marginTop: '0.5rem' }}>
+        <div role="alert" className="alert alert-error">
           <p style={{ marginTop: 0 }}>{error}</p>
-          <button type="button" style={{ ...buttonStyle, background: '#15142E', color: '#FFE9B5', border: 'none', marginTop: '0.5rem' }} onClick={() => window.location.reload()}>
+          <button type="button" className="btn btn-primary" style={{ marginTop: '0.5rem' }} onClick={() => window.location.reload()}>
             Tentar novamente
           </button>
         </div>
       )}
       {success && (
-        <p role="status" style={{ color: 'var(--color-sucesso-texto)' }}>
-          {success}
-        </p>
+        <p role="status" className="alert alert-success">{success}</p>
       )}
 
       <section aria-label="Lembrete de dormir" style={{ marginTop: '1.5rem' }}>
-        <h2 style={{ fontSize: '18px' }}>Lembrete de dormir</h2>
-        <p style={{ color: '#4B4A6B', marginTop: 0, fontSize: '15px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '0.5rem' }}>Lembrete de dormir</h2>
+        <p style={{ color: 'var(--text-muted)', marginTop: 0, fontSize: '15px' }}>
           Com o app aberto (aba no navegador ou instalado), avisamos você no seu horário de dormir.{' '}
           <strong>Não é um alarme:</strong> navegadores não garantem notificação com o app fechado, e o suporte é
           irregular no celular. A preferência fica guardada apenas neste dispositivo.
         </p>
 
         {permissaoNotificacao() === 'denied' && (
-          <p style={{ color: '#4B4A6B', fontSize: '15px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
             Notificações estão bloqueadas para este site — libere nas permissões do navegador para ativar o lembrete.
           </p>
         )}
         {!suportaNotificacao() && (
-          <p style={{ color: '#4B4A6B', fontSize: '15px' }}>Este navegador não suporta notificações.</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '15px' }}>Este navegador não suporta notificações.</p>
         )}
 
         {bedtime ? (
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.6rem',
-              minHeight: '44px',
-              fontSize: '16px',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minHeight: '44px', fontSize: '16px', fontWeight: 700, cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={lembrete}
               onChange={alternarLembrete}
-              style={{ width: '24px', height: '24px', accentColor: '#15142E' }}
+              style={{ width: '24px', height: '24px', accentColor: 'var(--color-ambar)' }}
             />
             Avisar às {bedtime}
           </label>
         ) : (
-          <p style={{ color: '#4B4A6B', fontSize: '15px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
             Defina o “Horário de dormir” na meta para usar o lembrete.
           </p>
         )}
 
         {msgLembrete && (
-          <p role="status" style={{ color: '#4B4A6B', fontSize: '15px' }}>
+          <p role="status" style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
             {msgLembrete}
           </p>
         )}
       </section>
 
+      <section aria-label="Tema" style={{ marginTop: '1.5rem' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '0.5rem' }}>Tema</h2>
+        <p style={{ color: 'var(--text-muted)', marginTop: 0, fontSize: '15px', marginBottom: '0.75rem' }}>
+          Escolha a aparência do app. No modo automático, segue a preferência do sistema.
+        </p>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            role="radio"
+            aria-pressed={theme === 'light'}
+            onClick={() => setTheme('light')}
+            className="toggle"
+            style={{ flex: 1, minWidth: '100px' }}
+          >
+            ☀️ Claro
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-pressed={theme === 'dark'}
+            onClick={() => setTheme('dark')}
+            className="toggle"
+            style={{ flex: 1, minWidth: '100px' }}
+          >
+            🌙 Escuro
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-pressed={theme === 'auto'}
+            onClick={() => setTheme('auto')}
+            className="toggle"
+            style={{ flex: 1, minWidth: '100px' }}
+          >
+            🤖 Automático
+          </button>
+        </div>
+        <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '0.5rem' }}>
+          Atual: {theme === 'light' ? 'Claro' : theme === 'dark' ? 'Escuro' : 'Automático'}
+        </p>
+      </section>
+
       <section aria-label="Conta" style={{ marginTop: '1.5rem' }}>
-        <h2 style={{ fontSize: '18px' }}>Conta</h2>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '0.5rem' }}>Conta</h2>
         {me && (
-          <p style={{ color: '#4B4A6B', marginTop: 0 }}>
+          <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>
             {me.displayName} · {me.email}
           </p>
         )}
         <button
           type="button"
           onClick={handleLogout}
-          style={{ ...buttonStyle, background: '#FFFFFF', color: '#15142E', border: '1px solid #C9C6F0' }}
+          className="btn btn-ghost"
+          style={{ width: '100%' }}
         >
           Sair da conta
         </button>
