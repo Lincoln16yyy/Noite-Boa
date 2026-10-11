@@ -149,10 +149,11 @@ public class StatsService {
         backoff = @Backoff(delay = 200, multiplier = 2, random = true)
     )
     private List<SleepLog> fetchLogsWithRetry(UUID userId, int days, ZoneId zone) {
-        return sleepLogRepository.findByUserIdOrderBySleepStartDesc(userId)
-            .stream()
-            .filter(l -> l.getSleepStart().isAfter(OffsetDateTime.now().minusDays(days)))
-            .toList();
+        // A janela (agora - days) cobre também a dívida de sono (hoje-6 a
+        // ontem), pois days é sempre 7 ou 30 (#98): o limite é aplicado na
+        // consulta, sem carregar o histórico inteiro.
+        return sleepLogRepository.findByUserIdAndSleepStartGreaterThanOrderBySleepStartDesc(
+            userId, OffsetDateTime.now().minusDays(days));
     }
 
     private <T> T retryWithBackoff(Callable<T> task, int maxAttempts, long initialBackoffMs, double multiplier) {
