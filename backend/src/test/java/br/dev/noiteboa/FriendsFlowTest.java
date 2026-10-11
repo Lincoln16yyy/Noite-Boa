@@ -113,14 +113,15 @@ class FriendsFlowTest {
     }
 
     @Test
-    void cannotInviteSelfUnknownOrInvalidEmail() throws Exception {
+    void cannotInviteSelfOrInvalidEmailAndUnknownEmailIsNeutral() throws Exception {
         String ana = loginToken("ana-self@example.com", "Ana");
         mockMvc.perform(post("/api/friends/requests").header("Authorization", "Bearer " + ana)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"ana-self@example.com\"}"))
             .andExpect(status().isBadRequest());
+        // #103: e-mail sem conta responde igual a e-mail com conta (neutro, 200)
         mockMvc.perform(post("/api/friends/requests").header("Authorization", "Bearer " + ana)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"ninguem@example.net\"}"))
-            .andExpect(status().isNotFound());
+            .andExpect(status().isOk());
         mockMvc.perform(post("/api/friends/requests").header("Authorization", "Bearer " + ana)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"\"}"))
             .andExpect(status().isBadRequest());
@@ -130,13 +131,13 @@ class FriendsFlowTest {
     }
 
     @Test
-    void duplicateInviteReturns409() throws Exception {
+    void duplicatePendingInviteStaysNeutralAndAlreadyFriendsIs409() throws Exception {
         String ana = loginToken("ana-dup@example.com", "Ana");
         String bruno = loginToken("bruno-dup@example.com", "Bruno");
         invite(ana, "bruno-dup@example.com");
-        mockMvc.perform(post("/api/friends/requests").header("Authorization", "Bearer " + ana)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"bruno-dup@example.com\"}"))
-            .andExpect(status().isConflict());
+        // #103: reenvio do convite pendente é idempotente e neutro — um 409 aqui
+        // denunciaria que o e-mail tem conta (o inexistente responderia 200 de novo)
+        invite(ana, "bruno-dup@example.com");
         // já amigo também é 409
         String receivedId = requestId(bruno, "received", "ana-dup@example.com");
         mockMvc.perform(post("/api/friends/requests/" + receivedId + "/accept")

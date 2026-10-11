@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
  *
  * Regras de privacidade (issue #39, desenho aprovado):
  * - amizade = consentimento duplo (convite + aceite);
+ * - o envio de convite responde igual para e-mail existente e inexistente (#103);
  * - o ranking só inclui quem tem share_with_friends = true (filtro no servidor);
  * - o ranking expõe apenas nº de noites e % dos dias — nunca horários,
  *   durações, qualidade ou observações.
@@ -77,23 +78,28 @@ public class FriendshipService {
         if (normalized.isEmpty() || normalized.equalsIgnoreCase(me.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Você não pode convidar a si mesmo.");
         }
-        User invitee = users.findByEmailIgnoreCase(normalized)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                "Não encontramos ninguém com este e-mail."));
+        Optional<User> maybeInvitee = users.findByEmailIgnoreCase(normalized);
+        if (maybeInvitee.isEmpty()) {
+            // #103: sem conta, sem convite — mas a resposta é a mesma neutra de
+            // conta existente, para não revelar quem tem conta no app.
+            return SendResult.neutral();
+        }
+        User invitee = maybeInvitee.get();
 
         // convite inverso: um convite mútuo pendente equivale a aceite dos dois lados
         Optional<Friendship> incoming = friendships.findByRequesterIdAndAddresseeId(invitee.getId(), me.getId());
         if (incoming.isPresent()) {
             Friendship f = incoming.get();
             switch (f.getStatus()) {
+                // relação já existente entre os dois: 409 não vaza nada de estranhos
                 case ACCEPTED -> throw new ResponseStatusException(HttpStatus.CONFLICT, "Vocês já são amigos.");
                 case PENDING -> {
                     f.accept();
                     friendships.save(f);
-                    return new SendResult(f.getId(), f.getStatus().name().toLowerCase(Locale.ROOT), toFriend(invitee));
+                    return new SendResult(f.getId(), "accepted", toFriend(invitee));
                 }
-                case BLOCKED -> throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Não encontramos ninguém com este e-mail.");
+                // bloqueio fica escondido: mesma resposta de conta inexistente
+                case BLOCKED -> { return SendResult.neutral(); }
                 case DECLINED -> { /* segue como novo convite */ }
             }
         }
@@ -103,21 +109,17 @@ public class FriendshipService {
             Friendship f = outgoing.get();
             switch (f.getStatus()) {
                 case ACCEPTED -> throw new ResponseStatusException(HttpStatus.CONFLICT, "Vocês já são amigos.");
-                case PENDING -> throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Convite já enviado. Aguarde a resposta.");
-                case BLOCKED -> throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Não encontramos ninguém com este e-mail.");
-                case DECLINED -> {
-                    f.resend(); // recusou antes; pode mudar de ideia
-                    friendships.save(f);
-                    return new SendResult(f.getId(), "pending", toFriend(invitee));
-                }
+                // #103: pendente recusado não pode virar 409 — o duplo clique de um
+                // e-mail inexistente responderia 200 e denunciaria a existência.
+                // Idempotente: o convite pendente já está lá (visível em "Enviados").
+                case PENDING -> { return SendResult.neutral(); }
+                case BLOCKED -> { return SendResult.neutral(); }
+                case DECLINED -> { f.resend(); friendships.save(f); return SendResult.neutral(); }
             }
         }
 
-        Friendship friendship = new Friendship(UUID.randomUUID(), me, invitee);
-        friendships.save(friendship);
-        return new SendResult(friendship.getId(), "pending", toFriend(invitee));
+        friendships.save(new Friendship(UUID.randomUUID(), me, invitee));
+        return SendResult.neutral();
     }
 
     @Transactional
@@ -225,8 +227,14 @@ public class FriendshipService {
 
     public record RequestsResponse(List<RequestResponse> sent, List<RequestResponse> received) {}
 
-    /** status: "pending" (convite criado) ou "accepted" (convite mútuo aceito automaticamente). */
-    public record SendResult(UUID id, String status, FriendResponse friend) {}
+    /** status: "sent" (resposta neutra: criado, já pendente ou e-mail sem conta — os
+     *  três casos idênticos para não revelar quem tem conta, issue #103) ou
+     *  "accepted" (convite mútuo aceito automaticamente). */
+    public record SendResult(UUID id, String status, FriendResponse friend) {
+        static SendResult neutral() {
+            return new SendResult(null, "sent", null);
+        }
+    }
 
     /** Só o que o ranking pode revelar: nada de horários, durações, qualidade ou notas. */
     public record RankingEntry(UUID userId, String displayName, boolean isMe, int consistencyPercent, int nights) {}
