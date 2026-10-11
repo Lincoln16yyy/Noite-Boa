@@ -2,32 +2,6 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
-const formStyle = { display: 'flex', flexDirection: 'column', gap: '0.9rem', maxWidth: '420px' };
-
-const labelStyle = { display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '15px', fontWeight: 700 };
-
-const fieldStyle = {
-  width: '100%',
-  minHeight: '48px',
-  fontSize: '16px',
-  padding: '0.6rem 0.75rem',
-  border: '1px solid #C9C6F0',
-  borderRadius: '10px',
-  background: '#FFFFFF',
-  boxSizing: 'border-box',
-};
-
-const buttonStyle = {
-  minHeight: '52px',
-  fontSize: '17px',
-  fontWeight: 700,
-  border: 'none',
-  borderRadius: '10px',
-  background: '#15142E',
-  color: '#FFE9B5',
-  cursor: 'pointer',
-};
-
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,22 +23,23 @@ export default function Login() {
   }
 
   return (
-    <div>
-      <h1>Login</h1>
-      {accountCreated && <p role="status" style={{ color: 'var(--color-sucesso-texto)' }}>Conta criada! Faça login.</p>}
-      <form onSubmit={handleSubmit} style={formStyle}>
-        <label style={labelStyle}>
+    <div className="container">
+      <h1 style={{ fontSize: '2.25rem', fontWeight: 800, marginBottom: '1.5rem' }}>Login</h1>
+      {accountCreated && <p role="status" className="alert alert-success">Conta criada! Faça login.</p>}
+      <form onSubmit={handleSubmit} className="form">
+        <label className="label">
           E-mail
           <input
+            type="email"
             placeholder="E-mail"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
             required
-            style={fieldStyle}
+            className="field"
           />
         </label>
-        <label style={labelStyle}>
+        <label className="label">
           Senha
           <input
             type="password"
@@ -73,15 +48,15 @@ export default function Login() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             required
-            style={fieldStyle}
+            className="field"
           />
         </label>
-        <button type="submit" style={buttonStyle}>
+        <button type="submit" className="btn btn-primary" style={{ minHeight: '52px', fontSize: '1.06rem' }}>
           Entrar
         </button>
       </form>
-      {error && <p role="alert" style={{ color: 'var(--color-erro-texto)' }}>{error}</p>}
-      <p>
+      {error && <p role="alert" className="alert alert-error">{error}</p>}
+      <p style={{ marginTop: '1.5rem', fontSize: '0.9375rem' }}>
         Não tem conta? <Link to="/cadastro">Cadastre-se</Link>
       </p>
     </div>
