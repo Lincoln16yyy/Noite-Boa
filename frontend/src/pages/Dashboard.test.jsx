@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import App from '../App';
+import Dashboard from './Dashboard';
+import { renderWithAuth } from '../test/test-utils';
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status });
@@ -16,17 +17,19 @@ const summary7 = {
 
 const summary30 = { ...summary7, days: 30, averageHours: 6.25 };
 
+const mockUser = { id: 'u1', email: 'a@example.com', displayName: 'Teste', timezone: 'America/Sao_Paulo', shareWithFriends: true };
+
 describe('Dashboard', () => {
   let fetchMock;
   let currentSummary;
 
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem('token', 'jwt-123');
     vi.restoreAllMocks();
     currentSummary = summary7;
     fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
       const path = String(url);
+      if (path.includes('/me')) return jsonResponse(mockUser);
       if (path.includes('/goal')) return jsonResponse({ targetMinutes: 480, bedtime: null, wakeTime: null });
       if (path.includes('days=30')) return jsonResponse(summary30);
       if (path.includes('days=7')) return jsonResponse(currentSummary);
@@ -35,8 +38,7 @@ describe('Dashboard', () => {
   });
 
   function openScreen() {
-    window.history.pushState({}, '', '/dashboard');
-    render(<App />);
+    renderWithAuth(<Dashboard />, { user: mockUser, route: '/dashboard' });
   }
 
   it('mostra estado vazio com atalho para registrar', async () => {

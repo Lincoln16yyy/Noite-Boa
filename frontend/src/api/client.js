@@ -53,12 +53,12 @@ async function request(path, options = {}) {
     if (!response.ok) {
       const message = await readProblemMessage(response);
 
-      // 401 com sessão ativa = token expirado/inválido: limpa e volta pro login.
+      // 401 com sessão ativa = token expirado/inválido: limpa e avisa o contexto.
       // 401 sem sessão = falha de autenticação (ex.: senha errada): só mostra o erro.
       const hadSession = Boolean(getToken());
       if (response.status === 401 && hadSession) {
         clearSession();
-        window.location.href = '/login';
+        window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
         throw new Error('Sessão expirada. Faça login novamente.');
       }
 

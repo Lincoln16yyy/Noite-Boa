@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import App from '../App';
+import Historico from './Historico';
+import { renderWithAuth } from '../test/test-utils';
 import { toLocalInput } from '../lib/sleep';
 
 function jsonResponse(body, status = 200) {
@@ -19,13 +20,14 @@ function pageResponse(content, totalPages = 1) {
   return { content, totalElements: content.length, totalPages };
 }
 
+const mockUser = { id: 'u1', email: 'a@example.com', displayName: 'Teste', timezone: 'America/Sao_Paulo', shareWithFriends: true };
+
 describe('tela de Histórico', () => {
   let fetchMock;
   let state;
 
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem('token', 'jwt-123');
     vi.restoreAllMocks();
     state = { logs: [baseLog] };
 
@@ -44,14 +46,14 @@ describe('tela de Histórico', () => {
       if (options.method === 'POST') {
         return jsonResponse({ id: 'novo', ...JSON.parse(options.body) }, 201);
       }
+      if (String(url).includes('/me')) return jsonResponse(mockUser);
       const pageParam = Number((String(url).match(/page=(\d+)/) || [])[1] ?? 0);
       return jsonResponse(pageResponse(pageParam === 0 ? state.logs : []));
     });
   });
 
   function openScreen() {
-    window.history.pushState({}, '', '/historico');
-    render(<App />);
+    renderWithAuth(<Historico />, { user: mockUser, route: '/historico' });
   }
 
   it('lista as noites registradas com duração, nota e observação', async () => {

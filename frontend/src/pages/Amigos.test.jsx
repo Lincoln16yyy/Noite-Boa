@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import App from '../App';
+import Amigos from './Amigos';
+import { renderWithAuth } from '../test/test-utils';
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status });
@@ -15,7 +16,6 @@ const ME = {
 };
 
 const AMIGOS = [
-  // Bruno compartilha; Carla não — a lista só diz isso, sem métrica nenhuma
   { id: 'f1', displayName: 'Bruno', email: 'bruno@exemplo.com', sharesData: true },
   { id: 'f2', displayName: 'Carla', email: 'carla@exemplo.com', sharesData: false },
 ];
@@ -38,12 +38,13 @@ const RANKING_30 = {
   ranking: [{ userId: 'u1', displayName: 'Ana', isMe: true, consistencyPercent: 70, nights: 21 }],
 };
 
+const mockUser = ME;
+
 describe('tela de Amigos', () => {
   let fetchMock;
 
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem('token', 'jwt-123');
     vi.restoreAllMocks();
     fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
       const path = String(url);
@@ -70,8 +71,7 @@ describe('tela de Amigos', () => {
   });
 
   function openScreen() {
-    window.history.pushState({}, '', '/amigos');
-    render(<App />);
+    renderWithAuth(<Amigos />, { user: mockUser, route: '/amigos' });
   }
 
   function calls(method, pathFragment) {

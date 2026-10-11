@@ -1,10 +1,13 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import App from '../App';
+import Registrar from './Registrar';
+import { renderWithAuth } from '../test/test-utils';
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status });
 }
+
+const mockUser = { id: 'u1', email: 'a@example.com', displayName: 'Teste', timezone: 'America/Sao_Paulo', shareWithFriends: true };
 
 describe('tela de Registrar sono', () => {
   let fetchMock;
@@ -12,10 +15,10 @@ describe('tela de Registrar sono', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem('token', 'jwt-123');
-    posts = [];
     vi.restoreAllMocks();
+    posts = [];
     fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
+      if (String(url).includes('/me')) return jsonResponse(mockUser);
       if (options.method === 'POST') {
         const body = JSON.parse(options.body);
         posts.push(body);
@@ -26,8 +29,7 @@ describe('tela de Registrar sono', () => {
   });
 
   function openScreen() {
-    window.history.pushState({}, '', '/registrar');
-    render(<App />);
+    renderWithAuth(<Registrar />, { user: mockUser, route: '/registrar' });
   }
 
   it('preenche os padrões inteligentes (ontem à noite / hoje de manhã)', async () => {
@@ -79,7 +81,7 @@ describe('tela de Registrar sono', () => {
       notes: 'dormi bem',
     });
     expect(await screen.findByText(/dormi bem/)).toBeInTheDocument();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3)); // lista inicial, POST, lista atualizada
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4)); // /me + lista inicial + POST + lista atualizada
   });
 
   it('bloqueia acordar antes de dormir', async () => {
