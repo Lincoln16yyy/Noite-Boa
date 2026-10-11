@@ -34,6 +34,21 @@ public class SleepController {
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size) {
         String email = (String) authentication.getPrincipal();
+
+        // validação de parâmetros de paginação (issue #96)
+        if (page < 0) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "page deve ser >= 0");
+        }
+        if (size < 1) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "size deve ser >= 1");
+        }
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "from não pode ser posterior a to");
+        }
+
         int cappedSize = Math.min(size, 100);
         var result = sleepService.list(email, from, to, page, cappedSize);
         return ResponseEntity.ok(result);
