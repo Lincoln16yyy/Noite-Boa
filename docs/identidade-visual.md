@@ -8,7 +8,7 @@
 - **Personalidade:** calma, acolhedora, confiável, simples.
 - **Tom de voz:** próximo e gentil, sem culpa ("Que tal dormir um pouco mais cedo hoje?" em vez de "Você dormiu mal").
 - **Slogan:** *Durma melhor, no seu ritmo.*
-- **Atenção ao nome:** antes de publicar, confira domínio, nome no GitHub, lojas de apps e INPI. Nomes curtos costumam já estar em uso, e um complemento ajuda a se destacar nas buscas (ex.: "Noite Boa - Diário do Sono").
+- **Nome definitivo:** "Noite Boa" — decisão registrada em [`nome-do-produto.md`](nome-do-produto.md), com as conferências de domínio/lojas/INPI e as pendências (logo do cabeçalho, repositório e Vercel). Um complemento ajuda a se destacar nas buscas (ex.: "Noite Boa — Diário do Sono").
 
 ## Logo
 | Arquivo | Uso |
