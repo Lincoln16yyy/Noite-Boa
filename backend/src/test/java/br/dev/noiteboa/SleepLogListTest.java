@@ -83,4 +83,36 @@ class SleepLogListTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.totalElements").value(1));
     }
+
+    // Issue #96: validação de parâmetros de paginação e intervalo
+    @Test
+    void pageNegativoRetorna400() throws Exception {
+        String token = token("d@example.com");
+        mockMvc.perform(get("/api/sleep-logs?page=-1").header("Authorization", "Bearer " + token))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void sizeZeroRetorna400() throws Exception {
+        String token = token("e@example.com");
+        mockMvc.perform(get("/api/sleep-logs?size=0").header("Authorization", "Bearer " + token))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void sizeAcimaDe100EhLimitadoA100() throws Exception {
+        String token = token("f@example.com");
+        createLog(token, "2026-10-01T22:00:00Z", "2026-10-02T06:00:00Z", 4);
+        mockMvc.perform(get("/api/sleep-logs?size=1000").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.pageable.pageSize").value(100));
+    }
+
+    @Test
+    void fromMaiorQueToRetorna400() throws Exception {
+        String token = token("g@example.com");
+        mockMvc.perform(get("/api/sleep-logs?from=2026-10-20T00:00:00Z&to=2026-10-05T00:00:00Z")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isBadRequest());
+    }
 }
