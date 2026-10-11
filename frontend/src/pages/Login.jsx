@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
+import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const { login } = useAuth();
   const location = useLocation();
   const accountCreated = Boolean(location.state?.created);
 
@@ -14,9 +14,7 @@ export default function Login() {
     e.preventDefault();
     setError('');
     try {
-      const data = await api.post('/auth/login', { email, password });
-      localStorage.setItem('token', data.accessToken);
-      navigate('/registrar');
+      await login(email, password);
     } catch (err) {
       setError(err.message);
     }
