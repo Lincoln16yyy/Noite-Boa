@@ -83,7 +83,8 @@ describe('tela de Histórico', () => {
     fireEvent.change(screen.getByLabelText('Acordou às'), {
       target: { value: toLocalInput(new Date('2026-10-08T08:00:00.000Z')) },
     });
-    fireEvent.click(screen.getByTitle('2 Ruim'));
+    // Clica no radio de qualidade 2 (Ruim) via label
+    fireEvent.click(screen.getByLabelText('Ruim (2)'));
     fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => {
