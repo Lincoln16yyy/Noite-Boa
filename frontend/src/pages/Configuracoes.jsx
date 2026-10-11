@@ -34,6 +34,9 @@ export default function Configuracoes() {
   const [success, setSuccess] = useState('');
   const [lembrete, setLembre] = useState(lembreteAtivo());
   const [msgLembrete, setMsgLembrete] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -99,6 +102,32 @@ export default function Configuracoes() {
   function handleLogout() {
     clearSession();
     navigate('/login');
+  }
+
+  async function handleDeleteAccount() {
+    const email = me?.email;
+    const confirmation = deleteConfirm.trim();
+
+    setDeleteError('');
+    if (!email || (confirmation !== email && confirmation !== 'EXCLUIR')) {
+      setDeleteError('Digite seu e-mail ou "EXCLUIR" para confirmar.');
+      return;
+    }
+
+    setDeleting(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.delete('/me');
+      clearSession();
+      // Avisa o AuthProvider para derrubar o usuário da sessão
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+      navigate('/?deleted=true');
+    } catch (err) {
+      setDeleteError(err.message);
+      setDeleting(false);
+    }
   }
 
   /** Ativa/desativa o lembrete. A permissão só é pedida aqui, com clique explícito. */
@@ -294,6 +323,43 @@ export default function Configuracoes() {
         >
           Sair da conta
         </button>
+      </section>
+
+      <section aria-label="Excluir conta" style={{ marginTop: '1.5rem' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--color-erro)' }}>Excluir conta</h2>
+        <p style={{ color: 'var(--text-muted)', marginTop: 0, fontSize: '15px', marginBottom: '0.75rem' }}>
+          Esta ação é <strong>irreversível</strong>. Todos os seus registros de sono, metas, amigos e preferências serão
+          apagados permanentemente. Não é possível desfazer.
+        </p>
+        <div style={{ marginBottom: '0.75rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <span>
+              Digite seu e-mail ou <strong>EXCLUIR</strong> para confirmar
+            </span>
+            <input
+              type="text"
+              className="field"
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              placeholder="seu@email.com ou EXCLUIR"
+              autoComplete="email"
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          onClick={handleDeleteAccount}
+          disabled={!deleteConfirm.trim() || deleting}
+          className="btn btn-danger"
+          style={{ width: '100%' }}
+        >
+          {deleting ? 'Excluindo…' : 'Excluir minha conta'}
+        </button>
+        {deleteError && (
+          <p role="alert" className="alert alert-error" style={{ marginTop: '0.75rem' }}>
+            {deleteError}
+          </p>
+        )}
       </section>
     </div>
   );
