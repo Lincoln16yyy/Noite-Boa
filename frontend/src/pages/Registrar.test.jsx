@@ -117,4 +117,67 @@ describe('tela de Registrar sono', () => {
     openScreen();
     expect(await screen.findByText('Nenhuma noite registrada ainda.')).toBeInTheDocument();
   });
+
+  it('não cria duplicata quando o envio é clicado duas vezes (#99)', async () => {
+    let liberarPost;
+    fetchMock.mockImplementation(async (url, options = {}) => {
+      if (String(url).includes('/me')) return jsonResponse(mockUser);
+      if (options.method === 'POST') {
+        const body = JSON.parse(options.body);
+        posts.push(body);
+        await new Promise((resolver) => {
+          liberarPost = resolver;
+        });
+        return jsonResponse({ id: 'novo-id', ...body }, 201);
+      }
+      return jsonResponse({ content: [], totalElements: 0 });
+    });
+
+    openScreen();
+    fireEvent.change(await screen.findByLabelText('Dormiu às'), {
+      target: { value: '2026-10-07T23:00' },
+    });
+    fireEvent.change(screen.getByLabelText('Acordou às'), {
+      target: { value: '2026-10-08T07:00' },
+    });
+    fireEvent.click(screen.getByLabelText('Boa (4)'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar registro' }));
+
+    // Durante o envio: botão desabilitado com o texto "Salvando…"
+    expect(screen.getByRole('button', { name: 'Salvando…' })).toBeDisabled();
+
+    // Um segundo clique não dispara nova requisição
+    fireEvent.click(screen.getByRole('button', { name: 'Salvando…' }));
+    expect(posts).toHaveLength(1);
+
+    liberarPost();
+    expect(await screen.findByRole('status')).toHaveTextContent('Noite registrada');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Salvar registro' })).toBeEnabled());
+    expect(posts).toHaveLength(1);
+  });
+
+  it('exibe a mensagem de sobreposição vinda do servidor (409)', async () => {
+    fetchMock.mockImplementation(async (url, options = {}) => {
+      if (String(url).includes('/me')) return jsonResponse(mockUser);
+      if (options.method === 'POST') {
+        return jsonResponse({ detail: 'Este período se sobrepõe a um registro existente.' }, 409);
+      }
+      return jsonResponse({ content: [], totalElements: 0 });
+    });
+
+    openScreen();
+    fireEvent.change(await screen.findByLabelText('Dormiu às'), {
+      target: { value: '2026-10-07T23:00' },
+    });
+    fireEvent.change(screen.getByLabelText('Acordou às'), {
+      target: { value: '2026-10-08T07:00' },
+    });
+    fireEvent.click(screen.getByLabelText('Boa (4)'));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar registro' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('sobrepõe');
+    // A sessão permanece e o botão volta a ficar habilitado para tentar de novo
+    expect(screen.getByRole('button', { name: 'Salvar registro' })).toBeEnabled();
+  });
 });

@@ -13,6 +13,13 @@ public interface SleepLogRepository extends JpaRepository<SleepLog, UUID> {
 
     java.util.List<SleepLog> findByUserIdOrderBySleepStartDesc(UUID userId);
 
+    /**
+     * Candidatos a sobreposição (#99): registros do usuário em que
+     * sleepStart &lt; :end AND sleepEnd &gt; :start. Vizinhos (fim == início) não aparecem.
+     */
+    java.util.List<SleepLog> findByUserIdAndSleepStartLessThanAndSleepEndGreaterThan(
+        UUID userId, OffsetDateTime end, OffsetDateTime start);
+
     @Query("SELECT s FROM SleepLog s WHERE s.user.id = :userId " +
            "AND s.sleepStart >= COALESCE(:from, s.sleepStart) " +
            "AND s.sleepStart <= COALESCE(:to, s.sleepStart) " +

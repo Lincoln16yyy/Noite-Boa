@@ -78,9 +78,10 @@ class StatsSummaryTest {
     @Test
     void sleepDebtWithSingleNightYesterdayIsZero() throws Exception {
         String token = token("stats4@example.com");
-        // Registra uma noite de 8h ontem
+        // Registra uma noite de 8h ontem. Fim às 00:00Z do dia seguinte (não 06:00Z)
+        // para a noite ficar sempre no passado — validação da #99 rejeita fim futuro.
         var yesterday = java.time.LocalDate.now().minusDays(1);
-        create(token, yesterday.atTime(22, 0).toString() + "Z", yesterday.plusDays(1).atTime(6, 0).toString() + "Z", 4);
+        create(token, yesterday.atTime(16, 0).toString() + "Z", yesterday.plusDays(1).atTime(0, 0).toString() + "Z", 4);
 
         mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
@@ -93,7 +94,7 @@ class StatsSummaryTest {
         // Registra 7 noites de 8h cada (últimos 7 dias)
         for (int i = 6; i >= 0; i--) {
             var date = java.time.LocalDate.now().minusDays(i + 1); // ontem até 7 dias atrás
-            create(token, date.atTime(22, 0).toString() + "Z", date.plusDays(1).atTime(6, 0).toString() + "Z", 4);
+            create(token, date.atTime(16, 0).toString() + "Z", date.plusDays(1).atTime(0, 0).toString() + "Z", 4);
         }
 
         mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + token))
@@ -107,7 +108,7 @@ class StatsSummaryTest {
         // Registra 5 noites de 8h, pula 2 dias
         for (int i = 6; i >= 2; i--) {
             var date = java.time.LocalDate.now().minusDays(i + 1);
-            create(token, date.atTime(22, 0).toString() + "Z", date.plusDays(1).atTime(6, 0).toString() + "Z", 4);
+            create(token, date.atTime(16, 0).toString() + "Z", date.plusDays(1).atTime(0, 0).toString() + "Z", 4);
         }
         // Dias 0 e 1 (ontem e anteontem) sem registro
 
