@@ -103,7 +103,7 @@ export default function Amigos() {
       setSuccess(
         resultado.status === 'accepted'
           ? `Convite mútuo: vocês agora são amigos de ${resultado.friend.displayName}.`
-          : `Convite enviado para ${resultado.friend.displayName}. Aguarde o aceite.`,
+          : 'Se este e-mail tiver conta, o convite foi enviado.',
       );
       await carregar();
     } catch (err) {
@@ -189,7 +189,7 @@ export default function Amigos() {
           </button>
         </form>
         <p style={{ ...mutedTextStyle, marginTop: '0.35rem' }}>
-          O convite só vira amizade quando a outra pessoa aceitar.
+          Não confirmamos se o e-mail tem conta (por privacidade). Se tiver, o convite só vira amizade quando a pessoa aceitar.
         </p>
       </section>
 

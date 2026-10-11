@@ -120,7 +120,7 @@ describe('tela de Amigos', () => {
     fireEvent.change(await screen.findByLabelText('E-mail do amigo'), { target: { value: 'fabio@exemplo.com' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar convite' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Convite enviado para Fábio');
+    expect(await screen.findByRole('status')).toHaveTextContent('Se este e-mail tiver conta, o convite foi enviado.');
     expect(JSON.parse(calls('POST', '/friends/requests')[0][1].body)).toEqual({ email: 'fabio@exemplo.com' });
   });
 
@@ -167,7 +167,7 @@ describe('tela de Amigos', () => {
       const path = String(url);
       const method = options.method ?? 'GET';
       if (path.includes('/friends/requests') && method === 'POST') {
-        return jsonResponse({ detail: 'Não encontramos ninguém com este e-mail.' }, 404);
+        return jsonResponse({ detail: 'Erro interno' }, 500);
       }
       if (path.includes('/api/me')) return jsonResponse(ME);
       if (path.includes('/friends/requests')) return jsonResponse({ sent: [], received: [] });
@@ -180,12 +180,12 @@ describe('tela de Amigos', () => {
     fireEvent.change(await screen.findByLabelText('E-mail do amigo'), { target: { value: 'fantasma@exemplo.com' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar convite' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Não encontramos ninguém com este e-mail.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Erro interno');
   });
 
   it('avisa que o convite não é amizade até o aceite', async () => {
     openScreen();
-    expect(await screen.findByText('O convite só vira amizade quando a outra pessoa aceitar.')).toBeInTheDocument();
+    expect(await screen.findByText(/Não confirmamos se o e-mail tem conta/)).toBeInTheDocument();
     expect(screen.getByText(/Seus horários e registros nunca aparecem no ranking/)).toBeInTheDocument();
   });
 });
