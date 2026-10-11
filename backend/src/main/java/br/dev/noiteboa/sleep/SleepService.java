@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Service
@@ -17,9 +18,43 @@ public class SleepService {
     private final SleepLogRepository sleepLogRepository;
     private final UserRepository userRepository;
 
+    /**
+     * Limites de sanidade das datas (#99) — constantes fáceis de ajustar.
+     * sleepEnd pode ir até 5 min "no futuro" para absorver a latência entre
+     * acordar e enviar; sleepStart não pode ser anterior a 1 ano.
+     */
+    static final Duration MAX_FUTURE_SKEW = Duration.ofMinutes(5);
+    static final Duration MAX_AGE = Duration.ofDays(365);
+
     public SleepService(SleepLogRepository sleepLogRepository, UserRepository userRepository) {
         this.sleepLogRepository = sleepLogRepository;
         this.userRepository = userRepository;
+    }
+
+    /** Rejeita datas impossíveis: muito no futuro ou antigas demais (#99). */
+    private void validarDatas(OffsetDateTime sleepStart, OffsetDateTime sleepEnd) {
+        if (sleepEnd.isAfter(OffsetDateTime.now().plus(MAX_FUTURE_SKEW))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sleepEnd não pode estar no futuro");
+        }
+        if (sleepStart.isBefore(OffsetDateTime.now().minus(MAX_AGE))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sleepStart não pode ser anterior a 1 ano");
+        }
+    }
+
+    /**
+     * Rejeita com 409 um período que se sobreponha a outro registro do mesmo
+     * usuário (#99). Adjacentes (fim == início de outro) são permitidos.
+     * Na edição, o próprio registro é ignorado.
+     */
+    private void assertSemSobreposicao(UUID userId, OffsetDateTime sleepStart, OffsetDateTime sleepEnd, UUID ignorarId) {
+        boolean sobrepoe = sleepLogRepository
+            .findByUserIdAndSleepStartLessThanAndSleepEndGreaterThan(userId, sleepEnd, sleepStart)
+            .stream()
+            .anyMatch(l -> ignorarId == null || !l.getId().equals(ignorarId));
+        if (sobrepoe) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Este período se sobrepõe a um registro existente.");
+        }
     }
 
     public SleepLogResponse create(String email, CreateSleepLogRequest request) {
@@ -32,6 +67,8 @@ public class SleepService {
         }
         User user = userRepository.findByEmailIgnoreCase(email)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        validarDatas(request.getSleepStart(), request.getSleepEnd());
+        assertSemSobreposicao(user.getId(), request.getSleepStart(), request.getSleepEnd(), null);
         SleepLog log = new SleepLog(UUID.randomUUID(), user, request.getSleepStart(), request.getSleepEnd(), request.getQuality(), request.getNotes());
         sleepLogRepository.save(log);
         return new SleepLogResponse(log.getId(), log.getSleepStart(), log.getSleepEnd(), log.getQuality(), log.getNotes());
@@ -58,6 +95,8 @@ public class SleepService {
         if (java.time.Duration.between(request.getSleepStart(), request.getSleepEnd()).toHours() > 24) {
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Duração máxima é 24h");
         }
+        validarDatas(request.getSleepStart(), request.getSleepEnd());
+        assertSemSobreposicao(user.getId(), request.getSleepStart(), request.getSleepEnd(), log.getId());
         log.update(request.getSleepStart(), request.getSleepEnd(), request.getQuality(), request.getNotes());
         sleepLogRepository.save(log);
         return new SleepLogResponse(log.getId(), log.getSleepStart(), log.getSleepEnd(), log.getQuality(), log.getNotes());

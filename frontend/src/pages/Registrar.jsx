@@ -28,6 +28,7 @@ export default function Registrar() {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [saving, setSaving] = useState(false);
   const [recent, setRecent] = useState([]);
   const [recentLoaded, setRecentLoaded] = useState(false);
 
@@ -55,6 +56,7 @@ export default function Registrar() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (saving) return; // guarda extra contra duplo envio (#99)
     setError('');
     setSuccess('');
 
@@ -65,6 +67,7 @@ export default function Registrar() {
       return;
     }
 
+    setSaving(true);
     try {
       const created = await api.post('/sleep-logs', toApiPayload(form));
       setSuccess(`Noite registrada: ${formatDuration(created.sleepStart, created.sleepEnd)} de sono.`);
@@ -74,6 +77,8 @@ export default function Registrar() {
       await loadRecent();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -124,9 +129,10 @@ export default function Registrar() {
         <button
           type="submit"
           className="btn btn-primary"
+          disabled={saving}
           style={{ minHeight: '52px', fontSize: '1.06rem' }}
         >
-          Salvar registro
+          {saving ? 'Salvando…' : 'Salvar registro'}
         </button>
       </form>
 

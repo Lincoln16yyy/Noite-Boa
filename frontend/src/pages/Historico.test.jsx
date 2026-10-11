@@ -98,6 +98,36 @@ describe('tela de Histórico', () => {
     expect(await screen.findByText(/9h · nota 2/)).toBeInTheDocument();
   });
 
+  it('desabilita o botão e mostra "Salvando…" durante o envio da edição (#99)', async () => {
+    let liberarPut;
+    fetchMock.mockImplementation(async (url, options = {}) => {
+      if (String(url).includes('/me')) return jsonResponse(mockUser);
+      if (options.method === 'PUT') {
+        await new Promise((resolver) => {
+          liberarPut = resolver;
+        });
+        const body = JSON.parse(options.body);
+        return jsonResponse({ id: 'log-1', ...body });
+      }
+      return jsonResponse(pageResponse(state.logs));
+    });
+
+    openScreen();
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar' }));
+    fireEvent.click(screen.getByLabelText('Ruim (2)'));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    // Durante o envio: botão desabilitado com "Salvando…"; clique extra não reenvia
+    expect(screen.getByRole('button', { name: 'Salvando…' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvando…' }));
+    expect(fetchMock.mock.calls.filter(([, options]) => options.method === 'PUT')).toHaveLength(1);
+
+    liberarPut();
+    // Ao terminar, o formulário inline fecha e a lista volta
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Salvar' })).not.toBeInTheDocument());
+    expect(fetchMock.mock.calls.filter(([, options]) => options.method === 'PUT')).toHaveLength(1);
+  });
+
   it('mostra estado vazio amigável com atalho para registrar', async () => {
     state.logs = [];
     openScreen();
