@@ -99,6 +99,21 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- A suíte compartilha o IP 127.0.0.1 e faz dezenas de
+                         cadastros/logins; com os limites de produção (issue #104)
+                         esgotaria o orçamento de cadastro (5/hora por IP) e
+                         derrubaria testes alheios. AuthRateLimitTest força os
+                         valores de produção de volta via @TestPropertySource. -->
+                    <systemPropertyVariables>
+                        <noiteboa.ratelimit.login.limite>1000000</noiteboa.ratelimit.login.limite>
+                        <noiteboa.ratelimit.cadastro.limite>1000000</noiteboa.ratelimit.cadastro.limite>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>

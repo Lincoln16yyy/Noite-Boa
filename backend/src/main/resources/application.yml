@@ -1,6 +1,19 @@
 # A Render injeta $PORT (10000); localmente segue 8080
 server:
+  # Render: obter o IP real do cliente em X-Forwarded-For (necessário para o
+  # limite de tentativas de login/cadastro; issue #104). Localmente não há
+  # proxy e o valor não muda nada.
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:framework}
   port: ${PORT:8080}
+
+noiteboa:
+  ratelimit:
+    login:        # por IP + e-mail
+      limite: ${RATELIMIT_LOGIN_LIMITE:5}
+      janela-segundos: ${RATELIMIT_LOGIN_JANELA:60}
+    cadastro:     # por IP
+      limite: ${RATELIMIT_CADASTRO_LIMITE:5}
+      janela-segundos: ${RATELIMIT_CADASTRO_JANELA:3600}
 
 spring:
   datasource:
