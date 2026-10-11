@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
  * Atualização de preferências da conta. Os dois campos são opcionais,
  * mas ao menos um precisa estar presente (validado no controller):
  * timezone é validado com ZoneId; shareWithFriends é o opt-in de
- * compartilhamento da consistência com amigos (padrão desligado).
+ * compartilhamento das noites registradas com amigos (padrão desligado).
  */
 public class UpdateMeRequest {
 

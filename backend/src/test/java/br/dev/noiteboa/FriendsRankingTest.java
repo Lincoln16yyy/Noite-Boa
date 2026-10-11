@@ -29,9 +29,9 @@ import java.util.UUID;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
- * Ranking de consistência (issue #39):
+ * Ranking de noites registradas (issue #39, nome da #142):
  * - só entram quem é amigo aceito E tem share_with_friends = true (regra de servidor);
- * - só expõe consistência (%) e nº de noites — nunca horários, durações,
+ * - só expõe nº de noites e % dos dias — nunca horários, durações,
  *   qualidade ou observações;
  * - o próprio usuário aparece no ranking mesmo sem opt-in (é o ranking dele).
  */

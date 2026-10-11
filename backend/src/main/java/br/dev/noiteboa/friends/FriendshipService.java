@@ -20,12 +20,12 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Amigos e ranking de consistência.
+ * Amigos e ranking de noites registradas.
  *
  * Regras de privacidade (issue #39, desenho aprovado):
  * - amizade = consentimento duplo (convite + aceite);
  * - o ranking só inclui quem tem share_with_friends = true (filtro no servidor);
- * - o ranking expõe apenas consistência (%) e nº de noites — nunca horários,
+ * - o ranking expõe apenas nº de noites e % dos dias — nunca horários,
  *   durações, qualidade ou observações.
  */
 @Service
