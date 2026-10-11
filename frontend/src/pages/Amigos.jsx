@@ -47,9 +47,9 @@ const rowStyle = { display: 'flex', gap: '0.6rem', alignItems: 'center', flexWra
 const mutedTextStyle = { color: 'var(--text-muted)', fontSize: '15px' };
 
 /**
- * Amigos e ranking de consistência (issue #39).
+ * Amigos e ranking de noites registradas (issue #39, nome da #142).
  * Privacidade primeiro: sem opt-in, o usuário não aparece no ranking dos amigos;
- * e o ranking só mostra consistência (%) e nº de noites — nunca horários ou durações.
+ * e o ranking só mostra nº de noites e % dos dias — nunca horários ou durações.
  */
 export default function Amigos() {
   const [me, setMe] = useState(null);
@@ -143,8 +143,8 @@ export default function Amigos() {
     <div style={{ maxWidth: '560px' }}>
       <h1>Amigos</h1>
 
-      <section aria-label="Compartilhar consistência" style={{ marginBottom: '1.5rem' }}>
-        <h2 style={{ fontSize: '18px' }}>Compartilhar consistência</h2>
+      <section aria-label="Compartilhar minhas noites registradas" style={{ marginBottom: '1.5rem' }}>
+        <h2 style={{ fontSize: '18px' }}>Compartilhar minhas noites registradas</h2>
         <label
           style={{
             display: 'flex',
@@ -162,11 +162,11 @@ export default function Amigos() {
             onChange={alternarCompartilhar}
             style={{ width: '24px', height: '24px', accentColor: 'var(--color-ambar)' }}
           />
-          Compartilhar minha consistência com amigos
+          Compartilhar minhas noites registradas com amigos
         </label>
         <p style={{ ...mutedTextStyle, marginTop: '0.35rem' }}>
-          Seus horários e registros nunca aparecem no ranking — só quantos dias você registrou noites. Você pode
-          desativar quando quiser.
+          Seus horários e registros nunca aparecem no ranking — só quantas noites você registrou e em que porcentagem
+          dos dias. Você pode desativar quando quiser.
         </p>
       </section>
 
@@ -293,9 +293,9 @@ export default function Amigos() {
         ))}
       </section>
 
-      <section aria-label="Ranking de consistência" style={{ marginBottom: '1.5rem' }}>
+      <section aria-label="Ranking de noites registradas" style={{ marginBottom: '1.5rem' }}>
         <div style={{ ...rowStyle, justifyContent: 'space-between' }}>
-          <h2 style={{ fontSize: '18px', margin: 0 }}>Ranking de consistência</h2>
+          <h2 style={{ fontSize: '18px', margin: 0 }}>Ranking de noites registradas</h2>
           <div style={rowStyle}>
             {[7, 30].map((opcao) => (
               <button
@@ -319,8 +319,8 @@ export default function Amigos() {
           </div>
         </div>
         <p style={{ ...mutedTextStyle, marginTop: '0.35rem' }}>
-          Só entram quem é amigo aceito e compartilhou a consistência. O ranking mostra apenas quantos dias você
-          registrou noites — nunca horários ou durações.
+          Só entram quem é amigo aceito e compartilhou suas noites registradas. O ranking mostra apenas quantas noites
+          você registrou e em que porcentagem dos dias — nunca horários ou durações.
         </p>
         {ranking.map((linha, index) => (
           <div key={linha.userId} style={cardStyle}>
@@ -330,9 +330,8 @@ export default function Amigos() {
                 {linha.displayName}
                 {linha.isMe ? ' (você)' : ''}
               </span>
-              <span style={{ fontWeight: 700 }}>{linha.consistencyPercent}%</span>
-              <span style={mutedTextStyle}>
-                {linha.nights} {linha.nights === 1 ? 'noite' : 'noites'}
+              <span style={{ fontWeight: 700 }}>
+                {linha.nights} {linha.nights === 1 ? 'noite' : 'noites'} · {linha.consistencyPercent}% dos dias
               </span>
             </div>
           </div>

@@ -26,7 +26,7 @@
 7. Deploy público funcionando.
 
 ### Pós-MVP (só depois do MVP no ar)
-- PWA instalável, lembrete de hora de dormir (melhor esforço), amigos e ranking de consistência, sons de relaxamento, avaliação de app nativo para alarme.
+- PWA instalável, lembrete de hora de dormir (melhor esforço), amigos e ranking de noites registradas, sons de relaxamento, avaliação de app nativo para alarme.
 
 ### Fora de escopo (por enquanto)
 - Integração com wearables, IA/recomendações médicas, pagamentos, app nativo.

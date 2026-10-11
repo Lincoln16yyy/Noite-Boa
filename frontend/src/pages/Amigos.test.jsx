@@ -98,18 +98,18 @@ describe('tela de Amigos', () => {
     expect(screen.getByText('aguardando resposta')).toBeInTheDocument();
   });
 
-  it('ranking mostra posição, consistência, noites e marca o próprio usuário', async () => {
+  it('ranking mostra posição, noites, % dos dias e marca o próprio usuário', async () => {
     openScreen();
-    const regiao = await screen.findByRole('region', { name: 'Ranking de consistência' });
+    const regiao = await screen.findByRole('region', { name: 'Ranking de noites registradas' });
     expect(within(regiao).getByText('1º')).toBeInTheDocument();
-    expect(within(regiao).getByText('86%')).toBeInTheDocument();
-    expect(within(regiao).getByText('6 noites')).toBeInTheDocument();
+    expect(within(regiao).getByText('6 noites · 86% dos dias')).toBeInTheDocument();
     expect(within(regiao).getByText('Ana (você)')).toBeInTheDocument();
+    expect(within(regiao).getByText('3 noites · 43% dos dias')).toBeInTheDocument();
   });
 
   it('toggle de compartilhar salva o opt-in na conta', async () => {
     openScreen();
-    fireEvent.click(await screen.findByLabelText('Compartilhar minha consistência com amigos'));
+    fireEvent.click(await screen.findByLabelText('Compartilhar minhas noites registradas com amigos'));
 
     await waitFor(() => expect(calls('PUT', '/api/me').length).toBe(1));
     expect(JSON.parse(calls('PUT', '/api/me')[0][1].body)).toEqual({ shareWithFriends: true });
@@ -156,8 +156,7 @@ describe('tela de Amigos', () => {
     openScreen();
     fireEvent.click(await screen.findByRole('button', { name: '30 dias' }));
 
-    await waitFor(() => expect(screen.getByText('70%')).toBeInTheDocument());
-    expect(screen.getByText('21 noites')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('21 noites · 70% dos dias')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: '30 dias' })).toHaveAttribute('aria-pressed', 'true');
     expect(calls('GET', 'days=30').length).toBe(1);
   });

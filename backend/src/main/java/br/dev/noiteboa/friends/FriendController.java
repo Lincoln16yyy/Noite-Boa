@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Amigos e ranking de consistência. Todas as rotas exigem autenticação
+ * Amigos e ranking de noites registradas. Todas as rotas exigem autenticação
  * (SecurityConfig: anyRequest().authenticated()).
  */
 @RestController
