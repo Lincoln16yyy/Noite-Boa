@@ -47,7 +47,10 @@ for f in "$DIR"/*.md; do
   if grep -qxF "$title" <<<"$existing_titles"; then echo "já existe: $title"; continue; fi
   awk 'BEGIN{c=0} /^---$/ && c<2 {c++; next} c>=2' "$f" > "$tmp"
   args=(); IFS=',' read -ra L <<<"$labels"
-  for l in "${L[@]}"; do args+=(--label "$l"); done
+  for l in "${L[@]}"; do
+    l="$(echo "$l" | sed 's/^ *//;s/ *$//')"  # trim
+    [[ -n "$l" ]] && args+=(--label "$l")
+  done
   [[ -n "$milestone" ]] && args+=(--milestone "$milestone")
   run gh issue create --repo "$REPO" --title "$title" --body-file "$tmp" "${args[@]}"
   created=$((created+1))
