@@ -171,25 +171,28 @@ export default function Dashboard() {
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [errorMessage, setErrorMessage] = useState('');
 
-  const load = useCallback(async (selectedDays) => {
+  const load = useCallback(async (selectedDays, signal) => {
     setStatus('loading');
     setErrorMessage('');
     try {
       const [summaryData, goalData] = await Promise.all([
-        api.get(`/stats/summary?days=${selectedDays}`),
-        api.get('/goal'),
+        api.get(`/stats/summary?days=${selectedDays}`, { signal }),
+        api.get('/goal', { signal }),
       ]);
       setSummary(summaryData);
       setGoal(goalData);
       setStatus('ready');
     } catch (err) {
+      if (err.name === 'AbortError') return; // ignora cancelamento
       setErrorMessage(err.message);
       setStatus('error');
     }
   }, []);
 
   useEffect(() => {
-    load(days);
+    const controller = new AbortController();
+    load(days, controller.signal);
+    return () => controller.abort(); // cancela requisição anterior ao trocar de período
   }, [days, load]);
 
   const goalHours = goal ? goal.targetMinutes / 60 : 8;
