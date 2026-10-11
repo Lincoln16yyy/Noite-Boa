@@ -72,6 +72,47 @@ class StatsSummaryTest {
         mockMvc.perform(get("/api/stats/summary?days=30").header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.averageHours").value(0.0))
-            .andExpect(jsonPath("$.sleepDebtMinutes").value(3360));
+            .andExpect(jsonPath("$.sleepDebtMinutes").value(0));
+    }
+
+    @Test
+    void sleepDebtWithSingleNightYesterdayIsZero() throws Exception {
+        String token = token("stats4@example.com");
+        // Registra uma noite de 8h ontem
+        var yesterday = java.time.LocalDate.now().minusDays(1);
+        create(token, yesterday.atTime(22, 0).toString() + "Z", yesterday.plusDays(1).atTime(6, 0).toString() + "Z", 4);
+
+        mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sleepDebtMinutes").value(0));
+    }
+
+    @Test
+    void sleepDebtPerfectWeekIsZero() throws Exception {
+        String token = token("stats5@example.com");
+        // Registra 7 noites de 8h cada (últimos 7 dias)
+        for (int i = 6; i >= 0; i--) {
+            var date = java.time.LocalDate.now().minusDays(i + 1); // ontem até 7 dias atrás
+            create(token, date.atTime(22, 0).toString() + "Z", date.plusDays(1).atTime(6, 0).toString() + "Z", 4);
+        }
+
+        mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sleepDebtMinutes").value(0));
+    }
+
+    @Test
+    void sleepDebtWithTwoMissedDays() throws Exception {
+        String token = token("stats6@example.com");
+        // Registra 5 noites de 8h, pula 2 dias
+        for (int i = 6; i >= 2; i--) {
+            var date = java.time.LocalDate.now().minusDays(i + 1);
+            create(token, date.atTime(22, 0).toString() + "Z", date.plusDays(1).atTime(6, 0).toString() + "Z", 4);
+        }
+        // Dias 0 e 1 (ontem e anteontem) sem registro
+
+        mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sleepDebtMinutes").value(960)); // 2 dias * 480 min
     }
 }
