@@ -333,7 +333,9 @@ export default function Configuracoes() {
         </p>
         <div style={{ marginBottom: '0.75rem' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-            Digite seu e-mail ou <strong>EXCLUIR</strong> para confirmar
+            <span>
+              Digite seu e-mail ou <strong>EXCLUIR</strong> para confirmar
+            </span>
             <input
               type="text"
               className="field"
@@ -348,13 +350,8 @@ export default function Configuracoes() {
           type="button"
           onClick={handleDeleteAccount}
           disabled={!deleteConfirm.trim() || deleting}
-          className="btn btn-primary"
-          style={{
-            background: 'var(--color-erro)',
-            borderColor: 'var(--color-erro)',
-            color: '#FFFFFF',
-            width: '100%',
-          }}
+          className="btn btn-danger"
+          style={{ width: '100%' }}
         >
           {deleting ? 'Excluindo…' : 'Excluir minha conta'}
         </button>
