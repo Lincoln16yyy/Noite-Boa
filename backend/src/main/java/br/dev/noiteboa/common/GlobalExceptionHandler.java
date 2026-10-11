@@ -43,6 +43,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(detail);
     }
 
+    @ExceptionHandler(br.dev.noiteboa.common.ratelimit.RateLimitExceededException.class)
+    public ResponseEntity<ProblemDetail> handleRateLimit(
+            br.dev.noiteboa.common.ratelimit.RateLimitExceededException ex) {
+        // 429 de limite de tentativas (issue #104): RFC 7807 + Retry-After em segundos
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+            .body(detail);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex, HttpServletRequest request) {
         // A resposta não vaza detalhes, mas a stack fica nos logs para diagnóstico (#84):

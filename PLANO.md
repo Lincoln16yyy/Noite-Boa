@@ -137,6 +137,7 @@ Erros seguem RFC 7807 (`ProblemDetail`). Documentação interativa via OpenAPI/S
 - Dados de sono podem ser tratados como dados pessoais ligados à saúde; coletar o mínimo necessário.
 - Usuário pode excluir conta e todos os dados (issue no M5).
 - Senhas só com BCrypt; JWT com expiração curta; segredos em variáveis de ambiente, nunca no Git.
+- Limite de tentativas em login e cadastro, em memória por IP (+ e-mail no login), respondendo 429 com `Retry-After`; limites configuráveis por variável de ambiente; o IP real vem de `X-Forwarded-For` atrás do proxy da Render.
 - Validação de entrada em toda rota; verificação de dono em todo recurso de sono.
 - CORS restrito ao domínio do front-end.
 - Política de privacidade simples antes de abrir ao público (conferir com orientação adequada, não sou advogado).

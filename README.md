@@ -128,6 +128,9 @@ SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `sono` / `sono` / `sono_dev_only` | Credenciais; **troque em produção** |
 | `JWT_SECRET` | valor só de dev | **Obrigatório em produção** (assina os tokens) |
 | `JWT_EXPIRATION_SECONDS` | `3600` | Validade do token em segundos |
+| `RATELIMIT_LOGIN_LIMITE` / `RATELIMIT_LOGIN_JANELA` | `5` / `60` | Tentativas de login por minuto por IP + e-mail; estouro responde **429** com `Retry-After` |
+| `RATELIMIT_CADASTRO_LIMITE` / `RATELIMIT_CADASTRO_JANELA` | `5` / `3600` | Cadastros por hora por IP; estouro responde **429** com `Retry-After` |
+| `FORWARD_HEADERS_STRATEGY` | `framework` | Obtém o IP real do cliente atrás do proxy da Render (base do limite acima) |
 | `SPRING_PROFILES_ACTIVE` | — | `dev` habilita o Swagger |
 
 Os padrões estão em `backend/src/main/resources/application.yml` e a referência versionada está no [`.env.example`](.env.example).
