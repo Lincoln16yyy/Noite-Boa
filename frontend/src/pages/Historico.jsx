@@ -9,9 +9,9 @@ import {
   validateSleepForm,
 } from '../lib/sleep';
 import LoadingWarning from '../components/LoadingWarning';
+import QualitySelector from '../components/QualitySelector';
 
 const PAGE_SIZE = 10;
-const QUALITY_LABELS = ['1 Péssima', '2 Ruim', '3 Ok', '4 Boa', '5 Ótima'];
 
 const cardStyle = {
   background: '#FFFFFF',
@@ -229,32 +229,6 @@ export default function Historico() {
                       required
                     />
                   </label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    {QUALITY_LABELS.map((label, index) => {
-                      const value = index + 1;
-                      const selected = edit.quality === value;
-                      return (
-                        <button
-                          key={value}
-                          type="button"
-                          title={label}
-                          aria-pressed={selected}
-                          onClick={() => setEdit({ ...edit, quality: value })}
-                          style={{
-                            flex: 1,
-                            minHeight: '48px',
-                            fontSize: '15px',
-                            borderRadius: '10px',
-                            border: selected ? '2px solid #15142E' : '1px solid #C9C6F0',
-                            background: selected ? '#FFE9B5' : '#FFFFFF',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {value}
-                        </button>
-                      );
-                    })}
-                  </div>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                     Observação (opcional)
                     <textarea
@@ -265,6 +239,13 @@ export default function Historico() {
                       onChange={(e) => setEdit({ ...edit, notes: e.target.value })}
                     />
                   </label>
+                  <QualitySelector
+                    value={edit.quality}
+                    onChange={(v) => setEdit({ ...edit, quality: v })}
+                    disabled={savingEdit}
+                    legend="Qualidade"
+                    errorId={editError ? 'edit-error' : undefined}
+                  />
                   {editError && (
                     <p role="alert" style={{ color: 'var(--color-erro-texto)', margin: 0 }}>
                       {editError}

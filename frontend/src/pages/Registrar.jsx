@@ -8,8 +8,7 @@ import {
   validateSleepForm,
 } from '../lib/sleep';
 import LoadingWarning from '../components/LoadingWarning';
-
-const QUALITY_LABELS = ['1 Péssima', '2 Ruim', '3 Ok', '4 Boa', '5 Ótima'];
+import QualitySelector from '../components/QualitySelector';
 
 const fieldStyle = {
   width: '100%',
@@ -101,42 +100,14 @@ export default function Registrar() {
           Acordou às
           <input
             type="datetime-local"
-            style={fieldStyle}
+            className="field"
             value={sleepEnd}
             onChange={(e) => setSleepEnd(e.target.value)}
             required
           />
         </label>
 
-        <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
-          <legend style={{ marginBottom: '0.35rem', fontWeight: 700 }}>Como foi a noite?</legend>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {QUALITY_LABELS.map((label, index) => {
-              const value = index + 1;
-              const selected = quality === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={selected}
-                  title={label}
-                  onClick={() => setQuality(value)}
-                  style={{
-                    flex: 1,
-                    minHeight: '56px',
-                    fontSize: '16px',
-                    borderRadius: '10px',
-                    border: selected ? '2px solid #15142E' : '1px solid #C9C6F0',
-                    background: selected ? '#FFE9B5' : '#FFFFFF',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {value}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
+        <QualitySelector value={quality} onChange={setQuality} errorId={error ? 'quality-error' : undefined} />
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
           Observação (opcional)

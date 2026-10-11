@@ -68,7 +68,8 @@ describe('tela de Registrar sono', () => {
     fireEvent.change(screen.getByLabelText('Acordou às'), {
       target: { value: '2026-10-08T07:00' },
     });
-    fireEvent.click(screen.getByTitle('4 Boa'));
+    // Clica no radio de qualidade 4 (Boa) via label (aria-label = "Boa (4)")
+    fireEvent.click(screen.getByLabelText('Boa (4)'));
     fireEvent.change(screen.getByLabelText(/Observação/), { target: { value: 'dormi bem' } });
     fireEvent.click(screen.getByRole('button', { name: 'Salvar registro' }));
 
