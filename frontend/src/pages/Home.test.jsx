@@ -1,15 +1,15 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import App from '../App';
+import { renderWithAuth } from '../test/test-utils';
 
 describe('landing page', () => {
   beforeEach(() => {
     localStorage.clear();
-    window.history.pushState({}, '', '/');
   });
 
   it('apresenta proposta, como funciona e chamada para cadastro', () => {
-    render(<App />);
+    renderWithAuth(<App />, { route: '/' });
 
     // proposta
     expect(
@@ -31,28 +31,25 @@ describe('landing page', () => {
   });
 
   it('botão principal de cadastro leva para /cadastro', () => {
-    render(<App />);
-
+    renderWithAuth(<App />, { route: '/' });
     fireEvent.click(screen.getByRole('link', { name: 'Criar conta grátis' }));
     expect(window.location.pathname).toBe('/cadastro');
   });
 
   it('segunda chamada leva para /cadastro', () => {
-    render(<App />);
-
+    renderWithAuth(<App />, { route: '/' });
     fireEvent.click(screen.getByRole('link', { name: 'Criar conta' }));
     expect(window.location.pathname).toBe('/cadastro');
   });
 
   it('link "Já tenho conta" leva para /login', () => {
-    render(<App />);
-
+    renderWithAuth(<App />, { route: '/' });
     fireEvent.click(screen.getByRole('link', { name: 'Já tenho conta' }));
     expect(window.location.pathname).toBe('/login');
   });
 
   it('nome da marca aparece como texto e a marca é decorativa', () => {
-    const { container } = render(<App />);
+    const { container } = renderWithAuth(<App />, { route: '/' });
 
     expect(screen.getByText('Noite Boa', { selector: 'span' })).toBeInTheDocument();
 

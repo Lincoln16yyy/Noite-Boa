@@ -1,15 +1,19 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import App from '../App';
+import { renderWithAuth } from '../test/test-utils';
 
 describe('Página de Política de Privacidade', () => {
   beforeEach(() => {
     localStorage.clear();
-    window.history.pushState({}, '', '/privacidade');
   });
 
+  function openScreen(route = '/privacidade') {
+    return renderWithAuth(null, { route });
+  }
+
   it('abre direto pela URL, sem exigir login', () => {
-    render(<App />);
+    openScreen();
+
     expect(
       screen.getByRole('heading', { level: 1, name: /política de privacidade/i }),
     ).toBeInTheDocument();
@@ -20,7 +24,7 @@ describe('Página de Política de Privacidade', () => {
   });
 
   it('informa a data de atualização e os serviços externos', () => {
-    render(<App />);
+    openScreen();
     expect(screen.getAllByText(/última atualização/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Vercel/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Render/).length).toBeGreaterThan(0);
@@ -28,7 +32,7 @@ describe('Página de Política de Privacidade', () => {
   });
 
   it('mostra o responsável e o canal de contato de privacidade confirmados', () => {
-    render(<App />);
+    openScreen();
     // responsável: projeto pessoal, sem empresa
     expect(screen.getByText(/projeto pessoal/i)).toBeInTheDocument();
     // canal de contato é link de e-mail nos dois pontos (seções 1 e 10)
@@ -42,7 +46,7 @@ describe('Página de Política de Privacidade', () => {
   });
 
   it('não promete aceitação automática de novas versões da política', () => {
-    render(<App />);
+    openScreen();
     expect(
       screen.queryByText(/continuar usando o aplicativo.*aceita a versão nova/i),
     ).not.toBeInTheDocument();
@@ -50,8 +54,7 @@ describe('Página de Política de Privacidade', () => {
   });
 
   it('chega na página pelo link do cadastro', () => {
-    window.history.pushState({}, '', '/cadastro');
-    render(<App />);
+    const { screen } = renderWithAuth(null, { route: '/cadastro' });
     fireEvent.click(screen.getByRole('link', { name: /política de privacidade/i }));
     expect(window.location.pathname).toBe('/privacidade');
     expect(

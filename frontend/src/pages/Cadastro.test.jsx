@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import App from '../App';
+import { renderWithAuth } from '../test/test-utils';
 
 describe('tela de Cadastro', () => {
   beforeEach(() => {
@@ -8,13 +8,16 @@ describe('tela de Cadastro', () => {
     vi.restoreAllMocks();
   });
 
+  function openScreen() {
+    return renderWithAuth(null, { route: '/cadastro' });
+  }
+
   it('cria a conta e leva para o login', async () => {
-    window.history.pushState({}, '', '/cadastro');
+    const { screen } = openScreen();
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ id: '1', email: 'ana@exemplo.com' }), { status: 201 }),
     );
 
-    render(<App />);
     fireEvent.change(screen.getByPlaceholderText('Nome'), { target: { value: 'Ana' } });
     fireEvent.change(screen.getByPlaceholderText('E-mail'), {
       target: { value: 'ana@exemplo.com' },
@@ -38,10 +41,9 @@ describe('tela de Cadastro', () => {
   });
 
   it('valida a senha antes de chamar a API', async () => {
-    window.history.pushState({}, '', '/cadastro');
+    const { screen } = openScreen();
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 201 }));
 
-    render(<App />);
     fireEvent.change(screen.getByPlaceholderText('Nome'), { target: { value: 'Ana' } });
     fireEvent.change(screen.getByPlaceholderText('E-mail'), {
       target: { value: 'ana@exemplo.com' },
@@ -56,20 +58,18 @@ describe('tela de Cadastro', () => {
   });
 
   it('exibe o link da política de privacidade', () => {
-    window.history.pushState({}, '', '/cadastro');
-    render(<App />);
+    const { screen } = openScreen();
 
     const link = screen.getByRole('link', { name: /política de privacidade/i });
     expect(link).toHaveAttribute('href', '/privacidade');
   });
 
   it('mostra o erro de e-mail duplicado vindo da API', async () => {
-    window.history.pushState({}, '', '/cadastro');
+    const { screen } = openScreen();
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ detail: 'Já existe uma conta com este e-mail.' }), { status: 409 }),
     );
 
-    render(<App />);
     fireEvent.change(screen.getByPlaceholderText('Nome'), { target: { value: 'Ana' } });
     fireEvent.change(screen.getByPlaceholderText('E-mail'), {
       target: { value: 'ana@exemplo.com' },
