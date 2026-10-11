@@ -11,7 +11,12 @@ import java.util.UUID;
 
 public interface SleepLogRepository extends JpaRepository<SleepLog, UUID> {
 
-    java.util.List<SleepLog> findByUserIdOrderBySleepStartDesc(UUID userId);
+    /**
+     * Janela para estatísticas/ranking (#98): só registros a partir de
+     * `since` (exclusive), em ordem decrescente do início do sono.
+     */
+    java.util.List<SleepLog> findByUserIdAndSleepStartGreaterThanOrderBySleepStartDesc(
+        UUID userId, OffsetDateTime since);
 
     @Query("SELECT s FROM SleepLog s WHERE s.user.id = :userId " +
            "AND s.sleepStart >= COALESCE(:from, s.sleepStart) " +

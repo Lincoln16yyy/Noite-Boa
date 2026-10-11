@@ -178,8 +178,9 @@ public class FriendshipService {
             .map(u -> {
                 ZoneId zone = ZoneId.of(u.getTimezone() != null ? u.getTimezone() : "America/Sao_Paulo");
                 // noite = dia local (do início do sono) com pelo menos um registro
-                Set<java.time.LocalDate> diasComRegistro = sleepLogs.findByUserIdOrderBySleepStartDesc(u.getId()).stream()
-                    .filter(l -> l.getSleepStart().isAfter(desde))
+                // (#98: o limite de data vai para a consulta, não varre o histórico)
+                Set<java.time.LocalDate> diasComRegistro = sleepLogs
+                    .findByUserIdAndSleepStartGreaterThanOrderBySleepStartDesc(u.getId(), desde).stream()
                     .map(l -> l.getSleepStart().atZoneSameInstant(zone).toLocalDate())
                     .collect(Collectors.toSet());
                 int noites = diasComRegistro.size();
