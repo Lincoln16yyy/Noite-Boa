@@ -3,14 +3,17 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { iniciarLembrete } from './lib/reminder';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import './styles/tokens.css';
 import './styles/base.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </ThemeProvider>
   </StrictMode>,
 );
 
