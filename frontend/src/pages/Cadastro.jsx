@@ -2,32 +2,6 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
-const formStyle = { display: 'flex', flexDirection: 'column', gap: '0.9rem', maxWidth: '420px' };
-
-const labelStyle = { display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '15px', fontWeight: 700 };
-
-const fieldStyle = {
-  width: '100%',
-  minHeight: '48px',
-  fontSize: '16px',
-  padding: '0.6rem 0.75rem',
-  border: '1px solid #C9C6F0',
-  borderRadius: '10px',
-  background: '#FFFFFF',
-  boxSizing: 'border-box',
-};
-
-const buttonStyle = {
-  minHeight: '52px',
-  fontSize: '17px',
-  fontWeight: 700,
-  border: 'none',
-  borderRadius: '10px',
-  background: '#15142E',
-  color: '#FFE9B5',
-  cursor: 'pointer',
-};
-
 export default function Cadastro() {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -55,10 +29,10 @@ export default function Cadastro() {
   }
 
   return (
-    <div>
-      <h1>Cadastro</h1>
-      <form onSubmit={handleSubmit} style={formStyle}>
-        <label style={labelStyle}>
+    <div className="container">
+      <h1 style={{ fontSize: '2.25rem', fontWeight: 800, marginBottom: '1.5rem' }}>Cadastro</h1>
+      <form onSubmit={handleSubmit} className="form">
+        <label className="label">
           Nome
           <input
             placeholder="Nome"
@@ -66,21 +40,22 @@ export default function Cadastro() {
             onChange={(e) => setDisplayName(e.target.value)}
             autoComplete="name"
             required
-            style={fieldStyle}
+            className="field"
           />
         </label>
-        <label style={labelStyle}>
+        <label className="label">
           E-mail
           <input
+            type="email"
             placeholder="E-mail"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
             required
-            style={fieldStyle}
+            className="field"
           />
         </label>
-        <label style={labelStyle}>
+        <label className="label">
           Senha (mín. 8 caracteres)
           <input
             type="password"
@@ -89,18 +64,18 @@ export default function Cadastro() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
             required
-            style={fieldStyle}
+            className="field"
           />
         </label>
-        <button type="submit" style={buttonStyle}>
+        <button type="submit" className="btn btn-primary" style={{ minHeight: '52px', fontSize: '1.06rem' }}>
           Criar conta
         </button>
       </form>
-      {error && <p role="alert" style={{ color: 'var(--color-erro-texto)' }}>{error}</p>}
-      <p style={{ fontSize: '14px' }}>
+      {error && <p role="alert" className="alert alert-error">{error}</p>}
+      <p style={{ marginTop: '1rem', fontSize: '0.875rem' }}>
         Leia como cuidamos dos seus dados na <Link to="/privacidade">Política de Privacidade</Link>.
       </p>
-      <p>
+      <p style={{ marginTop: '0.5rem' }}>
         Já tem conta? <Link to="/login">Entrar</Link>
       </p>
     </div>

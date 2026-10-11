@@ -15,17 +15,236 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Foco visível para teclado (a11y) */
-a:focus-visible,
-button:focus-visible,
-input:focus-visible,
-select:focus-visible {
+/* Links padrão — Índigo com sublinhado e foco visível (ânima Âmbar) */
+a {
+  color: var(--color-indigo);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+}
+
+a:hover {
+  color: var(--color-noite);
+}
+
+a:focus-visible {
+  outline: 3px solid var(--color-ambar);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Em fundo escuro o índigo fica fraco: usa Luar (15:1 sobre Noite) */
+header a:focus-visible {
+  outline-color: var(--color-luar);
+}
+
+/* Links do menu: alvo de toque mínimo de 44px (WCAG 2.5.8) */
+header nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-1);
+}
+
+/* ===== Classes reutilizáveis baseadas em tokens ===== */
+
+/* Botão primário — Âmbar sobre Noite */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-ambar);
+  color: var(--color-noite);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #e6a03d;
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Botão fantasma — borda Índigo, texto Índigo, fundo transparente */
+.btn-ghost {
+  background: transparent;
+  color: var(--color-indigo);
+  border: 2px solid var(--color-indigo);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--color-indigo);
+  color: var(--color-luar);
+}
+
+.btn-ghost:focus-visible {
+  outline: 3px solid var(--color-ambar);
+  outline-offset: 2px;
+}
+
+/* Campo de formulário */
+.field {
+  width: 100%;
+  min-height: 48px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-lavanda);
+  border-radius: var(--radius-sm);
+  background: #FFFFFF;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--color-indigo);
+  box-shadow: 0 0 0 3px rgba(63, 60, 187, 0.25);
+}
+
+.field::placeholder {
+  color: var(--color-lavanda);
+  opacity: 0.6;
+}
+
+.field:disabled {
+  background: var(--color-nevoa);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Label de formulário */
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--color-noite);
+}
+
+/* Container de formulário */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 420px;
+}
+
+/* Cartão */
+.card {
+  background: var(--color-nevoa);
+  border: 1px solid var(--color-lavanda);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-card);
+}
+
+/* Cartão escuro (para dashboard) */
+.card-dark {
+  background: var(--color-noite);
+  color: var(--color-luar);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-card);
+}
+
+/* Container principal */
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-4);
+}
+
+/* Estilos de estado */
+.alert {
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
+}
+
+.alert-error {
+  background: #FDE8E8;
+  border: 1px solid var(--color-erro);
+  color: var(--color-erro-texto);
+}
+
+.alert-success {
+  background: #E8F8F1;
+  border: 1px solid var(--color-sucesso);
+  color: var(--color-sucesso-texto);
+}
+
+.alert-info {
+  background: #FFF8E1;
+  border: 1px solid var(--color-ambar);
+  color: #7C6A00;
+}
+
+/* Estados de loading */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-12);
+  color: var(--color-lavanda);
+}
+
+/* Toggle buttons (para seleção de período) */
+.toggle {
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--color-lavanda);
+  background: var(--color-nevoa);
+  color: var(--color-indigo);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toggle[aria-pressed="true"] {
+  border-color: var(--color-indigo);
+  background: var(--color-indigo);
+  color: var(--color-luar);
+}
+
+.toggle:focus-visible {
+  outline: 3px solid var(--color-ambar);
+  outline-offset: 2px;
+}
+
+/* Foco visível para teclado (a11y) - reforçado */
+*:focus-visible {
   outline: 3px solid var(--color-indigo);
   outline-offset: 2px;
 }
 
 /* Em fundo escuro o índigo fica fraco: usa Luar (15:1 sobre Noite) */
-header a:focus-visible {
+header a:focus-visible,
+.card-dark *:focus-visible,
+[style*="var(--color-noite)"] *:focus-visible {
   outline-color: var(--color-luar);
 }
 
