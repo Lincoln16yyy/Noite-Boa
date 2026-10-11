@@ -1,11 +1,19 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
+/** Tempo padrão de timeout (ms) — pode ser alterado via `api.setTimeout(ms)` */
+let requestTimeout = 30000;
+
 function getToken() {
   return localStorage.getItem('token');
 }
 
 export function clearSession() {
   localStorage.removeItem('token');
+}
+
+/** Configura o timeout global (ms) — usado em testes para simular timeout rápido. */
+export function setTimeout(ms) {
+  requestTimeout = ms;
 }
 
 async function readProblemMessage(response) {
@@ -19,6 +27,10 @@ async function readProblemMessage(response) {
   return '';
 }
 
+function isNetworkError(error) {
+  return error instanceof TypeError && error.message === 'Failed to fetch';
+}
+
 async function request(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   const token = getToken();
@@ -26,25 +38,43 @@ async function request(path, options = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), requestTimeout);
 
-  if (!response.ok) {
-    const message = await readProblemMessage(response);
+  try {
+    const response = await fetch(`${BASE_URL}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
 
-    // 401 com sessão ativa = token expirado/inválido: limpa e volta pro login.
-    // 401 sem sessão = falha de autenticação (ex.: senha errada): só mostra o erro.
-    const hadSession = Boolean(getToken());
-    if (response.status === 401 && hadSession) {
-      clearSession();
-      window.location.href = '/login';
-      throw new Error('Sessão expirada. Faça login novamente.');
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const message = await readProblemMessage(response);
+
+      // 401 com sessão ativa = token expirado/inválido: limpa e volta pro login.
+      // 401 sem sessão = falha de autenticação (ex.: senha errada): só mostra o erro.
+      const hadSession = Boolean(getToken());
+      if (response.status === 401 && hadSession) {
+        clearSession();
+        window.location.href = '/login';
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
+
+      throw new Error(message || `Erro ${response.status}`);
     }
 
-    throw new Error(message || `Erro ${response.status}`);
-  }
+    if (response.status === 204) return null;
+    return response.json();
+  } catch (err) {
+    clearTimeout(timeoutId);
 
-  if (response.status === 204) return null;
-  return response.json();
+    if (err.name === 'AbortError' || isNetworkError(err)) {
+      throw new Error('Não foi possível conectar ao servidor. Verifique sua conexão ou tente novamente mais tarde.');
+    }
+    throw err;
+  }
 }
 
 export const api = {

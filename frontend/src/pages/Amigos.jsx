@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import LoadingWarning from '../components/LoadingWarning';
 
 const fieldStyle = {
   width: '100%',
@@ -127,7 +128,12 @@ export default function Amigos() {
     }
   }
 
-  if (loading) return <p>Carregando…</p>;
+  if (loading) return (
+    <>
+      <p>Carregando…</p>
+      <LoadingWarning isLoading={true} />
+    </>
+  );
 
   return (
     <div style={{ maxWidth: '560px' }}>
@@ -184,9 +190,12 @@ export default function Amigos() {
       </section>
 
       {error && (
-        <p role="alert" style={{ color: 'var(--color-erro-texto)' }}>
-          {error}
-        </p>
+        <div role="alert" style={{ ...cardStyle, borderColor: 'var(--color-erro)', marginBottom: '0.75rem' }}>
+          <p style={{ marginTop: 0, color: 'var(--color-erro-texto)' }}>{error}</p>
+          <button type="button" style={smallButtonStyle} onClick={() => carregar(dias)}>
+            Tentar novamente
+          </button>
+        </div>
       )}
       {success && (
         <p role="status" style={{ color: 'var(--color-sucesso-texto)' }}>
