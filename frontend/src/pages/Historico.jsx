@@ -14,8 +14,8 @@ import QualitySelector from '../components/QualitySelector';
 const PAGE_SIZE = 10;
 
 const cardStyle = {
-  background: '#FFFFFF',
-  border: '1px solid #C9C6F0',
+  background: 'var(--card-bg)',
+  border: '1px solid var(--card-border)',
   borderRadius: '10px',
   padding: '0.75rem',
   display: 'flex',
@@ -28,9 +28,9 @@ const fieldStyle = {
   minHeight: '48px',
   fontSize: '16px',
   padding: '0.6rem 0.75rem',
-  border: '1px solid #C9C6F0',
+  border: '1px solid var(--input-border)',
   borderRadius: '10px',
-  background: '#FFFFFF',
+  background: 'var(--input-bg)',
   boxSizing: 'border-box',
 };
 
@@ -39,8 +39,8 @@ const smallButtonStyle = {
   padding: '0 0.9rem',
   fontSize: '15px',
   borderRadius: '10px',
-  border: '1px solid #C9C6F0',
-  background: '#FFFFFF',
+  border: '1px solid var(--border-color)',
+  background: 'var(--bg-secondary)',
   cursor: 'pointer',
 };
 
@@ -154,7 +154,7 @@ export default function Historico() {
       {!loading && totalElements === 0 && (
         <div style={{ ...cardStyle, alignItems: 'flex-start' }}>
           <p style={{ margin: 0 }}>Você ainda não registrou nenhuma noite de sono.</p>
-          <Link to="/registrar" style={{ color: '#15142E', fontWeight: 700 }}>
+          <Link to="/registrar" style={{ color: 'var(--color-ambar)', fontWeight: 700 }}>
             Registrar a primeira noite →
           </Link>
         </div>
@@ -177,7 +177,7 @@ export default function Historico() {
                   <span>
                     {formatDuration(log.sleepStart, log.sleepEnd)} · nota {log.quality}
                   </span>
-                  {log.notes && <span style={{ color: '#4B4A6B' }}>{log.notes}</span>}
+                  {log.notes && <span style={{ color: 'var(--text-muted)' }}>{log.notes}</span>}
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button type="button" style={smallButtonStyle} onClick={() => startEdit(log)}>
                       Editar
@@ -260,8 +260,8 @@ export default function Historico() {
                       disabled={savingEdit}
                       style={{
                         ...smallButtonStyle,
-                        background: '#15142E',
-                        color: '#FFE9B5',
+                        background: 'var(--color-noite)',
+                        color: 'var(--color-luar)',
                         border: 'none',
                         fontWeight: 700,
                       }}
@@ -290,7 +290,7 @@ export default function Historico() {
           >
             Anterior
           </button>
-          <span style={{ color: '#4B4A6B' }}>
+          <span style={{ color: 'var(--text-muted)' }}>
             Página {page + 1} de {Math.max(totalPages, 1)} · {totalElements} noite{totalElements === 1 ? '' : 's'}
           </span>
           <button

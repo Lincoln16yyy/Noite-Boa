@@ -30,17 +30,17 @@ const botaoStyle = {
   fontWeight: 700,
   border: 'none',
   borderRadius: '10px',
-  background: '#15142E',
-  color: '#FFE9B5',
+  background: 'var(--btn-primary-bg)',
+  color: 'var(--btn-primary-text)',
   cursor: 'pointer',
 };
 
 const erroStyle = {
-  background: '#FDE8E8',
-  border: '1px solid #F5B8B8',
+  background: 'var(--alert-error-bg)',
+  border: '1px solid var(--alert-error-border)',
   borderRadius: '10px',
   padding: '0.75rem',
-  color: 'var(--color-erro-texto)',
+  color: 'var(--alert-error-text)',
 };
 
 export default function Sons() {
@@ -245,22 +245,19 @@ export default function Sons() {
         disabled={!podeTocar || carregando}
         aria-pressed={tocando}
         aria-label={tocando ? 'Pausar som' : 'Tocar som'}
-        style={{
-          ...botaoStyle,
-          opacity: podeTocar ? 1 : 0.6,
-          cursor: podeTocar ? 'pointer' : 'not-allowed',
-        }}
+        className="btn btn-primary"
+        style={{ opacity: podeTocar ? 1 : 0.6, cursor: podeTocar ? 'pointer' : 'not-allowed' }}
       >
         {carregando ? 'Carregando...' : tocando ? 'Pausar som' : 'Tocar som'}
       </button>
 
-      <p style={{ fontSize: '14px', color: '#555' }}>
+      <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
         Limitação honesta: o áudio pausa quando você sai desta aba ou trava a tela — apps em
         navegador não garantem reprodução em segundo plano contínua (mesma restrição do lembrete
         de dormir).
       </p>
 
-      <p style={{ fontSize: '13px', color: '#666' }}>
+      <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
         Licenças e fontes: todas as ambiências utilizam Creative Commons Zero (CC0 1.0 Universal).
         Consulte a tabela completa de fontes e hashes em <code>docs/audio-licencas.md</code>.
       </p>

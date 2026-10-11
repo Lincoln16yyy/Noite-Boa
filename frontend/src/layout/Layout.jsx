@@ -51,12 +51,12 @@ export default function Layout() {
   // Mostra esqueleto enquanto carrega a sessão
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F5F3FF', display: 'flex', flexDirection: 'column' }}>
-        <header style={{ padding: '1rem', background: '#15142E' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
+        <header style={{ padding: '1rem', background: 'var(--color-noite)' }}>
           <img src="/logo-horizontal-light.svg" alt="Noite Boa" style={{ height: '40px', width: 'auto' }} />
         </header>
         <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div role="status" aria-live="polite" style={{ color: '#B9B6FF' }}>Carregando…</div>
+          <div role="status" aria-live="polite" style={{ color: 'var(--color-lavanda)' }}>Carregando…</div>
         </main>
         {isMobile && (
           <nav
@@ -66,8 +66,8 @@ export default function Layout() {
               bottom: 0,
               left: 0,
               right: 0,
-              background: '#15142E',
-              borderTop: '1px solid #3F3CBB',
+              background: 'var(--color-noite)',
+              borderTop: '1px solid var(--color-indigo)',
               display: 'flex',
               justifyContent: 'space-around',
               padding: '0.5rem 0',
@@ -75,12 +75,12 @@ export default function Layout() {
             }}
           >
             {BOTTOM_TABS.map((tab) => (
-              <button key={tab.path} disabled style={{ opacity: 0.5, cursor: 'not-allowed', background: 'none', border: 'none', color: '#B9B6FF', padding: '0.5rem', minHeight: '44px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem', fontSize: '11px' }}>
+              <button key={tab.path} disabled style={{ opacity: 0.5, cursor: 'not-allowed', background: 'none', border: 'none', color: 'var(--color-lavanda)', padding: '0.5rem', minHeight: '44px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem', fontSize: '11px' }}>
                 <span aria-hidden="true">{tab.icon}</span>
                 <span>{tab.label}</span>
               </button>
             ))}
-            <button disabled style={{ opacity: 0.5, cursor: 'not-allowed', background: 'none', border: 'none', color: '#B9B6FF', padding: '0.5rem', minHeight: '44px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem', fontSize: '11px' }}>
+            <button disabled style={{ opacity: 0.5, cursor: 'not-allowed', background: 'none', border: 'none', color: 'var(--color-lavanda)', padding: '0.5rem', minHeight: '44px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem', fontSize: '11px' }}>
               <span aria-hidden="true">⋯</span>
               <span>Mais</span>
             </button>
@@ -101,12 +101,12 @@ export default function Layout() {
   };
 
   return (
-    <div style={{ fontFamily: 'var(--font-sans)', background: 'var(--color-nevoa)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ fontFamily: 'var(--font-sans)', background: 'var(--bg-primary)', minHeight: '100vh', display: 'flex', flexDirection: 'column', color: 'var(--text-primary)' }}>
       {/* Header desktop */}
       <header
         style={{
           padding: '0.75rem 1rem',
-          background: '#15142E',
+          background: 'var(--color-noite)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -131,7 +131,7 @@ export default function Layout() {
                   to={item.path}
                   aria-current={isActive(item.path) ? 'page' : undefined}
                   style={{
-                    color: isActive(item.path) ? '#FFE9B5' : '#B9B6FF',
+                    color: isActive(item.path) ? 'var(--color-luar)' : 'var(--color-lavanda)',
                     textDecoration: 'none',
                     padding: '0.5rem 0.75rem',
                     borderRadius: '8px',
@@ -152,9 +152,9 @@ export default function Layout() {
                 onClick={handleLogout}
                 aria-label="Sair da conta"
                 style={{
-                  color: '#FFB347',
+                  color: 'var(--color-ambar)',
                   background: 'none',
-                  border: '1px solid #FFB347',
+                  border: '1px solid var(--color-ambar)',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '8px',
                   fontWeight: 700,
@@ -173,7 +173,7 @@ export default function Layout() {
                 to="/login"
                 aria-current={isActive('/login') ? 'page' : undefined}
                 style={{
-                  color: isActive('/login') ? '#FFE9B5' : '#B9B6FF',
+                  color: isActive('/login') ? 'var(--color-luar)' : 'var(--color-lavanda)',
                   textDecoration: 'none',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '8px',
@@ -189,8 +189,8 @@ export default function Layout() {
                 to="/cadastro"
                 aria-current={isActive('/cadastro') ? 'page' : undefined}
                 style={{
-                  color: '#15142E',
-                  background: '#FFE9B5',
+                  color: 'var(--color-noite)',
+                  background: 'var(--color-ambar)',
                   textDecoration: 'none',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '8px',
@@ -216,8 +216,8 @@ export default function Layout() {
             bottom: 0,
             left: 0,
             right: 0,
-            background: '#15142E',
-            borderTop: '1px solid #3F3CBB',
+            background: 'var(--color-noite)',
+            borderTop: '1px solid var(--color-indigo)',
             display: 'flex',
             justifyContent: 'space-around',
             padding: '0.4rem 0',
@@ -231,7 +231,7 @@ export default function Layout() {
               aria-current={isActive(tab.path) ? 'page' : undefined}
               style={{
                 textDecoration: 'none',
-                color: isActive(tab.path) ? '#FFE9B5' : '#B9B6FF',
+                color: isActive(tab.path) ? 'var(--color-luar)' : 'var(--color-lavanda)',
                 padding: '0.4rem 0.5rem',
                 minHeight: '44px',
                 minWidth: '44px',
@@ -258,7 +258,7 @@ export default function Layout() {
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#B9B6FF',
+                color: 'var(--color-lavanda)',
                 padding: '0.4rem 0.5rem',
                 minHeight: '44px',
                 minWidth: '44px',
@@ -282,8 +282,8 @@ export default function Layout() {
                   position: 'absolute',
                   bottom: '100%',
                   right: 0,
-                  background: '#15142E',
-                  border: '1px solid #3F3CBB',
+                  background: 'var(--color-noite)',
+                  border: '1px solid var(--color-indigo)',
                   borderRadius: '12px 12px 0 0',
                   boxShadow: '0 -4px 24px rgba(21,20,46,0.3)',
                   padding: '0.5rem',
@@ -311,7 +311,7 @@ export default function Layout() {
                         padding: '0.75rem 1rem',
                         background: 'none',
                         border: 'none',
-                        color: item.path === '/logout' ? '#FFB347' : '#FFE9B5',
+                        color: item.path === '/logout' ? 'var(--color-ambar)' : 'var(--color-luar)',
                         fontSize: '15px',
                         fontWeight: 600,
                         cursor: 'pointer',
@@ -331,7 +331,7 @@ export default function Layout() {
                         display: 'block',
                         width: '100%',
                         padding: '0.75rem 1rem',
-                        color: '#FFE9B5',
+                        color: 'var(--color-luar)',
                         textDecoration: 'none',
                         fontSize: '15px',
                         fontWeight: 600,

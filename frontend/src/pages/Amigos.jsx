@@ -7,9 +7,9 @@ const fieldStyle = {
   minHeight: '48px',
   fontSize: '16px',
   padding: '0.6rem 0.75rem',
-  border: '1px solid #C9C6F0',
+  border: '1px solid var(--input-border)',
   borderRadius: '10px',
-  background: '#FFFFFF',
+  background: 'var(--input-bg)',
   boxSizing: 'border-box',
 };
 
@@ -19,21 +19,24 @@ const buttonStyle = {
   fontWeight: 700,
   borderRadius: '10px',
   border: 'none',
-  background: '#15142E',
-  color: '#FFE9B5',
+  background: 'var(--btn-primary-bg)',
+  color: 'var(--btn-primary-text)',
   cursor: 'pointer',
 };
 
 const smallButtonStyle = {
-  ...buttonStyle,
   minHeight: '44px',
   padding: '0 0.9rem',
-  width: 'auto',
+  fontSize: '15px',
+  borderRadius: '10px',
+  border: '1px solid var(--card-border)',
+  background: 'var(--bg-secondary)',
+  cursor: 'pointer',
 };
 
 const cardStyle = {
-  background: '#FFFFFF',
-  border: '1px solid #E3E0F5',
+  background: 'var(--card-bg)',
+  border: '1px solid var(--card-border)',
   borderRadius: '12px',
   padding: '0.75rem',
   marginBottom: '0.5rem',
@@ -41,7 +44,7 @@ const cardStyle = {
 
 const rowStyle = { display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' };
 
-const mutedTextStyle = { color: '#4B4A6B', fontSize: '15px' };
+const mutedTextStyle = { color: 'var(--text-muted)', fontSize: '15px' };
 
 /**
  * Amigos e ranking de consistência (issue #39).
@@ -157,7 +160,7 @@ export default function Amigos() {
             type="checkbox"
             checked={Boolean(me?.shareWithFriends)}
             onChange={alternarCompartilhar}
-            style={{ width: '24px', height: '24px', accentColor: '#15142E' }}
+            style={{ width: '24px', height: '24px', accentColor: 'var(--color-ambar)' }}
           />
           Compartilhar minha consistência com amigos
         </label>
@@ -225,7 +228,7 @@ export default function Amigos() {
               </button>
               <button
                 type="button"
-                style={{ ...smallButtonStyle, background: '#FFFFFF', color: '#15142E', border: '1px solid #C9C6F0' }}
+                style={{ ...smallButtonStyle, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--card-border)' }}
                 onClick={() =>
                   executar(
                     () => api.post(`/friends/requests/${convite.id}/decline`),
@@ -250,7 +253,7 @@ export default function Amigos() {
               <span style={mutedTextStyle}>aguardando resposta</span>
               <button
                 type="button"
-                style={{ ...smallButtonStyle, background: '#FFFFFF', color: '#15142E', border: '1px solid #C9C6F0' }}
+                style={{ ...smallButtonStyle, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--card-border)' }}
                 onClick={() =>
                   executar(
                     () => api.delete(`/friends/requests/${convite.id}`),
@@ -275,7 +278,7 @@ export default function Amigos() {
               {!amigo.sharesData && <span style={mutedTextStyle}>não compartilha dados</span>}
               <button
                 type="button"
-                style={{ ...smallButtonStyle, background: '#FFFFFF', color: '#15142E', border: '1px solid #C9C6F0' }}
+                style={{ ...smallButtonStyle, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--card-border)' }}
                 onClick={() =>
                   executar(
                     () => api.delete(`/friends/${amigo.id}`),
@@ -305,9 +308,9 @@ export default function Amigos() {
                 }}
                 style={{
                   ...smallButtonStyle,
-                  background: dias === opcao ? '#15142E' : '#FFFFFF',
-                  color: dias === opcao ? '#FFE9B5' : '#15142E',
-                  border: '1px solid #C9C6F0',
+                  background: dias === opcao ? 'var(--color-noite)' : 'var(--bg-secondary)',
+                  color: dias === opcao ? 'var(--color-luar)' : 'var(--text-primary)',
+                  border: '1px solid var(--card-border)',
                 }}
               >
                 {opcao} dias

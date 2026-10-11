@@ -15,9 +15,9 @@ const fieldStyle = {
   minHeight: '48px',
   fontSize: '16px',
   padding: '0.6rem 0.75rem',
-  border: '1px solid #C9C6F0',
+  border: '1px solid var(--input-border)',
   borderRadius: '10px',
-  background: '#FFFFFF',
+  background: 'var(--input-bg)',
   boxSizing: 'border-box',
 };
 
@@ -80,7 +80,7 @@ export default function Registrar() {
   return (
     <div style={{ maxWidth: '480px' }}>
       <h1>Registrar noite</h1>
-      <p style={{ color: '#4B4A6B' }}>
+      <p style={{ color: 'var(--text-muted)' }}>
         Preencha quando você dormiu e acordou. Já deixamos os horários padrão: ontem à noite e hoje de manhã.
       </p>
 
@@ -89,7 +89,7 @@ export default function Registrar() {
           Dormiu às
           <input
             type="datetime-local"
-            style={fieldStyle}
+            className="field"
             value={sleepStart}
             onChange={(e) => setSleepStart(e.target.value)}
             required
@@ -123,16 +123,8 @@ export default function Registrar() {
 
         <button
           type="submit"
-          style={{
-            minHeight: '52px',
-            fontSize: '17px',
-            fontWeight: 700,
-            border: 'none',
-            borderRadius: '10px',
-            background: '#15142E',
-            color: '#FFE9B5',
-            cursor: 'pointer',
-          }}
+          className="btn btn-primary"
+          style={{ minHeight: '52px', fontSize: '1.06rem' }}
         >
           Salvar registro
         </button>
@@ -158,15 +150,15 @@ export default function Registrar() {
           </>
         )}
         {recentLoaded && recent.length === 0 && (
-          <p style={{ color: '#4B4A6B' }}>Nenhuma noite registrada ainda.</p>
+          <p style={{ color: 'var(--text-muted)' }}>Nenhuma noite registrada ainda.</p>
         )}
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {recent.map((log) => (
             <li
               key={log.id}
               style={{
-                background: '#FFFFFF',
-                border: '1px solid #C9C6F0',
+                background: 'var(--card-bg)',
+                border: '1px solid var(--card-border)',
                 borderRadius: '10px',
                 padding: '0.6rem 0.75rem',
               }}
@@ -175,7 +167,7 @@ export default function Registrar() {
                 {formatLocal(log.sleepStart)} → {formatLocal(log.sleepEnd)}
               </strong>{' '}
               · {formatDuration(log.sleepStart, log.sleepEnd)} · nota {log.quality}
-              {log.notes && <div style={{ color: '#4B4A6B' }}>{log.notes}</div>}
+              {log.notes && <div style={{ color: 'var(--text-muted)' }}>{log.notes}</div>}
             </li>
           ))}
         </ul>
