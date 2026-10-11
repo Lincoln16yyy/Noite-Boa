@@ -2,17 +2,17 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Configuracoes from './Configuracoes';
 import { renderWithAuth } from '../test/test-utils';
+import { agendarLembrete, cancelarLembrete, lembreteAtivo, permissaoNotificacao, setLembreteAtivo } from '../lib/reminder';
 
 vi.mock('../lib/reminder', () => ({
   agendarLembrete: vi.fn(() => true),
   cancelarLembrete: vi.fn(),
-  lembreteAtivo: () => false,
-  permissaoNotificacao: () => 'granted',
+  lembreteAtivo: vi.fn(() => false),
+  permissaoNotificacao: vi.fn(() => 'granted'),
   setLembreteAtivo: vi.fn(),
   suportaNotificacao: () => true,
 }));
 
-import { agendarLembrete, cancelarLembrete } from '../lib/reminder';
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status });
@@ -30,6 +30,9 @@ describe('tela de Configurações', () => {
     vi.restoreAllMocks();
     agendarLembrete.mockClear();
     cancelarLembrete.mockClear();
+    setLembreteAtivo.mockClear();
+    lembreteAtivo.mockReturnValue(false);
+    permissaoNotificacao.mockReturnValue('granted');
     fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
       const path = String(url);
       if (path.includes('/goal') && options.method === 'PUT') {
@@ -47,10 +50,11 @@ describe('tela de Configurações', () => {
 
   afterEach(() => {
     cancelarLembrete.mockClear();
+    delete window.Notification;
   });
 
   function openScreen() {
-    renderWithAuth(<Configuracoes />, { user: mockUser, route: '/configuracoes' });
+    return renderWithAuth(<Configuracoes />, { user: mockUser, route: '/configuracoes' });
   }
 
   function calls(method, pathFragment) {
@@ -96,7 +100,7 @@ describe('tela de Configurações', () => {
 
   it('sai da conta limpando a sessão', async () => {
     openScreen();
-    fireEvent.click(screen.getByRole('button', { name: 'Sair da conta' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sair da conta' }));
 
     expect(localStorage.getItem('token')).toBeNull();
   });
@@ -109,25 +113,31 @@ describe('tela de Configurações', () => {
 
   it('ativa o lembrete pedindo permissão só no clique', async () => {
     openScreen();
-    fireEvent.click(await screen.findByLabelText('Compartilhar minha consistência com amigos'));
-    await waitFor(() => expect(screen.getByLabelText('Avisar às')).toBeInTheDocument());
-    fireEvent.click(await screen.findByLabelText('Avisar às'));
+    fireEvent.click(await screen.findByLabelText(/Avisar às/));
     await waitFor(() => expect(agendarLembrete).toHaveBeenCalledWith('23:00'));
+    expect(setLembreteAtivo).toHaveBeenCalledWith(true);
   });
 
   it('não ativa o lembrete quando a notificação é negada', async () => {
+    permissaoNotificacao.mockReturnValue('denied');
+    window.Notification = { requestPermission: vi.fn().mockResolvedValue('denied') };
     openScreen();
-    fireEvent.click(await screen.findByLabelText('Avisar às'));
-    await waitFor(() => expect(agendarLembrete).toHaveBeenCalledWith('23:00'));
+    fireEvent.click(await screen.findByLabelText(/Avisar às/));
+    await waitFor(() =>
+      expect(screen.getByText(/Notificação bloqueada/)).toBeInTheDocument(),
+    );
+    expect(agendarLembrete).not.toHaveBeenCalled();
+    expect(setLembreteAtivo).not.toHaveBeenCalled();
   });
 
   it('desativa o lembrete ao desmarcar', async () => {
     openScreen();
-    fireEvent.click(await screen.findByLabelText('Avisar às'));
+    fireEvent.click(await screen.findByLabelText(/Avisar às/));
     await waitFor(() => expect(agendarLembrete).toHaveBeenCalled());
     cancelarLembrete.mockClear();
-    fireEvent.click(await screen.findByLabelText('Avisar às'));
+    fireEvent.click(screen.getByLabelText(/Avisar às/));
     await waitFor(() => expect(cancelarLembrete).toHaveBeenCalled());
+    expect(setLembreteAtivo).toHaveBeenCalledWith(false);
   });
 
   it('pede o horário de dormir quando a meta não tem', async () => {
@@ -136,11 +146,12 @@ describe('tela de Configurações', () => {
       return jsonResponse({ targetMinutes: 480, bedtime: null, wakeTime: null });
     });
     openScreen();
-    expect(screen.queryByLabelText('Avisar às')).not.toBeInTheDocument();
-    expect(screen.getByText(/Defina o.*Horário de dormir/)).toBeInTheDocument();
+    expect(await screen.findByText(/Defina o.*Horário de dormir/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Avisar às/)).not.toBeInTheDocument();
   });
 
   it('reagenda o lembrete quando o horário de dormir muda', async () => {
+    lembreteAtivo.mockReturnValue(true);
     openScreen();
     fireEvent.change(await screen.findByLabelText('Horário de dormir'), { target: { value: '22:30' } });
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
@@ -149,6 +160,7 @@ describe('tela de Configurações', () => {
   });
 
   it('cancela o lembrete se o horário de dormir for removido', async () => {
+    lembreteAtivo.mockReturnValue(true);
     openScreen();
     fireEvent.change(await screen.findByLabelText('Horário de dormir'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));

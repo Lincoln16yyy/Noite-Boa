@@ -1,9 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
-import { api } from '../api/client';
 import Cadastro from './Cadastro';
 
 describe('tela de Cadastro', () => {
@@ -13,123 +12,104 @@ describe('tela de Cadastro', () => {
   });
 
   const renderCadastro = () => {
-    return render(<Cadastro />, {
-      wrapper: ({ children }) => (
-        <MemoryRouter initialEntries={['/cadastro']}>
-          <ThemeProvider>
-            <AuthProvider>{children}</AuthProvider>
-          </ThemeProvider>
-        </MemoryRouter>
-      ),
-    });
+    return render(
+      <MemoryRouter initialEntries={['/cadastro']}>
+        <ThemeProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/cadastro" element={<Cadastro />} />
+              <Route path="/login" element={<h1>Login</h1>} />
+            </Routes>
+          </AuthProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
+    );
   };
 
-  describe('tela de Cadastro', () => {
-    it('cria a conta e leva para o login', async () => {
-      const { screen } = render(<Cadastro />, {
-        wrapper: ({ children }) => (
-          <MemoryRouter initialEntries={['/cadastro']}>
-            <ThemeProvider>
-              <AuthProvider>{children}</AuthProvider>
-            </ThemeProvider>
-          </MemoryRouter>
-        ),
-      });
+  it('cria a conta e leva para o login', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/me')) return new Response('null', { status: 200 });
+      return new Response(JSON.stringify({ id: '1', email: 'ana@exemplo.com' }), { status: 201 });
+    });
 
-      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ id: '1', email: 'ana@exemplo.com' }), { status: 201 }),
-      );
+    renderCadastro();
 
-      fireEvent.change(screen.getByPlaceholderText('Nome'), { target: { value: 'Ana' } });
-      fireEvent.change(screen.getByPlaceholderText('E-mail'), {
-        target: { value: 'ana@exemplo.com' },
-      });
-      fireEvent.change(screen.getByPlaceholderText('Senha (mín. 8 caracteres)'), {
-        target: { value: 'senha1234' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
+    fireEvent.change(screen.getByPlaceholderText('Nome'), { target: { value: 'Ana' } });
+    fireEvent.change(screen.getByPlaceholderText('E-mail'), {
+      target: { value: 'ana@exemplo.com' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Senha (mín. 8 caracteres)'), {
+      target: { value: 'senha1234' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
 
-      await waitFor(() => expect(window.location.pathname).toBe('/login'));
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/auth/register'),
-        expect.objectContaining({
-          body: JSON.stringify({
-            displayName: 'Ana',
-            email: 'ana@exemplo.com',
-            password: 'senha1234',
-          }),
+    // Navega para a tela de login (MemoryRouter)
+    expect(await screen.findByRole('heading', { name: 'Login' })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/register'),
+      expect.objectContaining({
+        body: JSON.stringify({
+          displayName: 'Ana',
+          email: 'ana@exemplo.com',
+          password: 'senha1234',
         }),
-      );
+      }),
+    );
+  });
+
+  it('valida a senha antes de chamar a API', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      // Sessão inicial do AuthProvider; o cadastro não deve chegar aqui
+      if (String(url).includes('/me')) return new Response('null', { status: 200 });
+      return new Response('{}', { status: 201 });
     });
 
-    it('valida a senha antes de chamar a API', async () => {
-      render(<Cadastro />, {
-        wrapper: ({ children }) => (
-          <MemoryRouter initialEntries={['/cadastro']}>
-            <ThemeProvider>
-              <AuthProvider>{children}</AuthProvider>
-            </ThemeProvider>
-          </MemoryRouter>
-        ),
-      });
+    renderCadastro();
 
-      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 201 }));
+    fireEvent.change(screen.getByPlaceholderText('Nome'), { target: { value: 'Ana' } });
+    fireEvent.change(screen.getByPlaceholderText('E-mail'), {
+      target: { value: 'ana@exemplo.com' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Senha (mín. 8 caracteres)'), {
+      target: { value: '123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
 
-      fireEvent.change(screen.getByPlaceholderText('Nome'), { target: { value: 'Ana' } });
-      fireEvent.change(screen.getByPlaceholderText('E-mail'), {
-        target: { value: 'ana@exemplo.com' },
-      });
-      fireEvent.change(screen.getByPlaceholderText('Senha (mín. 8 caracteres)'), {
-        target: { value: '123' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('pelo menos 8 caracteres');
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('/auth/register'),
+      expect.anything(),
+    );
+  });
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('pelo menos 8 caracteres');
-      expect(fetchMock).not.toHaveBeenCalled();
+  it('exibe o link da política de privacidade', () => {
+    renderCadastro();
+
+    const link = screen.getByRole('link', { name: /política de privacidade/i });
+    expect(link).toHaveAttribute('href', '/privacidade');
+  });
+
+  it('mostra o erro de e-mail duplicado vindo da API', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/auth/register')) {
+        return new Response(JSON.stringify({ detail: 'Já existe uma conta com este e-mail.' }), { status: 409 });
+      }
+      return new Response('null', { status: 200 });
     });
 
-    it('exibe o link da política de privacidade', () => {
-      render(<Cadastro />, {
-        wrapper: ({ children }) => (
-          <MemoryRouter initialEntries={['/cadastro']}>
-            <ThemeProvider>
-              <AuthProvider>{children}</AuthProvider>
-            </ThemeProvider>
-          </MemoryRouter>
-        ),
-      });
+    renderCadastro();
 
-      const link = screen.getByRole('link', { name: /política de privacidade/i });
-      expect(link).toHaveAttribute('href', '/privacidade');
+    fireEvent.change(screen.getByPlaceholderText('Nome'), { target: { value: 'Ana' } });
+    fireEvent.change(screen.getByPlaceholderText('E-mail'), {
+      target: { value: 'ana@exemplo.com' },
     });
-
-    it('mostra o erro de e-mail duplicado vindo da API', async () => {
-      render(<Cadastro />, {
-        wrapper: ({ children }) => (
-          <MemoryRouter initialEntries={['/cadastro']}>
-            <ThemeProvider>
-              <AuthProvider>{children}</AuthProvider>
-            </ThemeProvider>
-          </MemoryRouter>
-        ),
-      });
-
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ detail: 'Já existe uma conta com este e-mail.' }), { status: 409 }),
-      );
-
-      fireEvent.change(screen.getByPlaceholderText('Nome'), { target: { value: 'Ana' } });
-      fireEvent.change(screen.getByPlaceholderText('E-mail'), {
-        target: { value: 'ana@exemplo.com' },
-      });
-      fireEvent.change(screen.getByPlaceholderText('Senha (mín. 8 caracteres)'), {
-        target: { value: 'senha1234' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
-
-      expect(await screen.findByRole('alert')).toHaveTextContent('Já existe uma conta');
-      // O formulário permanece em /cadastro após erro de validação
-      expect(screen.getByPlaceholderText('Nome')).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('Senha (mín. 8 caracteres)'), {
+      target: { value: 'senha1234' },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Já existe uma conta');
+    // O formulário permanece em /cadastro após erro de validação
+    expect(screen.getByPlaceholderText('Nome')).toBeInTheDocument();
   });
 });
