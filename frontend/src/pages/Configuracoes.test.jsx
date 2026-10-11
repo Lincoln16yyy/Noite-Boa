@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Route, Routes } from 'react-router-dom';
 import Configuracoes from './Configuracoes';
 import { renderWithAuth } from '../test/test-utils';
 import { agendarLembrete, cancelarLembrete, lembreteAtivo, permissaoNotificacao, setLembreteAtivo } from '../lib/reminder';
@@ -165,5 +166,82 @@ describe('tela de Configurações', () => {
     fireEvent.change(await screen.findByLabelText('Horário de dormir'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
     await waitFor(() => expect(cancelarLembrete).toHaveBeenCalled());
+  });
+
+  it('mostra a seção de excluir conta', async () => {
+    openScreen();
+    expect(await screen.findByText('Excluir conta')).toBeInTheDocument();
+    expect(screen.getByText(/irreversível/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('seu@email.com ou EXCLUIR')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Excluir minha conta' })).toBeInTheDocument();
+  });
+
+  it('recusa exclusão com confirmação inválida', async () => {
+    openScreen();
+    fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), { target: { value: 'errado' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.length).toBeGreaterThan(0);
+    expect(alerts[0]).toHaveTextContent(/Digite seu e-mail ou "EXCLUIR"/);
+    expect(calls('DELETE', '/me').length).toBe(0);
+    expect(localStorage.getItem('token')).toBe('mock-token');
+  });
+
+  it('exclui a conta com confirmação por e-mail e leva para a página inicial', async () => {
+    fetchMock.mockImplementation(async (url, options = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+    renderWithAuth(
+      <Routes>
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/" element={<h1>Página inicial</h1>} />
+      </Routes>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+    fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), { target: { value: 'ana@exemplo.com' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
+    await waitFor(() => expect(calls('DELETE', '/me').length).toBe(1));
+    expect(await screen.findByRole('heading', { name: 'Página inicial' })).toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('exclui a conta com confirmação EXCLUIR', async () => {
+    fetchMock.mockImplementation(async (url, options = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+    openScreen();
+    fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), { target: { value: 'EXCLUIR' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
+    await waitFor(() => expect(calls('DELETE', '/me').length).toBe(1));
+    await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
+  });
+
+  it('mantém a sessão e mostra erro quando a exclusão falha no servidor', async () => {
+    fetchMock.mockImplementation(async (url, options = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'DELETE') {
+        return jsonResponse({ detail: 'Erro interno. Tente novamente.' }, 500);
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+    openScreen();
+    fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), { target: { value: 'EXCLUIR' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Erro interno. Tente novamente.');
+    // A sessão local não pode ser apagada quando o servidor falha
+    expect(localStorage.getItem('token')).toBe('mock-token');
+    expect(screen.getByRole('button', { name: 'Excluir minha conta' })).toBeEnabled();
   });
 });

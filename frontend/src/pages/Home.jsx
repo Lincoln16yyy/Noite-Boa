@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import styles from './Home.module.css';
 
 const STEPS = [
@@ -17,8 +17,17 @@ const STEPS = [
 ];
 
 export default function Home() {
+  const [searchParams] = useSearchParams();
+  const contaExcluida = searchParams.get('deleted') === 'true';
+
   return (
     <div className={styles.page}>
+      {contaExcluida && (
+        <p role="status" className={styles.notice}>
+          Sua conta foi excluída. Seus registros, metas e amizades foram apagados — pode criar
+          uma nova conta quando quiser.
+        </p>
+      )}
       <section className={styles.hero} aria-labelledby="hero-title">
         <div className={styles.brand}>
           <img src="/mark-light.svg" alt="" className={styles.mark} />
