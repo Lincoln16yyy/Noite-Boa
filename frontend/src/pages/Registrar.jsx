@@ -7,6 +7,7 @@ import {
   toApiPayload,
   validateSleepForm,
 } from '../lib/sleep';
+import LoadingWarning from '../components/LoadingWarning';
 
 const QUALITY_LABELS = ['1 Péssima', '2 Ruim', '3 Ok', '4 Boa', '5 Ótima'];
 
@@ -179,7 +180,12 @@ export default function Registrar() {
 
       <section aria-label="Seus últimos registros" style={{ marginTop: '1.5rem' }}>
         <h2 style={{ fontSize: '18px' }}>Seus últimos registros</h2>
-        {!recentLoaded && <p>Carregando…</p>}
+        {!recentLoaded && (
+          <>
+            <p>Carregando…</p>
+            <LoadingWarning isLoading={true} />
+          </>
+        )}
         {recentLoaded && recent.length === 0 && (
           <p style={{ color: '#4B4A6B' }}>Nenhuma noite registrada ainda.</p>
         )}

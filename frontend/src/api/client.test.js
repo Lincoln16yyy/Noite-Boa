@@ -1,10 +1,11 @@
 import { vi } from 'vitest';
-import { api } from './client';
+import { api, setTimeout } from './client';
 
 describe('api client', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+    setTimeout(30000); // reset to default
   });
 
   it('attaches token when present', async () => {
@@ -39,5 +40,17 @@ describe('api client', () => {
       new Response(JSON.stringify({ detail: 'Já existe uma conta com este e-mail.' }), { status: 409 }),
     );
     await expect(api.post('/auth/register', {})).rejects.toThrow('Já existe uma conta');
+  });
+
+  // Issue #107: timeout e erro de rede com mensagem amigável
+  it('lança mensagem amigável em caso de erro de rede (Failed to fetch)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(api.get('/me')).rejects.toThrow('Não foi possível conectar ao servidor');
+  });
+
+  it('permite configurar timeout via setTimeout', () => {
+    setTimeout(5000);
+    // não testa internamente, mas garante que a função existe e é exportada
+    expect(typeof setTimeout).toBe('function');
   });
 });

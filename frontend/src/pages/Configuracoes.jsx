@@ -9,6 +9,7 @@ import {
   setLembreteAtivo as salvarLembrete,
   suportaNotificacao,
 } from '../lib/reminder';
+import LoadingWarning from '../components/LoadingWarning';
 
 const TIMEZONES =
   typeof Intl.supportedValuesOf === 'function'
@@ -148,7 +149,12 @@ export default function Configuracoes() {
     setMsgLembrete(`Lembrete armado para ${bedtime}, enquanto o app estiver aberto.`);
   }
 
-  if (loading) return <p>Carregando…</p>;
+  if (loading) return (
+    <>
+      <p>Carregando…</p>
+      <LoadingWarning isLoading={true} />
+    </>
+  );
 
   return (
     <div style={{ maxWidth: '480px' }}>
@@ -201,9 +207,12 @@ export default function Configuracoes() {
       </form>
 
       {error && (
-        <p role="alert" style={{ color: 'var(--color-erro-texto)' }}>
-          {error}
-        </p>
+        <div role="alert" style={{ ...buttonStyle, background: '#FDE8E8', border: '1px solid #F5B8B8', color: 'var(--color-erro-texto)', textAlign: 'left', marginTop: '0.5rem' }}>
+          <p style={{ marginTop: 0 }}>{error}</p>
+          <button type="button" style={{ ...buttonStyle, background: '#15142E', color: '#FFE9B5', border: 'none', marginTop: '0.5rem' }} onClick={() => window.location.reload()}>
+            Tentar novamente
+          </button>
+        </div>
       )}
       {success && (
         <p role="status" style={{ color: 'var(--color-sucesso-texto)' }}>

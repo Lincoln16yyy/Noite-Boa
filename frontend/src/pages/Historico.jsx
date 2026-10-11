@@ -8,6 +8,7 @@ import {
   toLocalInput,
   validateSleepForm,
 } from '../lib/sleep';
+import LoadingWarning from '../components/LoadingWarning';
 
 const PAGE_SIZE = 10;
 const QUALITY_LABELS = ['1 Péssima', '2 Ruim', '3 Ok', '4 Boa', '5 Ótima'];
@@ -132,12 +133,20 @@ export default function Historico() {
       <h1>Histórico</h1>
 
       {error && (
-        <p role="alert" style={{ color: 'var(--color-erro-texto)' }}>
-          {error}
-        </p>
+        <div role="alert" style={{ ...cardStyle, borderColor: 'var(--color-erro)', marginBottom: '0.75rem' }}>
+          <p style={{ marginTop: 0, color: 'var(--color-erro-texto)' }}>{error}</p>
+          <button type="button" style={smallButtonStyle} onClick={() => load(page)}>
+            Tentar novamente
+          </button>
+        </div>
       )}
 
-      {loading && <p>Carregando…</p>}
+      {loading && (
+        <>
+          <p>Carregando…</p>
+          <LoadingWarning isLoading={true} />
+        </>
+      )}
 
       {!loading && totalElements === 0 && (
         <div style={{ ...cardStyle, alignItems: 'flex-start' }}>

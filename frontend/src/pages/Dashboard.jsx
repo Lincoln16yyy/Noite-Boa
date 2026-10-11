@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { formatHours, formatMinutes } from '../lib/dashboard';
+import LoadingWarning from '../components/LoadingWarning';
 
 // Recharts pesa o bundle: o gráfico só carrega quando o dashboard precisa dele.
 const SleepChart = lazy(() => import('../components/SleepChart'));
@@ -83,7 +84,12 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {status === 'loading' && <p>Carregando…</p>}
+      {status === 'loading' && (
+        <>
+          <p>Carregando…</p>
+          <LoadingWarning isLoading={true} />
+        </>
+      )}
 
       {status === 'error' && (
         <div role="alert" style={{ ...cardStyle, borderColor: '#E5484D' }}>
