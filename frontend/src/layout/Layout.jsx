@@ -1,6 +1,10 @@
 import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+
+/** Breakpoint único da navegação (issue #157): até 767px é celular. */
+const CONSULTA_CELULAR = '(max-width: 767px)';
 
 /** Rotas protegidas: só acessíveis com usuário logado */
 const PROTECTED_ROUTES = ['/registrar', '/historico', '/dashboard', '/amigos', '/sons', '/configuracoes'];
@@ -35,7 +39,9 @@ const MORE_ITEMS = [
 export default function Layout() {
   const { user, loading, logout } = useAuth();
   const location = useLocation();
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  // Reativo a redimensionamento/rotação (media query do navegador), não um
+  // `window.innerWidth` lido uma única vez no primeiro render.
+  const isMobile = useMediaQuery(CONSULTA_CELULAR);
   const [moreOpen, setMoreOpen] = useState(false);
 
   // Redireciona rotas protegidas se não logado
@@ -122,6 +128,10 @@ export default function Layout() {
           <img src="/logo-horizontal-dark.svg" alt="" style={{ height: '36px', width: 'auto' }} />
         </Link>
 
+        {/* No celular logado o cabeçalho fica só com o logo: a navegação vai
+            para a barra inferior, sem duplicar. Visitante segue com
+            Entrar/Cadastrar (não há barra inferior para ele). */}
+        {(!isMobile || !user) && (
         <nav aria-label="Navegação principal" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           {user ? (
             <>
@@ -205,10 +215,11 @@ export default function Layout() {
             </>
           )}
         </nav>
+        )}
       </header>
 
-      {/* Bottom bar mobile */}
-      {isMobile && (
+      {/* Bottom bar mobile (só para usuário logado) */}
+      {isMobile && user && (
         <nav
           aria-label="Navegação principal"
           style={{
@@ -292,12 +303,6 @@ export default function Layout() {
                   animation: 'slideUp 0.15s ease-out',
                 }}
               >
-                <style jsx>{`
-                  @keyframes slideUp {
-                    from { opacity: 0; transform: translateY(8px); }
-                    to { opacity: 1; transform: translateY(0); }
-                  }
-                `}</style>
                 {MORE_ITEMS.map((item) =>
                   item.action ? (
                     <button

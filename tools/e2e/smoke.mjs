@@ -203,6 +203,33 @@ try {
     ]);
   });
 
+  // Issue #157: layout reage ao tamanho sem recarregar (media query), sem
+  // duplicar a navegação no celular (menu do cabeçalho + barra inferior).
+  await verificar.check('layout responsivo: celular sem menu duplicado, desktop sem barra', async () => {
+    const estadoLayout = () => pagina.evaluate(() => {
+      const cabecalho = document.querySelector('header');
+      const linksCabecalho = cabecalho ? cabecalho.querySelectorAll('nav a').length : 0;
+      const temBarra = Array.from(document.querySelectorAll('button'))
+        .some((b) => (b.getAttribute('aria-label') || '') === 'Mais opções');
+      return { linksCabecalho, temBarra };
+    });
+
+    await irPara('/dashboard');
+
+    await pagina.setViewport({ width: 390, height: 844 });
+    await dormir(300);
+    const celular = await estadoLayout();
+    if (celular.linksCabecalho !== 0) throw new Error(`cabeçalho com ${celular.linksCabecalho} link(s) no celular (390px)`);
+    if (!celular.temBarra) throw new Error('barra inferior não apareceu no celular (390px)');
+
+    // Alarga para desktop SEM recarregar: o layout deve mudar sozinho.
+    await pagina.setViewport({ width: 1280, height: 800 });
+    await dormir(300);
+    const desktop = await estadoLayout();
+    if (desktop.linksCabecalho === 0) throw new Error('cabeçalho sem links no desktop (1280px)');
+    if (desktop.temBarra) throw new Error('barra inferior ainda aparece no desktop (1280px)');
+  });
+
   await verificar.check('sair desloga', async () => {
     await irPara('/dashboard');
     await pagina.click('button[aria-label="Sair da conta"]');
