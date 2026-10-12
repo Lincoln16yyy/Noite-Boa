@@ -129,6 +129,7 @@ SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
 | `JWT_SECRET` | valor só de dev | **Obrigatório em produção** (assina os tokens) |
 | `JWT_EXPIRATION_SECONDS` | `3600` | Validade do token em segundos |
 | `RATELIMIT_LOGIN_LIMITE` / `RATELIMIT_LOGIN_JANELA` | `5` / `60` | Tentativas de login por minuto por IP + e-mail; estouro responde **429** com `Retry-After` |
+| `RATELIMIT_LOGIN_EMAIL_LIMITE` / `RATELIMIT_LOGIN_EMAIL_JANELA` | `20` / `3600` | Teto de tentativas de login por e-mail, **independente do IP** (fecha o furo de forjar o IP); estouro responde **429** |
 | `RATELIMIT_CADASTRO_LIMITE` / `RATELIMIT_CADASTRO_JANELA` | `5` / `3600` | Cadastros por hora por IP; estouro responde **429** com `Retry-After` |
 | `FORWARD_HEADERS_STRATEGY` | `framework` | Obtém o IP real do cliente atrás do proxy da Render (base do limite acima) |
 | `SPRING_PROFILES_ACTIVE` | — | `dev` habilita o Swagger |

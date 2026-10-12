@@ -2,7 +2,9 @@
 server:
   # Render: obter o IP real do cliente em X-Forwarded-For (necessário para o
   # limite de tentativas de login/cadastro; issue #104). Localmente não há
-  # proxy e o valor não muda nada.
+  # proxy e o valor não muda nada. Como a Render não limpa o cabeçalho vindo do
+  # cliente, o limite por IP prioriza CF-Connecting-IP (issue #155) — ver
+  # AuthController.ipConfiavel.
   forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:framework}
   port: ${PORT:8080}
 
@@ -11,6 +13,9 @@ noiteboa:
     login:        # por IP + e-mail
       limite: ${RATELIMIT_LOGIN_LIMITE:5}
       janela-segundos: ${RATELIMIT_LOGIN_JANELA:60}
+    login-email:  # por e-mail, independente do IP (issue #155)
+      limite: ${RATELIMIT_LOGIN_EMAIL_LIMITE:20}
+      janela-segundos: ${RATELIMIT_LOGIN_EMAIL_JANELA:3600}
     cadastro:     # por IP
       limite: ${RATELIMIT_CADASTRO_LIMITE:5}
       janela-segundos: ${RATELIMIT_CADASTRO_JANELA:3600}

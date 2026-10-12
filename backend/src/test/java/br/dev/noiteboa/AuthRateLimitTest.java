@@ -33,6 +33,8 @@ import java.util.UUID;
 @TestPropertySource(properties = {
     "noiteboa.ratelimit.login.limite=5",
     "noiteboa.ratelimit.login.janela-segundos=2",
+    "noiteboa.ratelimit.login-email.limite=8",
+    "noiteboa.ratelimit.login-email.janela-segundos=2",
     "noiteboa.ratelimit.cadastro.limite=5",
     "noiteboa.ratelimit.cadastro.janela-segundos=2",
 })
@@ -56,6 +58,39 @@ class AuthRateLimitTest {
             request.setRemoteAddr(ip);
             return request;
         });
+    }
+
+    /**
+     * Monta a requisição com cabeçalhos de proxy: remoteAddr (conexão direta),
+     * CF-Connecting-IP (posto pela Cloudflare, não forjável pelo cliente quando
+     * ela está na frente) e X-Forwarded-For (o cliente também pode mandar).
+     */
+    private static MockHttpServletRequestBuilder comCabecalhos(
+            MockHttpServletRequestBuilder builder, String remoteAddr, String cfConnectingIp, String xff) {
+        return builder.with(request -> {
+            request.setRemoteAddr(remoteAddr);
+            if (cfConnectingIp != null) {
+                request.addHeader("CF-Connecting-IP", cfConnectingIp);
+            }
+            if (xff != null) {
+                request.addHeader("X-Forwarded-For", xff);
+            }
+            return request;
+        });
+    }
+
+    private void loginErradoComCabecalhos(String remoteAddr, String cf, String xff, String email) throws Exception {
+        String body = "{\"email\":\"" + email + "\",\"password\":\"senha-errada\"}";
+        mockMvc.perform(comCabecalhos(
+                post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body), remoteAddr, cf, xff))
+            .andExpect(status().isUnauthorized());
+    }
+
+    private void loginCorreto(String remoteAddr, String email) throws Exception {
+        String body = "{\"email\":\"" + email + "\",\"password\":\"segredo123\"}";
+        mockMvc.perform(comCabecalhos(
+                post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body), remoteAddr, null, null))
+            .andExpect(status().isOk());
     }
 
     private void registrar(String ip, String email) throws Exception {
@@ -140,5 +175,59 @@ class AuthRateLimitTest {
         }
         // outro IP segue criando normalmente
         registrar("10.5.0.9", "outro-ip-" + UUID.randomUUID() + "@example.com");
+    }
+
+    @Test
+    void x_forwarded_for_forjado_nao_escapa_do_teto_por_email() throws Exception {
+        String email = "alvo-xff-" + UUID.randomUUID() + "@example.com";
+        registrar("10.6.0.1", email);
+
+        // Forja IP (remoteAddr + X-Forwarded-For) diferente a cada tentativa: o
+        // limite por IP não trava, mas o teto por e-mail (8) deve travar.
+        for (int i = 0; i < 8; i++) {
+            loginErradoComCabecalhos("10.6.0." + (10 + i), null, "203.0.113." + (i + 1), email);
+        }
+        String body = "{\"email\":\"" + email + "\",\"password\":\"senha-errada\"}";
+        mockMvc.perform(comCabecalhos(
+                post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body),
+                "10.6.0.200", null, "203.0.113.200"))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().exists("Retry-After"))
+            .andExpect(jsonPath("$.detail",
+                org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(email))));
+    }
+
+    @Test
+    void cf_connecting_ip_e_o_ip_confiavel_do_limite() throws Exception {
+        String email = "alvo-cf-" + UUID.randomUUID() + "@example.com";
+        registrar("10.7.0.1", email);
+
+        // remoteAddr e X-Forwarded-For forjados variando; o IP confiável é o
+        // CF-Connecting-IP (fixo): a 6ª tentativa estoura o limite por IP (5).
+        for (int i = 0; i < 5; i++) {
+            loginErradoComCabecalhos("10.7.0." + (10 + i), "198.51.100.7", "203.0.114." + (i + 1), email);
+        }
+        String body = "{\"email\":\"" + email + "\",\"password\":\"senha-errada\"}";
+        mockMvc.perform(comCabecalhos(
+                post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body),
+                "10.7.0.99", "198.51.100.7", "203.0.114.99"))
+            .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void login_correto_zera_o_teto_por_email() throws Exception {
+        String email = "alvo-limpa-" + UUID.randomUUID() + "@example.com";
+        registrar("10.8.0.1", email);
+
+        for (int i = 0; i < 4; i++) {
+            loginErradoComCabecalhos("10.8.0." + (10 + i), null, "203.0.115." + (i + 1), email);
+        }
+        loginCorreto("10.8.0.50", email); // login certo limpa os contadores
+
+        for (int i = 0; i < 4; i++) {
+            loginErradoComCabecalhos("10.8.0." + (20 + i), null, "203.0.116." + (i + 1), email);
+        }
+        // Sem a limpeza seriam 8 falhas e esta seria a 9ª -> 429; deve seguir 401
+        loginErradoComCabecalhos("10.8.0.60", null, "203.0.115.99", email);
     }
 }

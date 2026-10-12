@@ -23,18 +23,24 @@ public class AuthController {
     private final RateLimiter rateLimiter;
     private final int limiteLogin;
     private final long janelaLoginSegundos;
+    private final int limiteLoginEmail;
+    private final long janelaLoginEmailSegundos;
     private final int limiteCadastro;
     private final long janelaCadastroSegundos;
 
     public AuthController(AuthService authService, RateLimiter rateLimiter,
                           @Value("${noiteboa.ratelimit.login.limite}") int limiteLogin,
                           @Value("${noiteboa.ratelimit.login.janela-segundos}") long janelaLoginSegundos,
+                          @Value("${noiteboa.ratelimit.login-email.limite}") int limiteLoginEmail,
+                          @Value("${noiteboa.ratelimit.login-email.janela-segundos}") long janelaLoginEmailSegundos,
                           @Value("${noiteboa.ratelimit.cadastro.limite}") int limiteCadastro,
                           @Value("${noiteboa.ratelimit.cadastro.janela-segundos}") long janelaCadastroSegundos) {
         this.authService = authService;
         this.rateLimiter = rateLimiter;
         this.limiteLogin = limiteLogin;
         this.janelaLoginSegundos = janelaLoginSegundos;
+        this.limiteLoginEmail = limiteLoginEmail;
+        this.janelaLoginEmailSegundos = janelaLoginEmailSegundos;
         this.limiteCadastro = limiteCadastro;
         this.janelaCadastroSegundos = janelaCadastroSegundos;
     }
@@ -43,7 +49,7 @@ public class AuthController {
     public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request,
                                                      HttpServletRequest http) {
         // por IP: criar conta em massa sai caro (issue #104)
-        limitar("cadastro:" + ipDe(http), limiteCadastro, janelaCadastroSegundos);
+        limitar("cadastro:" + ipConfiavel(http), limiteCadastro, janelaCadastroSegundos);
         RegisterResponse response = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -53,10 +59,16 @@ public class AuthController {
             @Valid @RequestBody br.dev.noiteboa.auth.dto.LoginRequest request, HttpServletRequest http) {
         // por IP + e-mail: adivinhar senha de uma conta específica sai caro,
         // mas IPs diferentes (rede corporativa, celular) não se atrapalham
-        String chave = "login:" + ipDe(http) + ":" + chaveEmail(request.getEmail());
-        limitar(chave, limiteLogin, janelaLoginSegundos);
+        String chaveIpEmail = "login:" + ipConfiavel(http) + ":" + chaveEmail(request.getEmail());
+        // por e-mail, independente do IP: fecha o buraco de forjar o cabeçalho
+        // de IP e trocar de IP a cada tentativa (issue #155). Sem revelar se a
+        // conta existe: vale igual para e-mail com ou sem conta.
+        String chaveEmail = "login-email:" + chaveEmail(request.getEmail());
+        limitar(chaveIpEmail, limiteLogin, janelaLoginSegundos);
+        limitar(chaveEmail, limiteLoginEmail, janelaLoginEmailSegundos);
         br.dev.noiteboa.auth.dto.LoginResponse response = authService.login(request);
-        rateLimiter.limpar(chave); // login certo não conta contra o usuário
+        rateLimiter.limpar(chaveIpEmail); // login certo não conta contra o usuário
+        rateLimiter.limpar(chaveEmail);
         return ResponseEntity.ok(response);
     }
 
@@ -73,12 +85,27 @@ public class AuthController {
     }
 
     /**
-     * IP real do cliente com server.forward-headers-strategy=framework (configurado
-     * no application.yml): atrás do proxy da Render, getRemoteAddr devolve o IP do
-     * proxy e o cliente real vem em X-Forwarded-For. Localmente não há proxy e o
-     * endereço direto já é o do cliente.
+     * IP do cliente para o limite de tentativas (issue #155).
+     *
+     * A Render NÃO limpa o `X-Forwarded-For` que o cliente manda: ela apenas
+     * acrescenta o próprio hop. Como o `ForwardedHeaderFilter` do Spring
+     * (`server.forward-headers-strategy=framework`) reescreve `getRemoteAddr()`
+     * com o PRIMEIRO valor do cabeçalho, esse valor é controlável pelo cliente.
+     * Por isso preferimos o `CF-Connecting-IP`, que a Cloudflare (na frente da
+     * Render) sobrescreve e o cliente não consegue forjar. Sem ele (ex.: acesso
+     * direto/onrender sem Cloudflare, ou localmente) caímos no `getRemoteAddr()`.
+     *
+     * O teto por e-mail (independente do IP) é a defesa que não depende disso.
      */
-    private static String ipDe(HttpServletRequest http) {
+    private static String ipConfiavel(HttpServletRequest http) {
+        String cf = http.getHeader("CF-Connecting-IP");
+        if (cf != null && !cf.isBlank()) {
+            return cf.trim();
+        }
+        String trueClient = http.getHeader("True-Client-IP");
+        if (trueClient != null && !trueClient.isBlank()) {
+            return trueClient.trim();
+        }
         return http.getRemoteAddr();
     }
 }
