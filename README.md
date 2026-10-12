@@ -79,7 +79,18 @@ npm run build     # build de produção em frontend/dist
 
 ### O que a CI roda
 
-O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa, em cada PR: `mvn -B verify` (com PostgreSQL 16 como serviço) e `npm ci && npm run lint && npm test && npm run build`. **Só faça o merge com tudo verde.**
+O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa, em cada PR: `mvn -B verify` (com PostgreSQL 16 como serviço), `npm ci && npm run lint && npm test && npm run build` e um **teste de fumaça E2E** no navegador ([`tools/e2e`](tools/e2e)). **Só faça o merge com tudo verde.**
+
+### Teste de fumaça E2E
+
+Sobe o app compilado com a API simulada e cobre os fluxos que já quebraram sem os testes unitários pegarem (login, sessão, registrar noite, sair e modo escuro legível):
+
+```bash
+cd frontend && npm ci && npm run build
+cd ../tools/e2e && npm ci && npm run smoke
+```
+
+Detalhes em [`tools/e2e/README.md`](tools/e2e/README.md).
 
 ## API
 
