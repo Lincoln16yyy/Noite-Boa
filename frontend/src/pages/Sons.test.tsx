@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Sons from './Sons';
 import { renderWithAuth } from '../test/test-utils';
+import type { User } from '../api/types';
 
 vi.mock('../lib/player', async () => {
   const actual = await vi.importActual('../lib/player');
@@ -17,7 +18,7 @@ vi.mock('../lib/player', async () => {
 
 import * as player from '../lib/player';
 
-const mockUser = { id: 'u1', email: 'a@example.com', displayName: 'Teste', timezone: 'America/Sao_Paulo', shareWithFriends: true };
+const mockUser: User = { id: 'u1', email: 'a@example.com', displayName: 'Teste', timezone: 'America/Sao_Paulo', shareWithFriends: true };
 
 function abrirSons() {
   renderWithAuth(<Sons />, { user: mockUser, route: '/sons' });
@@ -27,9 +28,9 @@ describe('tela de Sons', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
-    player.suportaWebAudio.mockReturnValue(true);
-    player.suportaElementoAudio.mockReturnValue(true);
-    player.tocarSom.mockResolvedValue();
+    vi.mocked(player.suportaWebAudio).mockReturnValue(true);
+    vi.mocked(player.suportaElementoAudio).mockReturnValue(true);
+    vi.mocked(player.tocarSom).mockResolvedValue();
   });
 
   it('exige login (sem token redireciona após falha no /me)', async () => {
@@ -90,7 +91,7 @@ describe('tela de Sons', () => {
   });
 
   it('falha no carregamento de arquivo de áudio exibe alerta sugerindo ruídos', async () => {
-    player.tocarSom.mockRejectedValueOnce(new Error('Network error'));
+    vi.mocked(player.tocarSom).mockRejectedValueOnce(new Error('Network error'));
     abrirSons();
 
     // Seleciona uma ambiência (ex.: ondas)
@@ -104,7 +105,7 @@ describe('tela de Sons', () => {
   });
 
   it('sem suporte a Web Audio avisa nos ruídos mas permite tocar ambiências CC0', () => {
-    player.suportaWebAudio.mockReturnValue(false);
+    vi.mocked(player.suportaWebAudio).mockReturnValue(false);
     abrirSons();
 
     // Começa na chuva por padrão quando não há Web Audio
@@ -121,7 +122,7 @@ describe('tela de Sons', () => {
   });
 
   it('erro inesperado ao tocar ruído vira mensagem amigável sugerindo ambiências', async () => {
-    player.tocarSom.mockRejectedValueOnce(new Error('AudioContext crash'));
+    vi.mocked(player.tocarSom).mockRejectedValueOnce(new Error('AudioContext crash'));
     abrirSons();
 
     fireEvent.click(screen.getByRole('button', { name: 'Tocar som' }));

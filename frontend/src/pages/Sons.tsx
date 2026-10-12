@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
   SONS_DISPONIVEIS,
   ajustarVolume,
@@ -8,14 +9,14 @@ import {
   tocarSom,
 } from '../lib/player';
 
-const conteudo = {
+const conteudo: CSSProperties = {
   maxWidth: '480px',
   display: 'flex',
   flexDirection: 'column',
   gap: '1rem',
 };
 
-const opcaoStyle = {
+const opcaoStyle: CSSProperties = {
   minHeight: '48px',
   fontSize: '16px',
   display: 'flex',
@@ -24,7 +25,7 @@ const opcaoStyle = {
   cursor: 'pointer',
 };
 
-const erroStyle = {
+const erroStyle: CSSProperties = {
   background: 'var(--alert-error-bg)',
   border: '1px solid var(--alert-error-border)',
   borderRadius: '10px',
@@ -41,7 +42,8 @@ export default function Sons() {
   const [volume, setVolume] = useState(50);
   const [tocando, setTocando] = useState(false);
   const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState(null);
+  // Nulo quando não há erro; texto da mensagem quando algo falhou ao tocar.
+  const [erro, setErro] = useState<string | null>(null);
 
   const tocandoRef = useRef(false);
   const somIdRef = useRef(somId);
@@ -120,7 +122,7 @@ export default function Sons() {
     }
   }
 
-  function escolherSom(novoId) {
+  function escolherSom(novoId: string) {
     setSomId(novoId);
     setErro(null);
     if (tocandoRef.current) {
@@ -128,7 +130,7 @@ export default function Sons() {
     }
   }
 
-  function mudarVolume(novoValor) {
+  function mudarVolume(novoValor: number) {
     setVolume(novoValor);
     ajustarVolume(novoValor / 100);
   }
