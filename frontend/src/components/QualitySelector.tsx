@@ -1,9 +1,18 @@
 import { useId } from 'react';
+import type { CSSProperties } from 'react';
+
+/** Uma nota de qualidade do sono (1-5) com rótulo e emoji. */
+export interface QualityOption {
+  value: number;
+  label: string;
+  shortLabel: string;
+  emoji: string;
+}
 
 /**
  * Rótulos de qualidade com emojis discretos
  */
-export const QUALITY_OPTIONS = [
+export const QUALITY_OPTIONS: QualityOption[] = [
   { value: 1, label: 'Péssima', shortLabel: '1', emoji: '😫' },
   { value: 2, label: 'Ruim', shortLabel: '2', emoji: '😕' },
   { value: 3, label: 'Ok', shortLabel: '3', emoji: '😐' },
@@ -11,18 +20,26 @@ export const QUALITY_OPTIONS = [
   { value: 5, label: 'Ótima', shortLabel: '5', emoji: '😄' },
 ];
 
+/** Props de `QualitySelector`. */
+export interface QualitySelectorProps {
+  /** Valor atual (1-5, 0 = não selecionado) */
+  value: number;
+  /** Callback de mudança */
+  onChange: (value: number) => void;
+  /** Nome do radiogroup (para formulários) */
+  name?: string;
+  /** Desabilita o seletor */
+  disabled?: boolean;
+  /** Legenda do fieldset */
+  legend?: string;
+  /** ID do elemento de erro (aria-describedby) */
+  errorId?: string;
+}
+
 /**
  * Seletor de qualidade de sono acessível.
  * Radiogroup nativo com rótulos visuais (emoji + texto curto) e títulos completos.
  * Usa tokens CSS da identidade visual.
- *
- * @param {Object} props
- * @param {number} props.value - Valor atual (1-5, 0 = não selecionado)
- * @param {(value: number) => void} props.onChange - Callback de mudança
- * @param {string} [props.name] - Nome do radiogroup (para formulários)
- * @param {boolean} [props.disabled] - Desabilita o seletor
- * @param {string} [props.legend] - Legenda do fieldset
- * @param {string} [props.errorId] - ID do elemento de erro (aria-describedby)
  */
 export default function QualitySelector({
   value,
@@ -31,7 +48,7 @@ export default function QualitySelector({
   disabled = false,
   legend = 'Como foi a noite?',
   errorId,
-}) {
+}: QualitySelectorProps) {
   const groupId = useId();
 
   return (
@@ -70,20 +87,20 @@ export default function QualitySelector({
   );
 }
 
-const fieldsetStyle = {
+const fieldsetStyle: CSSProperties = {
   border: 'none',
   padding: 0,
   margin: 0,
 };
 
-const legendStyle = {
+const legendStyle: CSSProperties = {
   fontSize: '15px',
   fontWeight: 700,
   marginBottom: '0.5rem',
   color: 'var(--color-noite)',
 };
 
-const groupStyle = {
+const groupStyle: CSSProperties = {
   // Grade de 5 colunas: as cinco notas ficam em UMA linha no celular
   // (antes quebravam em 4 + 1). minmax(0, 1fr) deixa as colunas encolherem.
   display: 'grid',
@@ -91,14 +108,14 @@ const groupStyle = {
   gap: '0.375rem',
 };
 
-const labelStyle = {
+const labelStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   cursor: 'pointer',
   minWidth: 0,
 };
 
-const inputStyle = {
+const inputStyle: CSSProperties = {
   position: 'absolute',
   opacity: 0,
   width: 0,
@@ -106,7 +123,7 @@ const inputStyle = {
   pointerEvents: 'none',
 };
 
-const buttonStyle = (selected) => ({
+const buttonStyle = (selected: boolean): CSSProperties => ({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',

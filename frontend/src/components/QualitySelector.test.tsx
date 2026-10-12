@@ -11,9 +11,9 @@ describe('QualitySelector (issue #158)', () => {
   it('agrupa as 5 notas numa grade de 5 colunas (uma linha no celular)', () => {
     const { container } = render(<QualitySelector value={0} onChange={() => {}} />);
     // O <fieldset> e o <div> interno têm role=radiogroup; o grupo das opções é o <div>.
-    const grupo = container.querySelector('[role="radiogroup"] > div');
-    expect(grupo.style.display).toBe('grid');
-    expect(grupo.style.gridTemplateColumns).toContain('repeat(5');
+    const grupo = container.querySelector<HTMLDivElement>('[role="radiogroup"] > div');
+    expect(grupo?.style.display).toBe('grid');
+    expect(grupo?.style.gridTemplateColumns).toContain('repeat(5');
   });
 
   it('chama onChange com o valor da nota clicada', () => {

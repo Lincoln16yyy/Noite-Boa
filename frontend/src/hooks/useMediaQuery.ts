@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
  * @param {string} query - media query CSS, ex.: `(max-width: 767px)`
  * @returns {boolean} se a query está ativa no momento
  */
-export function useMediaQuery(query) {
+export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
     return window.matchMedia(query).matches;
@@ -21,7 +21,7 @@ export function useMediaQuery(query) {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
 
     const mql = window.matchMedia(query);
-    const aoMudar = (evento) => setMatches(evento.matches);
+    const aoMudar = (evento: MediaQueryListEvent) => setMatches(evento.matches);
 
     // Sincroniza caso a query tenha mudado desde a montagem.
     setMatches(mql.matches);
