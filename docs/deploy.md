@@ -34,7 +34,10 @@ de como fazer. Valores entre `<chaves>` são placeholders — substitua pelos se
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://<host-do-neon>/<banco>?sslmode=require` | Neon → Connect (veja formato abaixo) |
 | `SPRING_DATASOURCE_USERNAME` | usuário do Neon | Neon → Connect |
 | `SPRING_DATASOURCE_PASSWORD` | senha do Neon | Neon → Connect |
-| `CORS_ALLOWED_ORIGIN` | `https://<app-do-front>.vercel.app` | domínio do front na Vercel |
+| `CORS_ALLOWED_ORIGINS` | `https://<app-do-front>.vercel.app` | domínio(s) do front na Vercel, separados por vírgula |
+
+> O nome legado `CORS_ALLOWED_ORIGIN` (singular) também é aceito pelo back-end
+> como fallback, mas o nome canônico é o plural `CORS_ALLOWED_ORIGINS` (issue #192).
 
 **Formato do `SPRING_DATASOURCE_URL`:** o Neon entrega algo como
 `postgres://usuario:senha@ep-exemplo-abc123.aws.neon.tech/neondb?sslmode=require`.
@@ -94,7 +97,7 @@ Rode nesta ordem e **não pule nenhuma**:
    de que front → API → Neon funciona).
 6. **CORS:** na aba Network do navegador, a chamada para `/api/...` deve ter
    status 200 (sem erro de origem) e o header `access-control-allow-origin`
-   correspondente a `CORS_ALLOWED_ORIGIN`.
+   correspondente a `CORS_ALLOWED_ORIGINS`.
 
 ## Deploy contínuo (GitHub Actions → Render — issue #83)
 

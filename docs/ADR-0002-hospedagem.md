@@ -61,9 +61,10 @@ foram consultados nas páginas oficiais em **09/10/2026** e servem para a decis�
   ms; o pool Hikari (`DB_POOL_SIZE`, padrão 5) mantém conexões quentes entre requisições.
 - **Filesystem efêmero** na Render: nada é gravado no disco do serviço — todo
   persistência (Flyway + dados) vive no Neon.
-- **CORS de origem única** (`SecurityConfig` lê `CORS_ALLOWED_ORIGIN`): vale um
-  front-end de produção por vez; se um dia houver domínio custom + previews com API,
-  generalizar para lista de origens.
+- **CORS multi-origem** (`SecurityConfig` lê `cors.allowed-origins`, env
+  `CORS_ALLOWED_ORIGINS`, com origens separadas por vírgula; normaliza espaços e
+  barra final). O nome legado singular `CORS_ALLOWED_ORIGIN` também é aceito como
+  fallback (issue #192), então uma variável antiga no dashboard não derruba o front.
 - **Migrações na subida do serviço:** `spring.flyway.enabled=true` aplica V1..V4
   automaticamente no boot (apenas `CREATE`/`ALTER ADD COLUMN` — nada destrutivo).
   Com 1 instância free não há corrida entre instâncias; se um dia houver múltiplas,

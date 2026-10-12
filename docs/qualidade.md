@@ -43,7 +43,7 @@ cd frontend && npm run build && npx vite preview --port 4173
 
 # 2. API permitindo a origem do preview (o padrão é http://localhost:5173;
 #    sem isso as chamadas dão CORS e poluem o console da auditoria)
-cd backend && CORS_ALLOWED_ORIGIN=http://localhost:4173 SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
+cd backend && CORS_ALLOWED_ORIGINS=http://localhost:4173 SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
 
 # 3. Lighthouse em uma tela pública
 CHROME_PATH=/caminho/para/chrome npx lighthouse http://localhost:4173/ \
