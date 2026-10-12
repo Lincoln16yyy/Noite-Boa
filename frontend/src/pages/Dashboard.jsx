@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { formatHours, formatMinutes } from '../lib/dashboard';
+import { useAuth } from '../context/AuthContext';
 import LoadingWarning from '../components/LoadingWarning';
 
 // Recharts pesa o bundle: o gráfico só carrega quando o dashboard precisa dele.
@@ -165,6 +166,7 @@ function Metric({ title, value, hint }) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [days, setDays] = useState(7);
   const [summary, setSummary] = useState(null);
   const [goal, setGoal] = useState(null);
@@ -258,7 +260,7 @@ export default function Dashboard() {
             <section aria-label="Horas dormidas por dia">
               <h2 style={sectionTitleStyle}>Horas dormidas por dia</h2>
               <Suspense fallback={<p style={{ color: 'var(--color-lavanda)' }}>Carregando gráfico…</p>}>
-                <SleepChart summary={summary} days={days} goalHours={goalHours} />
+                <SleepChart summary={summary} days={days} goalHours={goalHours} timeZone={user?.timezone} />
               </Suspense>
             </section>
           </section>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import {
   formatDuration,
   formatLocal,
@@ -45,6 +46,8 @@ const smallButtonStyle = {
 };
 
 export default function Historico() {
+  const { user } = useAuth();
+  const fuso = user?.timezone; // fonte única: fuso do perfil (issue #102)
   const [page, setPage] = useState(0);
   const [logs, setLogs] = useState([]);
   const [totalPages, setTotalPages] = useState(0);
@@ -90,8 +93,8 @@ export default function Historico() {
     setEditError('');
     setConfirmId(null);
     setEdit({
-      sleepStart: toLocalInput(new Date(log.sleepStart)),
-      sleepEnd: toLocalInput(new Date(log.sleepEnd)),
+      sleepStart: toLocalInput(new Date(log.sleepStart), fuso),
+      sleepEnd: toLocalInput(new Date(log.sleepEnd), fuso),
       quality: log.quality,
       notes: log.notes ?? '',
     });
@@ -107,7 +110,7 @@ export default function Historico() {
     }
     setSavingEdit(true);
     try {
-      await api.put(`/sleep-logs/${editingId}`, toApiPayload(edit));
+      await api.put(`/sleep-logs/${editingId}`, toApiPayload(edit, fuso));
       setEditingId(null);
       await load(page);
     } catch (err) {
@@ -172,7 +175,7 @@ export default function Historico() {
               {!editing && (
                 <>
                   <strong>
-                    {formatLocal(log.sleepStart)} → {formatLocal(log.sleepEnd)}
+                    {formatLocal(log.sleepStart, fuso)} → {formatLocal(log.sleepEnd, fuso)}
                   </strong>{' '}
                   <span>
                     {formatDuration(log.sleepStart, log.sleepEnd)} · nota {log.quality}

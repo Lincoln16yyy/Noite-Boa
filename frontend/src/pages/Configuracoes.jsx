@@ -10,6 +10,7 @@ import {
   suportaNotificacao,
 } from '../lib/reminder';
 import { useTheme } from '../context/ThemeContext';
+import { fusoDoAparelho } from '../lib/fuso';
 import LoadingWarning from '../components/LoadingWarning';
 
 const TIMEZONES =
@@ -23,6 +24,7 @@ const toTimeInput = (value) => (value ? String(value).slice(0, 5) : '');
 export default function Configuracoes() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+  const fusoAparelho = fusoDoAparelho();
   const [me, setMe] = useState(null);
   const [hours, setHours] = useState('');
   const [bedtime, setBedtime] = useState('');
@@ -92,6 +94,23 @@ export default function Configuracoes() {
         if (bedtime) agendarLembrete(bedtime);
         else cancelarLembrete();
       }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** Aviso de fuso diferente (issue #102): alinha o perfil ao do aparelho. */
+  async function atualizarFusoDoAparelho() {
+    setError('');
+    setSuccess('');
+    setSaving(true);
+    try {
+      const updatedMe = await api.put('/me', { timezone: fusoAparelho });
+      setMe(updatedMe);
+      setTimezone(updatedMe.timezone);
+      setSuccess('Fuso horário atualizado para o do aparelho.');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -208,6 +227,28 @@ export default function Configuracoes() {
             ))}
           </select>
         </label>
+
+        {me && me.timezone && fusoAparelho && fusoAparelho !== me.timezone && (
+          <div
+            role="status"
+            style={{
+              border: '1px solid var(--card-border)',
+              borderRadius: '10px',
+              padding: '0.75rem',
+              marginTop: '0.5rem',
+              color: 'var(--text-muted)',
+              fontSize: '15px',
+            }}
+          >
+            <p style={{ marginTop: 0 }}>
+              Este aparelho está em <strong>{fusoAparelho}</strong>, mas seu perfil usa{' '}
+              <strong>{me.timezone}</strong> — dias e estatísticas seguem o fuso do perfil.
+            </p>
+            <button type="button" className="btn" onClick={atualizarFusoDoAparelho} disabled={saving}>
+              {saving ? 'Salvando…' : `Usar o fuso do aparelho (${fusoAparelho})`}
+            </button>
+          </div>
+        )}
 
         <button type="submit" className="btn btn-primary" disabled={saving}>
           {saving ? 'Salvando…' : 'Salvar alterações'}

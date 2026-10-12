@@ -19,8 +19,8 @@ import { buildDailySeries } from '../lib/dashboard';
  * - Barras abaixo da meta: Âmbar (#FFB347)
  * - Linha da meta tracejada: Luar (#FFE9B5)
  */
-export default function SleepChart({ summary, days, goalHours }) {
-  const data = buildDailySeries(summary, days);
+export default function SleepChart({ summary, days, goalHours, timeZone }) {
+  const data = buildDailySeries(summary, days, new Date(), timeZone);
 
   // Determina cor de cada barra baseado na meta
   const getBarColor = (hours) => (hours > 0 && hours < goalHours ? 'var(--color-ambar)' : 'var(--color-lavanda)');

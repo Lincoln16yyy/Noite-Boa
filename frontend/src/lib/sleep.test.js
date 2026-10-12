@@ -82,3 +82,43 @@ describe('formatDuration', () => {
     expect(formatDuration('2026-10-07T23:00:00Z', '2026-10-08T06:30:00Z')).toBe('7h30m');
   });
 });
+
+describe('fuso do perfil (issue #102)', () => {
+  const agora = new Date('2026-01-10T02:00:00Z'); // SP: 09/01 23:00 · Tokyo: 10/01 11:00
+
+  it('smartDefaults segue a virada de dia do fuso do perfil', () => {
+    // São Paulo às 23h: "hoje 07:00" do perfil (dia 09), ontem 23:00 vira 08
+    expect(smartDefaults(agora, 'America/Sao_Paulo')).toEqual({
+      sleepStart: '2026-01-08T23:00',
+      sleepEnd: '2026-01-09T07:00',
+    });
+    // Tóquio às 11h: dia 10 de Tóquio — outro resultado para o MESMO instante
+    expect(smartDefaults(agora, 'Asia/Tokyo')).toEqual({
+      sleepStart: '2026-01-09T23:00',
+      sleepEnd: '2026-01-10T07:00',
+    });
+  });
+
+  it('smartDefaults de madrugada vira "agora" no fuso do perfil', () => {
+    const madrugada = new Date('2026-01-10T06:00:00Z'); // SP: 03:00
+    expect(smartDefaults(madrugada, 'America/Sao_Paulo')).toEqual({
+      sleepStart: '2026-01-09T23:00',
+      sleepEnd: '2026-01-10T03:00',
+    });
+  });
+
+  it('toApiPayload interpreta os horários digitados no fuso do perfil', () => {
+    const payload = toApiPayload(
+      { sleepStart: '2026-01-09T23:00', sleepEnd: '2026-01-10T07:00', quality: 4, notes: null },
+      'Asia/Tokyo',
+    );
+    expect(payload.sleepStart).toBe('2026-01-09T14:00:00.000Z'); // 23:00 em Tóquio
+    expect(payload.sleepEnd).toBe('2026-01-09T22:00:00.000Z'); // 07:00 em Tóquio
+  });
+
+  it('toApiPayload sem fuso continua no horário do aparelho (comportamento antigo)', () => {
+    const payload = toApiPayload({ sleepStart: '2026-01-09T23:00', sleepEnd: '2026-01-10T07:00', quality: 4, notes: null });
+    expect(payload.sleepStart).toBe(new Date('2026-01-09T23:00').toISOString());
+    expect(payload.sleepEnd).toBe(new Date('2026-01-10T07:00').toISOString());
+  });
+});

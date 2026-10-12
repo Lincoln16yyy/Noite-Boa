@@ -29,7 +29,7 @@ describe('tela de Histórico', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
-    state = { logs: [baseLog] };
+    state = { logs: [baseLog], timezone: 'America/Sao_Paulo' };
 
     fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
       const id = typeof url === 'string' ? (url.match(/sleep-logs\/([^?]+)/) || [])[1] : null;
@@ -46,7 +46,7 @@ describe('tela de Histórico', () => {
       if (options.method === 'POST') {
         return jsonResponse({ id: 'novo', ...JSON.parse(options.body) }, 201);
       }
-      if (String(url).includes('/me')) return jsonResponse(mockUser);
+      if (String(url).includes('/me')) return jsonResponse({ ...mockUser, timezone: state.timezone });
       const pageParam = Number((String(url).match(/page=(\d+)/) || [])[1] ?? 0);
       return jsonResponse(pageResponse(pageParam === 0 ? state.logs : []));
     });
@@ -159,5 +159,35 @@ describe('tela de Histórico', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Anterior' }));
     expect(await screen.findByText('dormi bem')).toBeInTheDocument();
     expect(screen.getByText(/Página 1 de 3/)).toBeInTheDocument();
+  });
+
+  it('exibe os horários no fuso do perfil, não no do aparelho (issue #102)', async () => {
+    // 2026-10-07T23:00Z: São Paulo = 07/10 20h00 · Tóquio = 08/10 08h00
+    state.timezone = 'America/Sao_Paulo';
+    openScreen();
+    expect(await screen.findByText('07/10 20h00 → 08/10 04h00')).toBeInTheDocument();
+
+    state.timezone = 'Asia/Tokyo';
+    openScreen();
+    expect(await screen.findByText('08/10 08h00 → 08/10 16h00')).toBeInTheDocument();
+  });
+
+  it('abre a edição e envia no fuso do perfil (issue #102)', async () => {
+    state.timezone = 'Asia/Tokyo';
+    openScreen();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar' }));
+    // parede em Tóquio: 2026-10-07T23:00Z = 08/10 08:00 (acordou 16:00)
+    const startInput = await screen.findByDisplayValue('2026-10-08T08:00');
+    fireEvent.change(startInput, { target: { value: '2026-10-08T06:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => {
+      const putCall = fetchMock.mock.calls.find(([, options]) => options.method === 'PUT');
+      expect(putCall).toBeTruthy();
+      const body = JSON.parse(putCall[1].body);
+      // digitou 06:00 de parede em Tóquio (UTC+9) → 2026-10-07T21:00Z
+      expect(body.sleepStart).toBe('2026-10-07T21:00:00.000Z');
+    });
   });
 });

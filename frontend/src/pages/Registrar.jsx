@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import {
   formatDuration,
   formatLocal,
@@ -22,6 +23,8 @@ const fieldStyle = {
 };
 
 export default function Registrar() {
+  const { user } = useAuth();
+  const fuso = user?.timezone; // fonte única: fuso do perfil (issue #102)
   const [sleepStart, setSleepStart] = useState('');
   const [sleepEnd, setSleepEnd] = useState('');
   const [quality, setQuality] = useState(0);
@@ -31,12 +34,13 @@ export default function Registrar() {
   const [saving, setSaving] = useState(false);
   const [recent, setRecent] = useState([]);
   const [recentLoaded, setRecentLoaded] = useState(false);
+  const digitouRef = useRef(false); // não repor o digitado quando o fuso do perfil chegar (#102)
 
   const applyDefaults = useCallback(() => {
-    const defaults = smartDefaults();
+    const defaults = smartDefaults(new Date(), fuso);
     setSleepStart(defaults.sleepStart);
     setSleepEnd(defaults.sleepEnd);
-  }, []);
+  }, [fuso]);
 
   const loadRecent = useCallback(async () => {
     try {
@@ -49,10 +53,15 @@ export default function Registrar() {
     }
   }, []);
 
+  // Padrões com o fuso do perfil assim que ele chegar (o /me é assíncrono);
+  // quem já digitou um horário não tem o campo reposto no meio da edição.
   useEffect(() => {
-    applyDefaults();
+    if (!digitouRef.current) applyDefaults();
+  }, [applyDefaults]);
+
+  useEffect(() => {
     loadRecent();
-  }, [applyDefaults, loadRecent]);
+  }, [loadRecent]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -69,7 +78,7 @@ export default function Registrar() {
 
     setSaving(true);
     try {
-      const created = await api.post('/sleep-logs', toApiPayload(form));
+      const created = await api.post('/sleep-logs', toApiPayload(form, fuso));
       setSuccess(`Noite registrada: ${formatDuration(created.sleepStart, created.sleepEnd)} de sono.`);
       applyDefaults();
       setQuality(0);
@@ -96,7 +105,10 @@ export default function Registrar() {
             type="datetime-local"
             className="field"
             value={sleepStart}
-            onChange={(e) => setSleepStart(e.target.value)}
+            onChange={(e) => {
+              digitouRef.current = true;
+              setSleepStart(e.target.value);
+            }}
             required
           />
         </label>
@@ -107,7 +119,10 @@ export default function Registrar() {
             type="datetime-local"
             className="field"
             value={sleepEnd}
-            onChange={(e) => setSleepEnd(e.target.value)}
+            onChange={(e) => {
+              digitouRef.current = true;
+              setSleepEnd(e.target.value);
+            }}
             required
           />
         </label>
@@ -170,7 +185,7 @@ export default function Registrar() {
               }}
             >
               <strong>
-                {formatLocal(log.sleepStart)} → {formatLocal(log.sleepEnd)}
+                {formatLocal(log.sleepStart, fuso)} → {formatLocal(log.sleepEnd, fuso)}
               </strong>{' '}
               · {formatDuration(log.sleepStart, log.sleepEnd)} · nota {log.quality}
               {log.notes && <div style={{ color: 'var(--text-muted)' }}>{log.notes}</div>}

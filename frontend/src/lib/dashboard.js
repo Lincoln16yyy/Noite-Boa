@@ -1,26 +1,28 @@
 // Montagem dos dados do dashboard a partir do GET /api/stats/summary.
-// O back-end agrupa por dia local do usuário; aqui usamos a data local do
-// navegador para completar os dias sem registro com 0 h.
+// O back-end agrupa por dia local do usuário (fuso do perfil, issue #102);
+// aqui completamos os dias sem registro com 0 h NO MESMO FUSO, para a série
+// não deslocar quando o fuso do aparelho difere do perfil (viagem).
+
+import { fusoDoAparelho, isoDateNoFuso, menosDiasIso } from './fuso';
 
 const pad = (n) => String(n).padStart(2, '0');
-
-export function toIsoDate(date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
 
 /**
  * Série contínua de `days` dias terminando hoje, com as horas vindo do resumo.
  * Dias sem registro entram com 0 h (para o gráfico de barras não furar).
+ * `timeZone` é o fuso do perfil (default: o do aparelho, comportamento antigo);
+ * os dias são calculados nele, igual ao agrupamento do back-end.
  */
-export function buildDailySeries(summary, days, today = new Date()) {
+export function buildDailySeries(summary, days, today = new Date(), timeZone = fusoDoAparelho()) {
   const byDate = new Map((summary?.daily ?? []).map((day) => [day.date, day.hoursSlept]));
   const series = [];
+  const hojeIso = isoDateNoFuso(today, timeZone);
   for (let i = days - 1; i >= 0; i -= 1) {
-    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
-    const key = toIsoDate(date);
+    const key = menosDiasIso(hojeIso, i);
+    const [, mes, dia] = key.split('-');
     series.push({
       date: key,
-      label: `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`,
+      label: `${dia}/${mes}`,
       hours: byDate.get(key) ?? 0,
       hasData: byDate.has(key),
     });
