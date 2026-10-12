@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react';
 
 /**
+ * Props de `LoadingWarning`.
+ * `isLoading` fica true enquanto a requisição está em andamento;
+ * `delayMs` é o tempo antes de mostrar o aviso (padrão 4000ms).
+ */
+export interface LoadingWarningProps {
+  isLoading: boolean;
+  delayMs?: number;
+}
+
+/**
  * Componente que exibe aviso "Acordando o servidor…" após um atraso.
  * Usado quando o primeiro acesso ao servidor Render gratuito pode demorar.
- *
- * @param {boolean} isLoading - true enquanto a requisição está em andamento
- * @param {number} delayMs - ms antes de mostrar o aviso (padrão 4000)
- * @returns {JSX.Element | null}
  */
-export default function LoadingWarning({ isLoading, delayMs = 4000 }) {
+export default function LoadingWarning({ isLoading, delayMs = 4000 }: LoadingWarningProps) {
   const [showWarning, setShowWarning] = useState(false);
 
   useEffect(() => {

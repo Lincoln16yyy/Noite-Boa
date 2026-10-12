@@ -10,6 +10,19 @@ import {
   Cell,
 } from 'recharts';
 import { buildDailySeries } from '../lib/dashboard';
+import type { StatsSummary } from '../api/types';
+
+/** Props de `SleepChart`. */
+export interface SleepChartProps {
+  /** Resumo do back-end (pode faltar `daily`); ver `buildDailySeries`. */
+  summary: Pick<StatsSummary, 'daily'> | null;
+  /** Número de dias da série. */
+  days: number;
+  /** Meta de horas (linha tracejada). */
+  goalHours: number;
+  /** Fuso do perfil para calcular os dias (default: o do aparelho). */
+  timeZone?: string;
+}
 
 /**
  * Gráfico de barras das horas dormidas por dia com a linha da meta.
@@ -19,11 +32,12 @@ import { buildDailySeries } from '../lib/dashboard';
  * - Barras abaixo da meta: Âmbar (#FFB347)
  * - Linha da meta tracejada: Luar (#FFE9B5)
  */
-export default function SleepChart({ summary, days, goalHours, timeZone }) {
+export default function SleepChart({ summary, days, goalHours, timeZone }: SleepChartProps) {
   const data = buildDailySeries(summary, days, new Date(), timeZone);
 
   // Determina cor de cada barra baseado na meta
-  const getBarColor = (hours) => (hours > 0 && hours < goalHours ? 'var(--color-ambar)' : 'var(--color-lavanda)');
+  const getBarColor = (hours: number): string =>
+    hours > 0 && hours < goalHours ? 'var(--color-ambar)' : 'var(--color-lavanda)';
 
   return (
     <div

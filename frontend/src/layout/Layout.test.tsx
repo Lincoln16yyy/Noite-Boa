@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { mockMe, renderWithAuth } from '../test/test-utils';
 import Layout from './Layout';
+import type { User } from '../api/types';
 
-const usuario = {
+const usuario: User = {
   id: 'u1',
   email: 'a@example.com',
   displayName: 'Teste',
@@ -17,29 +18,38 @@ const matchMediaOriginal = window.matchMedia;
  * matchMedia controlável: o teste decide se a media query de celular casa e
  * pode trocar isso em tempo real para simular rotação/redimensionamento.
  */
-function instalarMatchMedia(celularInicial) {
+function instalarMatchMedia(celularInicial: boolean) {
   let celular = celularInicial;
-  const listeners = new Set();
-  const criar = (query) => ({
+  const listeners = new Set<(evento: MediaQueryListEvent) => void>();
+  const criar = (query: string) => ({
     matches: String(query).includes('max-width') ? celular : false,
     media: query,
     onchange: null,
-    addEventListener: (tipo, cb) => { if (tipo === 'change') listeners.add(cb); },
-    removeEventListener: (tipo, cb) => { if (tipo === 'change') listeners.delete(cb); },
-    addListener: (cb) => listeners.add(cb),
-    removeListener: (cb) => listeners.delete(cb),
+    addEventListener: (tipo: string, cb: (evento: MediaQueryListEvent) => void) => {
+      if (tipo === 'change') listeners.add(cb);
+    },
+    removeEventListener: (tipo: string, cb: (evento: MediaQueryListEvent) => void) => {
+      if (tipo === 'change') listeners.delete(cb);
+    },
+    addListener: (cb: (evento: MediaQueryListEvent) => void) => listeners.add(cb),
+    removeListener: (cb: (evento: MediaQueryListEvent) => void) => listeners.delete(cb),
     dispatchEvent: () => true,
   });
-  window.matchMedia = vi.fn(criar);
+  // Dublê de MediaQueryList instalado como propriedade própria do window via
+  // defineProperty (o "value" do descriptor é `any`, então não precisamos
+  // replicar as sobrecargas de addEventListener do tipo real).
+  Object.defineProperty(window, 'matchMedia', { value: vi.fn(criar), configurable: true, writable: true });
   return {
-    ativarCelular(novoValor) {
+    ativarCelular(novoValor: boolean) {
       celular = novoValor;
-      listeners.forEach((cb) => cb({ matches: celular, media: '(max-width: 767px)' }));
+      listeners.forEach((cb) =>
+        cb(Object.assign(new Event('change'), { matches: celular, media: '(max-width: 767px)' })),
+      );
     },
   };
 }
 
-async function renderLayout({ celular, user, route }) {
+async function renderLayout({ celular, user, route }: { celular: boolean; user: User | null; route: string }) {
   instalarMatchMedia(celular);
   if (user) mockMe(user);
   else vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
@@ -52,7 +62,7 @@ async function renderLayout({ celular, user, route }) {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  window.matchMedia = matchMediaOriginal;
+  Object.defineProperty(window, 'matchMedia', { value: matchMediaOriginal, configurable: true, writable: true });
 });
 
 describe('Layout — navegação responsiva (issue #157)', () => {

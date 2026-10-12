@@ -3,17 +3,38 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 
+/** Item do menu de navegação (desktop). */
+interface MenuItem {
+  path: string;
+  label: string;
+  exact: boolean;
+}
+
+/** Aba da barra inferior (mobile). */
+interface BottomTab {
+  path: string;
+  label: string;
+  icon: string;
+}
+
+/** Item do menu "Mais" (mobile); `action` marca itens de ação (ex.: Sair). */
+interface MoreItem {
+  path: string;
+  label: string;
+  action?: boolean;
+}
+
 /** Breakpoint único da navegação (issue #157): até 767px é celular. */
 const CONSULTA_CELULAR = '(max-width: 767px)';
 
 /** Rotas protegidas: só acessíveis com usuário logado */
-const PROTECTED_ROUTES = ['/registrar', '/historico', '/dashboard', '/amigos', '/sons', '/configuracoes'];
+const PROTECTED_ROUTES: string[] = ['/registrar', '/historico', '/dashboard', '/amigos', '/sons', '/configuracoes'];
 
 /** Rotas de autenticação: só acessíveis SEM usuário logado */
-const AUTH_ROUTES = ['/login', '/cadastro'];
+const AUTH_ROUTES: string[] = ['/login', '/cadastro'];
 
 /** Ordem dos itens no menu desktop / aba "Mais" mobile */
-const MENU_ITEMS_LOGGED_IN = [
+const MENU_ITEMS_LOGGED_IN: MenuItem[] = [
   { path: '/registrar', label: 'Registrar', exact: false },
   { path: '/historico', label: 'Histórico', exact: false },
   { path: '/dashboard', label: 'Dashboard', exact: false },
@@ -23,14 +44,14 @@ const MENU_ITEMS_LOGGED_IN = [
 ];
 
 /** 5 abas principais do bottom bar (mobile) */
-const BOTTOM_TABS = [
+const BOTTOM_TABS: BottomTab[] = [
   { path: '/registrar', label: 'Registrar', icon: '📝' },
   { path: '/historico', label: 'Histórico', icon: '📋' },
   { path: '/dashboard', label: 'Dashboard', icon: '📊' },
   { path: '/amigos', label: 'Amigos', icon: '👥' },
 ];
 
-const MORE_ITEMS = [
+const MORE_ITEMS: MoreItem[] = [
   { path: '/sons', label: 'Sons' },
   { path: '/configuracoes', label: 'Configurações' },
   { path: '/logout', label: 'Sair', action: true },
@@ -96,7 +117,7 @@ export default function Layout() {
     );
   }
 
-  const isActive = (path) => {
+  const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
