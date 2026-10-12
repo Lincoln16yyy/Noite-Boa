@@ -5,7 +5,7 @@ import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 
 /** Mocka o /me do AuthProvider: com usuário logado ou sem sessão (401). */
-function mockFetchUser(user) {
+function mockFetchUser(user: unknown) {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
     if (String(url).includes('/me')) {
       if (!user) {
