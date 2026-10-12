@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "typecheck": "tsc --noEmit",
+    "gen:api": "openapi-typescript ${API_DOCS_URL:-http://localhost:8080/v3/api-docs} -o src/api/schema.d.ts",
     "preview": "vite preview",
     "test": "vitest run"
   },
@@ -29,8 +30,9 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "jsdom": "^30.1.2",
+    "openapi-typescript": "^7.13.0",
     "oxlint": "^1.81.0",
-    "typescript": "^7.0.2",
+    "typescript": "^5.9.3",
     "vite": "^8.3.0",
     "vitest": "^5.0.3"
   }
