@@ -25,10 +25,14 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 
 /**
- * Issue #98: estatísticas e ranking consultam só o período, não o histórico
- * inteiro. Teste de equivalência: registros antigos (fora da janela de 7 dias)
- * não entram no cálculo e o resultado para dados dentro da janela é o mesmo
- * de antes (média 8h, 2 dias no "daily", dívida 1920, noites do amigo 3).
+ * Issue #98: média, consistência e série diária consultam só o período, não o
+ * histórico inteiro. Teste de equivalência: registros antigos (fora da janela de
+ * 7 dias) não entram nesses cálculos e o resultado para dados dentro da janela é
+ * o mesmo de antes (média 8h, 2 dias no "daily", noites do amigo 3).
+ *
+ * Já a DÍVIDA de sono parte do primeiro registro do HISTÓRICO do usuário (#161),
+ * não do primeiro registro dentro da janela — por isso as noites antigas mudam
+ * a dívida (1920) mesmo sem alterar média/série.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -87,7 +91,7 @@ class StatsAndRankingWindowTest {
     }
 
     @Test
-    void summaryIgnoresRecordsOutsideWindowAndKeepsSameResult() throws Exception {
+    void summaryKeepsWindowForAverageAndDailyButDebtUsesHistory() throws Exception {
         String token = token("janela-stats@example.com");
         createNight(token, 1, 8);   // ontem: 8h
         createNight(token, 2, 8);   // anteontem: 8h
@@ -101,11 +105,13 @@ class StatsAndRankingWindowTest {
             .andExpect(jsonPath("$.daily.length()").value(2))
             .andExpect(jsonPath("$.daily[0].date").value(java.time.LocalDate.now().minusDays(2).toString()))
             .andExpect(jsonPath("$.daily[1].date").value(java.time.LocalDate.now().minusDays(1).toString()))
-            // dívida: primeira noite registrada é today-2, então a janela de
-            // cálculo vai de today-2 a ontem — os dois dias têm 8h: dívida 0.
-            // (Se as noites antigas vazassem, firstSleepDate = today-42 e a
-            // dívida seria 4 × 480 = 1920.)
-            .andExpect(jsonPath("$.sleepDebtMinutes").value(0));
+            // dívida: o primeiro registro do HISTÓRICO é today-42 (fora da
+            // janela), então a janela de cálculo vai de today-6 a ontem. As
+            // noites de today-2 e today-1 têm 8h; os outros 4 dias (today-6 a
+            // today-3) não têm registro e contam como dívida cheia:
+            // 4 × 480 = 1920 (#161 mudou a regra: a janela parte do primeiro
+            // registro do usuário, não do primeiro registro dentro da janela).
+            .andExpect(jsonPath("$.sleepDebtMinutes").value(1920));
     }
 
     @Test

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface SleepLogRepository extends JpaRepository<SleepLog, UUID> {
@@ -17,6 +18,15 @@ public interface SleepLogRepository extends JpaRepository<SleepLog, UUID> {
      */
     java.util.List<SleepLog> findByUserIdAndSleepStartGreaterThanOrderBySleepStartDesc(
         UUID userId, OffsetDateTime since);
+
+    /**
+     * Início do primeiro registro de sono do usuário (histórico completo).
+     * Consulta barata (MIN por usuário) usada pela dívida de sono: a janela de
+     * cálculo parte do primeiro registro do usuário, não só dos dentro da
+     * janela consultada (#161). Vazio se o usuário nunca registrou.
+     */
+    @Query("SELECT MIN(s.sleepStart) FROM SleepLog s WHERE s.user.id = :userId")
+    Optional<OffsetDateTime> findFirstSleepStartByUserId(@Param("userId") UUID userId);
 
     /**
      * Candidatos a sobreposição (#99): registros do usuário em que

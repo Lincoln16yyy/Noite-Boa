@@ -71,7 +71,7 @@ Horários sempre em UTC no banco; conversão pelo `timezone` do usuário na hora
 **Definições das métricas (para ninguém inventar diferente):**
 - *Média de horas*: média da duração das noites no período (7 ou 30 dias).
 - *Consistência*: desvio padrão do horário de dormir no período (menor = melhor).
-- *Dívida de sono*: soma de (meta diária − dormido) nos últimos 7 dias, mínimo 0.
+- *Dívida de sono*: soma de (meta diária − dormido) nos últimos 7 dias, mínimo 0. Só conta a partir do primeiro registro do usuário no **histórico** (não da janela consultada): quem nunca registrou não tem dívida; dias sem registro dentro da janela contam como dívida cheia.
 
 ## 6. API (v1)
 
