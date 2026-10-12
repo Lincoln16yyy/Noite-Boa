@@ -15,7 +15,16 @@ import java.util.stream.Collectors;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Value("${cors.allowed-origins:http://localhost:5173}")
+    /**
+     * Origens permitidas, separadas por vírgula.
+     *
+     * Lê o nome canônico plural (`cors.allowed-origins`, env `CORS_ALLOWED_ORIGINS`)
+     * e, como fallback, o nome legado singular (`cors.allowed-origin`, env
+     * `CORS_ALLOWED_ORIGIN`) que a Render e a documentação usavam antes da #105.
+     * Sem o fallback, a variável singular era ignorada e a lista caía no default
+     * local, bloqueando o front em produção (issue #192).
+     */
+    @Value("${cors.allowed-origins:${cors.allowed-origin:http://localhost:5173}}")
     private String corsAllowedOrigins;
 
     @Bean
