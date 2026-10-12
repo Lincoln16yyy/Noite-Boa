@@ -14,11 +14,6 @@
   --color-sucesso: #2FBF9B;
   --color-erro:    #E5484D;
 
-  /* Variantes de TEXTO sobre fundo claro (WCAG AA 4,5:1) — ver docs/qualidade.md.
-     As cores acima continuam para bordas, ícones e preenchimentos. */
-  --color-sucesso-texto: #16745A; /* 5,71:1 sobre Névoa · 5,20:1 sobre branco */
-  --color-erro-texto:    #C1272D; /* 5,33:1 sobre Névoa · 5,84:1 sobre branco */
-
   /* Tipografia */
   --font-sans: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --fs-xs: 0.75rem;  --fs-sm: 0.875rem; --fs-md: 1rem;

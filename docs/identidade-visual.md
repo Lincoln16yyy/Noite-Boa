@@ -13,12 +13,12 @@
 ## Logo
 | Arquivo | Uso |
 |---|---|
-| `assets/brand/icon.svg` / `icon-512.png` | Ícone do app (PWA, loja, redes sociais) |
-| `assets/brand/icon-maskable.svg` / `icon-maskable-512.png` | Ícone PWA "maskable" (sem cantos arredondados; o sistema recorta) |
-| `assets/brand/favicon.svg` / `favicon-32.png` | Aba do navegador |
-| `assets/brand/logo-horizontal-light.svg` | Logo com texto para **fundo claro** |
-| `assets/brand/logo-horizontal-dark.svg` | Logo com texto para **fundo escuro** |
-| `assets/brand/mark-light.svg` / `mark-dark.svg` | Só a lua com a estrela, sem fundo |
+| `docs/assets/brand/icon.svg` / `icon-512.png` | Ícone do app (PWA, loja, redes sociais) |
+| `docs/assets/brand/icon-maskable.svg` / `icon-maskable-512.png` | Ícone PWA "maskable" (sem cantos arredondados; o sistema recorta) |
+| `docs/assets/brand/favicon.svg` / `favicon-32.png` | Aba do navegador |
+| `docs/assets/brand/logo-horizontal-light.svg` | Logo com texto para **fundo claro** |
+| `docs/assets/brand/logo-horizontal-dark.svg` | Logo com texto para **fundo escuro** |
+| `docs/assets/brand/mark-light.svg` / `mark-dark.svg` | Só a lua com a estrela, sem fundo |
 
 **Regras de uso**
 - Área livre ao redor do logo: no mínimo a altura da letra "N".
@@ -58,7 +58,7 @@
 Regra prática: no fundo claro o texto é Noite ou Índigo. Âmbar em fundo claro só como preenchimento de botão (com texto Noite). Mensagens de erro/sucesso em texto usam as variantes `*-texto` acima (adicionadas na issue #35; `#E5484D` e `#2FBF9B` continuam para bordas, ícones e preenchimentos) — medições em [`docs/qualidade.md`](qualidade.md).
 
 ## Tipografia
-**Nunito** (Google Fonts, licença SIL OFL, gratuita, inclusive para uso comercial). A licença está em `assets/brand/Nunito-OFL.txt`.
+**Nunito** (Google Fonts, licença SIL OFL, gratuita, inclusive para uso comercial). A licença está em `docs/assets/brand/Nunito-OFL.txt`.
 
 | Uso | Peso | Tamanho sugerido |
 |---|---|---|
@@ -67,7 +67,7 @@ Regra prática: no fundo claro o texto é Noite ou Índigo. Âmbar em fundo clar
 | Texto corrido | 400 | 16 px (mínimo 14 px) |
 | Números de destaque (ex.: 7h 42min) | 800 | 44 a 58 px, cor Luar em fundo escuro |
 
-Para usar no front-end, importe `assets/brand/tokens.css` (ele já carrega a fonte e define as variáveis de cor, tipografia, espaçamento e raios).
+Para usar no front-end, importe `docs/assets/brand/tokens.css` (ele já carrega a fonte e define as variáveis de cor, tipografia, espaçamento e raios).
 
 ## Componentes (diretrizes rápidas)
 - **Botão principal:** fundo Âmbar, texto Noite, peso 800, formato pílula.
