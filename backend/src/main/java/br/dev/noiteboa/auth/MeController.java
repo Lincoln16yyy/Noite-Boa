@@ -15,7 +15,7 @@ public class MeController {
     }
 
     @GetMapping("/api/me")
-    public ResponseEntity<?> me(Authentication authentication) {
+    public ResponseEntity<MeResponse> me(Authentication authentication) {
         String email = (String) authentication.getPrincipal();
         var user = userRepository.findByEmailIgnoreCase(email)
             .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED));
@@ -32,7 +32,7 @@ public class MeController {
     }
 
     @org.springframework.web.bind.annotation.PutMapping("/api/me")
-    public ResponseEntity<?> update(Authentication authentication,
+    public ResponseEntity<MeResponse> update(Authentication authentication,
             @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody br.dev.noiteboa.auth.dto.UpdateMeRequest request) {
         String email = (String) authentication.getPrincipal();
         var user = userRepository.findByEmailIgnoreCase(email)
