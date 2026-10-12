@@ -38,6 +38,12 @@ import java.util.UUID;
 @AutoConfigureMockMvc
 class StatsAndRankingWindowTest {
 
+    // O serviço agrupa por dia no fuso do perfil (padrão America/Sao_Paulo).
+    // O teste precisa montar as datas no mesmo fuso, senão o resultado muda com
+    // o fuso da máquina (CI em UTC quebrava entre 00h e 03h UTC) — mesmo
+    // problema do #173.
+    private static final java.time.ZoneId FUSO_PERFIL = java.time.ZoneId.of("America/Sao_Paulo");
+
     @Autowired MockMvc mockMvc;
     @Autowired UserRepository userRepository;
     @Autowired SleepLogRepository sleepLogRepository;
@@ -62,9 +68,9 @@ class StatsAndRankingWindowTest {
         return com.fasterxml.jackson.databind.json.JsonMapper.builder().build().readTree(json).get("accessToken").asText();
     }
 
-    /** Noite via HTTP: começa às 16hZ de `diasAtras` (sempre no passado). */
+    /** Noite via HTTP: começa às 16hZ de `diasAtras` (sempre no passado), no fuso do perfil. */
     private void createNight(String token, int diasAtras, int horas) throws Exception {
-        var start = java.time.LocalDate.now().minusDays(diasAtras).atTime(16, 0);
+        var start = java.time.LocalDate.now(FUSO_PERFIL).minusDays(diasAtras).atTime(16, 0);
         String body = "{\"sleepStart\":\"" + start + "Z\",\"sleepEnd\":\"" + start.plusHours(horas) + "Z\",\"quality\":4}";
         mockMvc.perform(post("/api/sleep-logs").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON).content(body))
@@ -103,8 +109,8 @@ class StatsAndRankingWindowTest {
             // só as 2 noites da janela entram: média 8h (não 7h) e 2 dias no "daily"
             .andExpect(jsonPath("$.averageHours").value(8.0))
             .andExpect(jsonPath("$.daily.length()").value(2))
-            .andExpect(jsonPath("$.daily[0].date").value(java.time.LocalDate.now().minusDays(2).toString()))
-            .andExpect(jsonPath("$.daily[1].date").value(java.time.LocalDate.now().minusDays(1).toString()))
+            .andExpect(jsonPath("$.daily[0].date").value(java.time.LocalDate.now(FUSO_PERFIL).minusDays(2).toString()))
+            .andExpect(jsonPath("$.daily[1].date").value(java.time.LocalDate.now(FUSO_PERFIL).minusDays(1).toString()))
             // dívida: o primeiro registro do HISTÓRICO é today-42 (fora da
             // janela), então a janela de cálculo vai de today-6 a ontem. As
             // noites de today-2 e today-1 têm 8h; os outros 4 dias (today-6 a
