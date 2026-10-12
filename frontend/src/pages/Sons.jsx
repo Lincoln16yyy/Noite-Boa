@@ -24,17 +24,6 @@ const opcaoStyle = {
   cursor: 'pointer',
 };
 
-const botaoStyle = {
-  minHeight: '52px',
-  fontSize: '17px',
-  fontWeight: 700,
-  border: 'none',
-  borderRadius: '10px',
-  background: 'var(--btn-primary-bg)',
-  color: 'var(--btn-primary-text)',
-  cursor: 'pointer',
-};
-
 const erroStyle = {
   background: 'var(--alert-error-bg)',
   border: '1px solid var(--alert-error-border)',

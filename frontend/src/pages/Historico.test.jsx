@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Historico from './Historico';
 import { renderWithAuth } from '../test/test-utils';
-import { toLocalInput } from '../lib/sleep';
+import { localInputNoFuso } from '../lib/fuso';
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status });
@@ -78,10 +78,10 @@ describe('tela de Histórico', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Editar' }));
 
     const startInput = screen.getByLabelText('Dormiu às');
-    expect(startInput.value).toBe(toLocalInput(new Date(baseLog.sleepStart)));
+    expect(startInput.value).toBe(localInputNoFuso(new Date(baseLog.sleepStart), mockUser.timezone));
 
     fireEvent.change(screen.getByLabelText('Acordou às'), {
-      target: { value: toLocalInput(new Date('2026-10-08T08:00:00.000Z')) },
+      target: { value: localInputNoFuso(new Date('2026-10-08T08:00:00.000Z'), mockUser.timezone) },
     });
     // Clica no radio de qualidade 2 (Ruim) via label
     fireEvent.click(screen.getByLabelText('Ruim (2)'));
