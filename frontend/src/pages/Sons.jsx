@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   SONS_DISPONIVEIS,
   ajustarVolume,
@@ -46,7 +46,13 @@ export default function Sons() {
   const tocandoRef = useRef(false);
   const somIdRef = useRef(somId);
 
-  useEffect(() => {
+  // Espelha o estado para o handler de visibilitychange, que é registrado uma
+  // única vez. useLayoutEffect (e não useEffect): o ref passa a valer junto do
+  // commit, antes de a tela mostrar "Pausar som". Com efeito passivo havia uma
+  // janela em que a aba já indicava reprodução mas o handler ainda via
+  // tocandoRef.current === false — o áudio continuava tocando ao ocultar a aba
+  // (issue #150, falha intermitente no CI por timing do efeito passivo).
+  useLayoutEffect(() => {
     tocandoRef.current = tocando;
   }, [tocando]);
 

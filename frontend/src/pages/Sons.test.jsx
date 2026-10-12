@@ -150,9 +150,11 @@ describe('tela de Sons', () => {
     Object.defineProperty(document, 'hidden', { value: true, configurable: true });
     fireEvent(document, new Event('visibilitychange'));
 
+    // O handler lê o ref espelhado; ele precisa já estar atualizado quando a UI
+    // passa a mostrar "Pausar som" (ver useLayoutEffect em Sons.jsx, issue #150).
     expect(player.pararSom).toHaveBeenCalled();
     expect(player.tocarSom).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Tocar som' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Tocar som' })).toBeInTheDocument();
 
     Object.defineProperty(document, 'hidden', { value: false, configurable: true });
   });
