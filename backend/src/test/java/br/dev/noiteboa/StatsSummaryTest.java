@@ -141,4 +141,20 @@ class StatsSummaryTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.sleepDebtMinutes").value(960)); // 2 dias * 480 min
     }
+
+    @Test
+    void sleepDebtCountsMissedDaysWhenHistoryIsOlderThanWindow() throws Exception {
+        String token = token("stats7@example.com");
+        // Histórico antigo, fora da janela de 7 dias (antes de hoje-6).
+        var antigo = java.time.LocalDate.now(FUSO_PERFIL).minusDays(10);
+        create(token, antigo.atTime(16, 0).toString() + "Z", antigo.plusDays(1).atTime(0, 0).toString() + "Z", 4);
+
+        // Nada registrado nos últimos 7 dias. Com a regra antiga (primeiro
+        // registro só da janela), a dívida virava 0. Agora a janela de cálculo
+        // começa no histórico do usuário, então os 6 dias (hoje-6 a ontem) sem
+        // registro contam como dívida cheia: 6 * 480 = 2880.
+        mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sleepDebtMinutes").value(2880));
+    }
 }
