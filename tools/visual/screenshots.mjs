@@ -7,6 +7,7 @@ import { mocks, telas } from './mocks.mjs';
 const BASE = process.env.BASE_URL || 'http://localhost:4173';
 const API_PORT = process.env.API_PORT || '8080'; // porta que o front chama (VITE_API_URL)
 const ONLY = (process.env.ONLY || '').split(',').map((s) => s.trim()).filter(Boolean);
+const TEMA = process.env.THEME || ''; // '' (padrão), 'dark' ou 'light'
 const OUT = new URL('./out/', import.meta.url).pathname;
 
 async function lancarNavegador() {
@@ -53,11 +54,12 @@ for (const [vpNome, vp] of viewports) {
       return req.continue();
     });
     if (precisaLogin) await page.evaluateOnNewDocument(() => localStorage.setItem('token', 'fake.jwt.token'));
+    if (TEMA) await page.evaluateOnNewDocument((tema) => localStorage.setItem('noiteboa.theme', tema), TEMA);
     try {
       await page.goto(BASE + caminho, { waitUntil: 'networkidle0', timeout: 20000 });
       await new Promise((r) => setTimeout(r, 600));
-      await page.screenshot({ path: `${OUT}${vpNome}-${nome}.png`, fullPage: true });
-      console.log('ok  ', vpNome, nome);
+      await page.screenshot({ path: `${OUT}${vpNome}-${nome}${TEMA ? `-${TEMA}` : ''}.png`, fullPage: true });
+      console.log('ok  ', vpNome, nome, TEMA);
     } catch (e) {
       falhas += 1;
       console.log('FALHA', vpNome, nome, e.message);

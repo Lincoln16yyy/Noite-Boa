@@ -1,0 +1,28 @@
+/* Layout do Dashboard (issue #158).
+   No celular continua em uma coluna; no desktop o resumo e o gráfico ficam
+   lado a lado e o conteúdo aproveita melhor a largura (antes ficava limitado a
+   720px, cerca de dois terços da tela). */
+.container {
+  max-width: 720px;
+}
+
+.resumoTexto {
+  margin-bottom: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .container {
+    max-width: 960px;
+  }
+
+  .resumo {
+    display: grid;
+    grid-template-columns: minmax(200px, 1fr) minmax(0, 1.6fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .resumoTexto {
+    margin-bottom: 0;
+  }
+}
