@@ -1,6 +1,19 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type { ReactNode } from 'react';
 
-const ThemeContext = createContext(null);
+/** Preferência de tema escolhida pelo usuário. */
+export type Theme = 'light' | 'dark' | 'auto';
+/** Tema efetivamente aplicado no documento ('auto' já resolvido). */
+export type ResolvedTheme = 'light' | 'dark';
+
+/** Valor do contexto de tema. */
+export interface ThemeContextValue {
+  theme: Theme;
+  resolvedTheme: ResolvedTheme;
+  setTheme: (theme: Theme) => void;
+}
+
+const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 const THEME_KEY = 'noiteboa.theme';
 
@@ -8,16 +21,17 @@ const THEME_KEY = 'noiteboa.theme';
  * Tema atual: 'light' | 'dark' | 'auto'
  * 'auto' segue prefers-color-scheme
  */
-export function ThemeProvider({ children, initialTheme = 'auto' }) {
-  const [theme, setThemeState] = useState(() => {
+export function ThemeProvider({ children, initialTheme = 'auto' }: { children: ReactNode; initialTheme?: Theme }) {
+  const [theme, setThemeState] = useState<Theme>(() => {
     // Inicialização síncrona para evitar flash
     if (typeof window !== 'undefined') {
-      return localStorage.getItem(THEME_KEY) || initialTheme;
+      // O valor persistido é sempre um dos três temas ('setTheme' só grava Theme).
+      return (localStorage.getItem(THEME_KEY) || initialTheme) as Theme;
     }
     return initialTheme;
   });
 
-  const [resolvedTheme, setResolvedTheme] = useState('light');
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>('light');
 
   // Aplica o tema no documento
   useEffect(() => {
@@ -44,7 +58,7 @@ export function ThemeProvider({ children, initialTheme = 'auto' }) {
     if (theme !== 'auto') return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = (e) => {
+    const handler = (e: MediaQueryListEvent) => {
       const resolved = e.matches ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', resolved);
       setResolvedTheme(resolved);
@@ -54,7 +68,7 @@ export function ThemeProvider({ children, initialTheme = 'auto' }) {
     return () => mediaQuery.removeEventListener('change', handler);
   }, [theme]);
 
-  const setTheme = useCallback((newTheme) => {
+  const setTheme = useCallback((newTheme: Theme) => {
     if (['light', 'dark', 'auto'].includes(newTheme)) {
       setThemeState(newTheme);
     }
@@ -68,7 +82,7 @@ export function ThemeProvider({ children, initialTheme = 'auto' }) {
 }
 
 /** Hook para acessar o contexto de tema */
-export function useTheme() {
+export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error('useTheme deve ser usado dentro de ThemeProvider');
   return ctx;
