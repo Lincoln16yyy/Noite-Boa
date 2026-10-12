@@ -2,11 +2,18 @@
 // Espelham as validações do back-end (SleepService/CreateSleepLogRequest):
 // início e fim obrigatórios, fim > início, duração máxima de 24h,
 // qualidade 1-5 e observação de no máximo 2000 caracteres.
+//
+// Fuso horário (issue #102): quando a tela informa o fuso do perfil (GET /me),
+// os horários de parede digitados são interpretados e exibidos NELE — igual ao
+// agrupamento do back-end. Sem fuso, vale o do aparelho (comportamento antigo).
+
+import { formatarNoFuso, isoDateNoFuso, localInputNoFuso, menosDiasIso, parseNoFuso, partesNoFuso } from './fuso';
 
 const pad = (n) => String(n).padStart(2, '0');
 
 /** Converte Date (ou ISO vindo da API) para o formato dos inputs datetime-local. */
-export function toLocalInput(date) {
+export function toLocalInput(date, timeZone) {
+  if (timeZone) return localInputNoFuso(date, timeZone);
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
@@ -19,8 +26,17 @@ function at(date, hours, minutes = 0) {
 /**
  * Padrões inteligentes: dormiu ontem às 23:00 e acordou hoje às 07:00.
  * Se a pessoa está registrando de madrugada (antes das 07:00), o fim vira "agora".
+ * Com `timeZone`, os "ontem/hoje" são de parede no fuso do perfil (issue #102).
  */
-export function smartDefaults(now = new Date()) {
+export function smartDefaults(now = new Date(), timeZone) {
+  if (timeZone) {
+    const agora = partesNoFuso(now, timeZone);
+    const hoje = isoDateNoFuso(now, timeZone);
+    return {
+      sleepStart: `${menosDiasIso(hoje, 1)}T23:00`,
+      sleepEnd: agora.hora < 7 ? localInputNoFuso(now, timeZone) : `${hoje}T07:00`,
+    };
+  }
   const start = at(now, 23);
   start.setDate(start.getDate() - 1);
 
@@ -42,10 +58,12 @@ export function validateSleepForm({ sleepStart, sleepEnd, quality, notes }) {
   return '';
 }
 
-export function toApiPayload({ sleepStart, sleepEnd, quality, notes }) {
+export function toApiPayload({ sleepStart, sleepEnd, quality, notes }, timeZone) {
+  const start = timeZone ? parseNoFuso(sleepStart, timeZone) : new Date(sleepStart);
+  const end = timeZone ? parseNoFuso(sleepEnd, timeZone) : new Date(sleepEnd);
   return {
-    sleepStart: new Date(sleepStart).toISOString(),
-    sleepEnd: new Date(sleepEnd).toISOString(),
+    sleepStart: start.toISOString(),
+    sleepEnd: end.toISOString(),
     quality: Number(quality),
     notes: notes || null,
   };
@@ -61,7 +79,8 @@ export function formatDuration(startIso, endIso) {
 
 const twoDigits = (n) => String(n).padStart(2, '0');
 
-export function formatLocal(iso) {
+export function formatLocal(iso, timeZone) {
+  if (timeZone) return formatarNoFuso(iso, timeZone);
   const d = new Date(iso);
   return `${twoDigits(d.getDate())}/${twoDigits(d.getMonth() + 1)} ${twoDigits(d.getHours())}h${twoDigits(d.getMinutes())}`;
 }

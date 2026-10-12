@@ -14,6 +14,12 @@ vi.mock('../lib/reminder', () => ({
   suportaNotificacao: () => true,
 }));
 
+// controla o fuso do aparelho nos testes (issue #102): o default é o do perfil
+vi.mock('../lib/fuso', async (importOriginal) => ({
+  ...(await importOriginal()),
+  fusoDoAparelho: () => globalThis.__fusoAparelho ?? 'America/Sao_Paulo',
+}));
+
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status });
@@ -29,6 +35,7 @@ describe('tela de Configurações', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+    globalThis.__fusoAparelho = 'America/Sao_Paulo';
     agendarLembrete.mockClear();
     cancelarLembrete.mockClear();
     setLembreteAtivo.mockClear();
@@ -85,9 +92,12 @@ describe('tela de Configurações', () => {
     fireEvent.change(await screen.findByLabelText('Fuso horário'), { target: { value: 'Europe/Lisbon' } });
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Preferências salvas.');
+    // mensagem de sucesso (role=status também é usado pelo aviso de fuso, #102)
+    expect(await screen.findByText('Preferências salvas.')).toBeInTheDocument();
     const put = calls('PUT', '/me')[0];
     expect(JSON.parse(put[1].body).timezone).toBe('Europe/Lisbon');
+    // o perfil passou a divergir do aparelho → o aviso discreto aparece
+    expect(await screen.findByRole('button', { name: 'Usar o fuso do aparelho (America/Sao_Paulo)' })).toBeInTheDocument();
   });
 
   it('recusa meta fora de 4 e 12 horas', async () => {
@@ -243,5 +253,33 @@ describe('tela de Configurações', () => {
     // A sessão local não pode ser apagada quando o servidor falha
     expect(localStorage.getItem('token')).toBe('mock-token');
     expect(screen.getByRole('button', { name: 'Excluir minha conta' })).toBeEnabled();
+  });
+
+  it('mostra o aviso quando o fuso do aparelho difere do perfil (issue #102)', async () => {
+    globalThis.__fusoAparelho = 'Asia/Tokyo'; // perfil: America/Sao_Paulo
+    openScreen();
+
+    const aviso = await screen.findByText(/Este aparelho está em/);
+    expect(aviso).toHaveTextContent('Este aparelho está em Asia/Tokyo');
+    expect(aviso).toHaveTextContent('mas seu perfil usa America/Sao_Paulo');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Usar o fuso do aparelho (Asia/Tokyo)' }));
+    await waitFor(() => expect(calls('PUT', '/me').length).toBe(1));
+    const body = JSON.parse(calls('PUT', '/me')[0][1].body);
+    expect(body).toEqual({ timezone: 'Asia/Tokyo' });
+    expect(await screen.findByText('Fuso horário atualizado para o do aparelho.')).toBeInTheDocument();
+    // sumiu depois de atualizado (mesmo aparelho, agora igual ao perfil)
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /Usar o fuso do aparelho/ })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('não mostra o aviso quando os fusos são iguais (issue #102)', async () => {
+    globalThis.__fusoAparelho = 'America/Sao_Paulo'; // igual ao perfil
+    openScreen();
+
+    await screen.findByText('Fuso horário');
+    expect(screen.queryByRole('button', { name: /Usar o fuso do aparelho/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Este aparelho está em/)).not.toBeInTheDocument();
   });
 });
