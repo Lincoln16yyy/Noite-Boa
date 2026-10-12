@@ -39,6 +39,19 @@ header a:focus-visible {
   outline-color: var(--border-focus);
 }
 
+/* Menu "Mais" da barra inferior (Layout.jsx, issue #157). Antes isso era um
+   <style jsx> dentro do JSX — sintaxe de Next.js, ignorada pelo Vite. */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Links do menu: alvo de toque mínimo de 44px (WCAG 2.5.8) */
 header nav a {
   display: inline-flex;
