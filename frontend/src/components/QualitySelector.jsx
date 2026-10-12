@@ -59,7 +59,7 @@ export default function QualitySelector({
               <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 {option.shortLabel}
               </span>
-              <span style={{ fontSize: '11px', fontWeight: 400, opacity: 0.7, marginTop: '2px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 400, opacity: 0.7, marginTop: '2px', textAlign: 'center', overflowWrap: 'anywhere', lineHeight: 1.1 }}>
                 {option.label}
               </span>
             </span>
@@ -84,17 +84,18 @@ const legendStyle = {
 };
 
 const groupStyle = {
-  display: 'flex',
-  gap: '0.5rem',
-  flexWrap: 'wrap',
+  // Grade de 5 colunas: as cinco notas ficam em UMA linha no celular
+  // (antes quebravam em 4 + 1). minmax(0, 1fr) deixa as colunas encolherem.
+  display: 'grid',
+  gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+  gap: '0.375rem',
 };
 
 const labelStyle = {
   display: 'flex',
   flexDirection: 'column',
   cursor: 'pointer',
-  flex: '1 1 70px',
-  minWidth: '70px',
+  minWidth: 0,
 };
 
 const inputStyle = {
@@ -112,14 +113,16 @@ const buttonStyle = (selected) => ({
   justifyContent: 'center',
   gap: '2px',
   minHeight: '72px',
-  padding: '8px 4px',
+  padding: '8px 2px',
   fontFamily: 'var(--font-sans)',
   fontSize: '13px',
   fontWeight: selected ? 700 : 400,
   borderRadius: '12px',
-  border: selected ? '2px solid var(--color-indigo)' : '1px solid var(--color-lavanda)',
-  background: selected ? 'var(--color-luar)' : '#FFFFFF',
-  color: selected ? 'var(--color-noite)' : 'var(--color-noite)',
+  // Tokens de TEMA (não a cor fixa da marca): no modo escuro a pílula inativa
+  // acompanha o fundo em vez de continuar branca (#158).
+  border: selected ? '2px solid var(--color-indigo)' : '1px solid var(--input-border)',
+  background: selected ? 'var(--color-luar)' : 'var(--input-bg)',
+  color: selected ? 'var(--color-noite)' : 'var(--text-primary)',
   cursor: 'pointer',
   transition: 'all 0.15s ease',
   boxShadow: selected ? '0 2px 8px rgba(63, 60, 187, 0.25)' : 'none',

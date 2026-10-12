@@ -32,7 +32,7 @@ export default function SleepChart({ summary, days, goalHours, timeZone }) {
       style={{ width: '100%', height: '240px' }}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 22, right: 8, left: -18, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-indigo)" opacity={0.15} />
           <XAxis
             dataKey="label"
@@ -65,12 +65,14 @@ export default function SleepChart({ summary, days, goalHours, timeZone }) {
             strokeDasharray="6 4"
             strokeWidth={2}
             label={{
+              // Acima da linha (fora da área das barras): antes, "insideTopRight"
+              // encostava na última barra (#158).
               value: `Meta ${goalHours}h`,
-              position: 'insideTopRight',
+              position: 'top',
               fontSize: 11,
               fill: 'var(--color-luar)',
               fontWeight: 700,
-              offset: -5,
+              offset: 6,
             }}
           />
           <Bar dataKey="hours" radius={[6, 6, 0, 0]}>

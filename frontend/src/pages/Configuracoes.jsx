@@ -319,7 +319,7 @@ export default function Configuracoes() {
             aria-pressed={theme === 'light'}
             onClick={() => setTheme('light')}
             className="toggle"
-            style={{ flex: 1, minWidth: '100px' }}
+            style={{ flex: '1 1 auto', minWidth: 'fit-content', whiteSpace: 'nowrap' }}
           >
             ☀️ Claro
           </button>
@@ -329,7 +329,7 @@ export default function Configuracoes() {
             aria-pressed={theme === 'dark'}
             onClick={() => setTheme('dark')}
             className="toggle"
-            style={{ flex: 1, minWidth: '100px' }}
+            style={{ flex: '1 1 auto', minWidth: 'fit-content', whiteSpace: 'nowrap' }}
           >
             🌙 Escuro
           </button>
@@ -339,7 +339,7 @@ export default function Configuracoes() {
             aria-pressed={theme === 'auto'}
             onClick={() => setTheme('auto')}
             className="toggle"
-            style={{ flex: 1, minWidth: '100px' }}
+            style={{ flex: '1 1 auto', minWidth: 'fit-content', whiteSpace: 'nowrap' }}
           >
             🤖 Automático
           </button>

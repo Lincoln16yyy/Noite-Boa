@@ -4,15 +4,12 @@ import { api } from '../api/client';
 import { formatHours, formatMinutes } from '../lib/dashboard';
 import { useAuth } from '../context/AuthContext';
 import LoadingWarning from '../components/LoadingWarning';
+import styles from './Dashboard.module.css';
 
 // Recharts pesa o bundle: o gráfico só carrega quando o dashboard precisa dele.
 const SleepChart = lazy(() => import('../components/SleepChart'));
 
 // Estilos usando tokens CSS (ver docs/identidade-visual.md)
-const containerStyle = {
-  maxWidth: '720px',
-};
-
 const sectionStyle = {
   background: 'var(--color-noite)',
   borderRadius: '28px',
@@ -20,6 +17,9 @@ const sectionStyle = {
   marginBottom: '1.25rem',
   boxShadow: 'var(--shadow-card)',
   color: 'var(--color-luar)',
+  // Borda sutil: no modo escuro o cartão (fundo Noite) some contra o fundo da
+  // página (também Noite); a borda Índigo o separa (#158).
+  border: '1px solid var(--color-indigo)',
 };
 
 const metricCardStyle = {
@@ -59,9 +59,10 @@ const periodToggleStyle = (active) => ({
   fontSize: '15px',
   fontWeight: active ? 700 : 400,
   borderRadius: '999px',
-  border: active ? '2px solid var(--color-indigo)' : '1px solid var(--color-lavanda)',
-  background: active ? 'var(--color-indigo)' : 'var(--color-nevoa)',
-  color: active ? 'var(--color-luar)' : 'var(--color-indigo)',
+  // Tokens de TEMA: no modo escuro a pílula inativa não fica mais branca (#158).
+  border: active ? '2px solid var(--toggle-active-bg)' : '1px solid var(--toggle-border)',
+  background: active ? 'var(--toggle-active-bg)' : 'var(--toggle-bg)',
+  color: active ? 'var(--toggle-active-text)' : 'var(--text-secondary)',
   cursor: 'pointer',
   transition: 'all 0.15s ease',
 });
@@ -201,7 +202,7 @@ export default function Dashboard() {
   const isEmpty = status === 'ready' && (!summary?.daily || summary.daily.length === 0);
 
   return (
-    <div style={containerStyle}>
+    <div className={styles.container}>
       <h1 style={{ fontSize: '28px', fontWeight: 800, marginBottom: '0.5rem' }}>Dashboard</h1>
 
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }} role="group" aria-label="Período">
@@ -249,8 +250,8 @@ export default function Dashboard() {
       {status === 'ready' && !isEmpty && summary && (
         <>
           {/* Cartão principal escuro com média grande + gráfico */}
-          <section aria-label="Resumo do sono" style={sectionStyle}>
-            <div style={{ marginBottom: '1.25rem' }}>
+          <section aria-label="Resumo do sono" style={sectionStyle} className={styles.resumo}>
+            <div className={styles.resumoTexto}>
               <div style={mainLabelStyle}>Média de {days} dias</div>
               <div style={mainNumberStyle}>{formatHours(summary.averageHours)}</div>
               <div style={mainSubtitleStyle}>por noite registrada</div>
