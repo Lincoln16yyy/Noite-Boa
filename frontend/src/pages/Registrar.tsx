@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ChangeEvent, FormEvent, CSSProperties } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -25,15 +26,15 @@ const fieldStyle = {
 export default function Registrar() {
   const { user } = useAuth();
   const fuso = user?.timezone; // fonte única: fuso do perfil (issue #102)
-  const [sleepStart, setSleepStart] = useState('');
-  const [sleepEnd, setSleepEnd] = useState('');
-  const [quality, setQuality] = useState(0);
-  const [notes, setNotes] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [recent, setRecent] = useState([]);
-  const [recentLoaded, setRecentLoaded] = useState(false);
+  const [sleepStart, setSleepStart] = useState<string>('');
+  const [sleepEnd, setSleepEnd] = useState<string>('');
+  const [quality, setQuality] = useState<number>(0);
+  const [notes, setNotes] = useState<string>('');
+  const [error, setError] = useState<string>('');
+  const [success, setSuccess] = useState<string>('');
+  const [saving, setSaving] = useState<boolean>(false);
+  const [recent, setRecent] = useState<any[]>([]);
+  const [recentLoaded, setRecentLoaded] = useState<boolean>(false);
   const digitouRef = useRef(false); // não repor o digitado quando o fuso do perfil chegar (#102)
 
   const applyDefaults = useCallback(() => {
@@ -44,7 +45,7 @@ export default function Registrar() {
 
   const loadRecent = useCallback(async () => {
     try {
-      const page = await api.get('/sleep-logs?page=0&size=5');
+      const page: any = await api.get('/sleep-logs?page=0&size=5');
       setRecent(page.content ?? []);
     } catch {
       setRecent([]);
@@ -63,7 +64,7 @@ export default function Registrar() {
     loadRecent();
   }, [loadRecent]);
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (saving) return; // guarda extra contra duplo envio (#99)
     setError('');
@@ -78,14 +79,15 @@ export default function Registrar() {
 
     setSaving(true);
     try {
-      const created = await api.post('/sleep-logs', toApiPayload(form, fuso));
+      const created: any = await api.post('/sleep-logs', toApiPayload(form, fuso));
       setSuccess(`Noite registrada: ${formatDuration(created.sleepStart, created.sleepEnd)} de sono.`);
       applyDefaults();
       setQuality(0);
       setNotes('');
       await loadRecent();
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -105,7 +107,7 @@ export default function Registrar() {
             type="datetime-local"
             className="field"
             value={sleepStart}
-            onChange={(e) => {
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
               digitouRef.current = true;
               setSleepStart(e.target.value);
             }}
@@ -119,7 +121,7 @@ export default function Registrar() {
             type="datetime-local"
             className="field"
             value={sleepEnd}
-            onChange={(e) => {
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
               digitouRef.current = true;
               setSleepEnd(e.target.value);
             }}
@@ -135,9 +137,9 @@ export default function Registrar() {
             rows={3}
             maxLength={2000}
             placeholder="Ex.: acordei várias vezes"
-            style={{ ...fieldStyle, minHeight: '80px', resize: 'vertical' }}
+            style={{ ...fieldStyle, minHeight: '80px', resize: 'vertical' } as CSSProperties}
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
           />
         </label>
 

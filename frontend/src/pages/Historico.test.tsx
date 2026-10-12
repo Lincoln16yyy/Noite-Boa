@@ -4,8 +4,8 @@ import Historico from './Historico';
 import { renderWithAuth } from '../test/test-utils';
 import { localInputNoFuso } from '../lib/fuso';
 
-function jsonResponse(body, status = 200) {
-  return new Response(JSON.stringify(body), { status });
+function jsonResponse(body: any, status = 200) {
+  return new Response(JSON.stringify(body), { status }) as any;
 }
 
 const baseLog = {
@@ -16,15 +16,15 @@ const baseLog = {
   notes: 'dormi bem',
 };
 
-function pageResponse(content, totalPages = 1) {
+function pageResponse(content: any[], totalPages = 1) {
   return { content, totalElements: content.length, totalPages };
 }
 
 const mockUser = { id: 'u1', email: 'a@example.com', displayName: 'Teste', timezone: 'America/Sao_Paulo', shareWithFriends: true };
 
 describe('tela de Histórico', () => {
-  let fetchMock;
-  let state;
+  let fetchMock: any;
+  let state: any;
 
   beforeEach(() => {
     localStorage.clear();
@@ -35,16 +35,16 @@ describe('tela de Histórico', () => {
       const id = typeof url === 'string' ? (url.match(/sleep-logs\/([^?]+)/) || [])[1] : null;
 
       if (options.method === 'DELETE') {
-        state.logs = state.logs.filter((log) => log.id !== id);
+        state.logs = state.logs.filter((log: any) => log.id !== id);
         return new Response(null, { status: 204 });
       }
       if (options.method === 'PUT') {
-        const body = JSON.parse(options.body);
-        state.logs = state.logs.map((log) => (log.id === id ? { ...log, ...body } : log));
+        const body = JSON.parse(options.body as any);
+        state.logs = state.logs.map((log: any) => (log.id === id ? { ...log, ...body } : log));
         return jsonResponse({ id, ...body });
       }
       if (options.method === 'POST') {
-        return jsonResponse({ id: 'novo', ...JSON.parse(options.body) }, 201);
+        return jsonResponse({ id: 'novo', ...JSON.parse(options.body as any) }, 201);
       }
       if (String(url).includes('/me')) return jsonResponse({ ...mockUser, timezone: state.timezone });
       const pageParam = Number((String(url).match(/page=(\d+)/) || [])[1] ?? 0);
@@ -69,7 +69,7 @@ describe('tela de Histórico', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sim, excluir' }));
 
     expect(await screen.findByText('Você ainda não registrou nenhuma noite de sono.')).toBeInTheDocument();
-    const deleteCall = fetchMock.mock.calls.find(([, options]) => options.method === 'DELETE');
+    const deleteCall = fetchMock.mock.calls.find(([, options]: any) => options.method === 'DELETE');
     expect(String(deleteCall[0])).toContain('/sleep-logs/log-1');
   });
 
@@ -78,7 +78,7 @@ describe('tela de Histórico', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Editar' }));
 
     const startInput = screen.getByLabelText('Dormiu às');
-    expect(startInput.value).toBe(localInputNoFuso(new Date(baseLog.sleepStart), mockUser.timezone));
+    expect((startInput as HTMLInputElement).value).toBe(localInputNoFuso(new Date(baseLog.sleepStart), mockUser.timezone));
 
     fireEvent.change(screen.getByLabelText('Acordou às'), {
       target: { value: localInputNoFuso(new Date('2026-10-08T08:00:00.000Z'), mockUser.timezone) },
@@ -88,10 +88,10 @@ describe('tela de Histórico', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => {
-      const putCall = fetchMock.mock.calls.find(([, options]) => options.method === 'PUT');
+      const putCall = fetchMock.mock.calls.find(([, options]: any) => options.method === 'PUT');
       expect(putCall).toBeTruthy();
       expect(String(putCall[0])).toContain('/sleep-logs/log-1');
-      const body = JSON.parse(putCall[1].body);
+      const body = JSON.parse(putCall[1].body as any);
       expect(body.quality).toBe(2);
       expect(body.sleepEnd).toBe(new Date('2026-10-08T08:00:00.000Z').toISOString());
     });
@@ -99,14 +99,14 @@ describe('tela de Histórico', () => {
   });
 
   it('desabilita o botão e mostra "Salvando…" durante o envio da edição (#99)', async () => {
-    let liberarPut;
-    fetchMock.mockImplementation(async (url, options = {}) => {
+    let liberarPut: any;
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       if (String(url).includes('/me')) return jsonResponse(mockUser);
       if (options.method === 'PUT') {
-        await new Promise((resolver) => {
+        await new Promise((resolver: any) => {
           liberarPut = resolver;
         });
-        const body = JSON.parse(options.body);
+        const body = JSON.parse(options.body as any);
         return jsonResponse({ id: 'log-1', ...body });
       }
       return jsonResponse(pageResponse(state.logs));
@@ -120,12 +120,12 @@ describe('tela de Histórico', () => {
     // Durante o envio: botão desabilitado com "Salvando…"; clique extra não reenvia
     expect(screen.getByRole('button', { name: 'Salvando…' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Salvando…' }));
-    expect(fetchMock.mock.calls.filter(([, options]) => options.method === 'PUT')).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([, options]: any) => options.method === 'PUT')).toHaveLength(1);
 
-    liberarPut();
+    liberarPut!();
     // Ao terminar, o formulário inline fecha e a lista volta
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Salvar' })).not.toBeInTheDocument());
-    expect(fetchMock.mock.calls.filter(([, options]) => options.method === 'PUT')).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([, options]: any) => options.method === 'PUT')).toHaveLength(1);
   });
 
   it('mostra estado vazio amigável com atalho para registrar', async () => {
@@ -139,7 +139,7 @@ describe('tela de Histórico', () => {
   });
 
   it('avança e volta de página', async () => {
-    fetchMock.mockImplementation(async (url) => {
+    fetchMock.mockImplementation(async (url: any) => {
       const pageParam = Number((String(url).match(/page=(\d+)/) || [])[1] ?? 0);
       const content =
         pageParam === 0
@@ -183,9 +183,9 @@ describe('tela de Histórico', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => {
-      const putCall = fetchMock.mock.calls.find(([, options]) => options.method === 'PUT');
+      const putCall = fetchMock.mock.calls.find(([, options]: any) => options.method === 'PUT');
       expect(putCall).toBeTruthy();
-      const body = JSON.parse(putCall[1].body);
+      const body = JSON.parse(putCall[1].body as any);
       // digitou 06:00 de parede em Tóquio (UTC+9) → 2026-10-07T21:00Z
       expect(body.sleepStart).toBe('2026-10-07T21:00:00.000Z');
     });

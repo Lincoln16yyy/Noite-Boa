@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { ChangeEvent, FormEvent, CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -12,9 +13,20 @@ import {
 import LoadingWarning from '../components/LoadingWarning';
 import QualitySelector from '../components/QualitySelector';
 
+export type ISODateTime = string;
+export type LocalDateTimeInput = string;
+
+export interface SleepLog {
+  id: string;
+  sleepStart: ISODateTime;
+  sleepEnd: ISODateTime;
+  quality: 1 | 2 | 3 | 4 | 5;
+  notes?: string | null;
+}
+
 const PAGE_SIZE = 10;
 
-const cardStyle = {
+const cardStyle: CSSProperties = {
   background: 'var(--card-bg)',
   border: '1px solid var(--card-border)',
   borderRadius: '10px',
@@ -24,7 +36,7 @@ const cardStyle = {
   gap: '0.5rem',
 };
 
-const fieldStyle = {
+const fieldStyle: CSSProperties = {
   width: '100%',
   minHeight: '48px',
   fontSize: '16px',
@@ -35,7 +47,7 @@ const fieldStyle = {
   boxSizing: 'border-box',
 };
 
-const smallButtonStyle = {
+const smallButtonStyle: CSSProperties = {
   minHeight: '44px',
   padding: '0 0.9rem',
   fontSize: '15px',
@@ -48,24 +60,29 @@ const smallButtonStyle = {
 export default function Historico() {
   const { user } = useAuth();
   const fuso = user?.timezone; // fonte única: fuso do perfil (issue #102)
-  const [page, setPage] = useState(0);
-  const [logs, setLogs] = useState([]);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [edit, setEdit] = useState({ sleepStart: '', sleepEnd: '', quality: 0, notes: '' });
-  const [editError, setEditError] = useState('');
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [confirmId, setConfirmId] = useState(null);
-  const [deleting, setDeleting] = useState(false);
+  const [page, setPage] = useState<number>(0);
+  const [logs, setLogs] = useState<SleepLog[]>([]);
+  const [totalPages, setTotalPages] = useState<number>(0);
+  const [totalElements, setTotalElements] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [edit, setEdit] = useState<{
+    sleepStart: LocalDateTimeInput;
+    sleepEnd: LocalDateTimeInput;
+    quality: number;
+    notes: string;
+  }>({ sleepStart: '', sleepEnd: '', quality: 0, notes: '' });
+  const [editError, setEditError] = useState<string>('');
+  const [savingEdit, setSavingEdit] = useState<boolean>(false);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
 
-  const load = useCallback(async (p, signal) => {
+  const load = useCallback(async (p: number, signal?: AbortSignal) => {
     setLoading(true);
     setError('');
     try {
-      const data = await api.get(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`, { signal });
+      const data: any = await api.get(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`);
       const content = data.content ?? [];
       if (content.length === 0 && p > 0) {
         setPage(p - 1); // página ficou vazia após excluir: volta uma
@@ -74,9 +91,10 @@ export default function Historico() {
       setLogs(content);
       setTotalPages(data.totalPages ?? 0);
       setTotalElements(data.totalElements ?? 0);
-    } catch (err) {
+    } catch (err: any) {
       if (err.name === 'AbortError') return; // ignora cancelamento
-      setError(err.message);
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -88,7 +106,7 @@ export default function Historico() {
     return () => controller.abort(); // cancela requisição anterior ao trocar de página
   }, [page, load]);
 
-  function startEdit(log) {
+  function startEdit(log: SleepLog) {
     setEditingId(log.id);
     setEditError('');
     setConfirmId(null);
@@ -100,7 +118,7 @@ export default function Historico() {
     });
   }
 
-  async function saveEdit(e) {
+  async function saveEdit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setEditError('');
     const problem = validateSleepForm(edit);
@@ -113,22 +131,24 @@ export default function Historico() {
       await api.put(`/sleep-logs/${editingId}`, toApiPayload(edit, fuso));
       setEditingId(null);
       await load(page);
-    } catch (err) {
-      setEditError(err.message);
+    } catch (err: any) {
+      const message = err instanceof Error ? err.message : String(err);
+      setEditError(message);
     } finally {
       setSavingEdit(false);
     }
   }
 
-  async function remove(id) {
+  async function remove(id: string) {
     setDeleting(true);
     setError('');
     try {
       await api.delete(`/sleep-logs/${id}`);
       setConfirmId(null);
       await load(page);
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
     } finally {
       setDeleting(false);
     }
@@ -231,7 +251,7 @@ export default function Historico() {
                       type="datetime-local"
                       style={fieldStyle}
                       value={edit.sleepEnd}
-                      onChange={(e) => setEdit({ ...edit, sleepEnd: e.target.value })}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setEdit({ ...edit, sleepEnd: e.target.value })}
                       required
                     />
                   </label>
@@ -242,12 +262,12 @@ export default function Historico() {
                       maxLength={2000}
                       style={{ ...fieldStyle, minHeight: '64px', resize: 'vertical' }}
                       value={edit.notes}
-                      onChange={(e) => setEdit({ ...edit, notes: e.target.value })}
+                      onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setEdit({ ...edit, notes: e.target.value })}
                     />
                   </label>
                   <QualitySelector
                     value={edit.quality}
-                    onChange={(v) => setEdit({ ...edit, quality: v })}
+                    onChange={(v: number) => setEdit({ ...edit, quality: v })}
                     disabled={savingEdit}
                     legend="Qualidade"
                     errorId={editError ? 'edit-error' : undefined}
