@@ -1,4 +1,6 @@
-const conteudo = {
+import type { CSSProperties } from 'react';
+
+const conteudo: CSSProperties = {
   maxWidth: '720px',
   display: 'flex',
   flexDirection: 'column',

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,13 +11,14 @@ export default function Login() {
   const location = useLocation();
   const accountCreated = Boolean(location.state?.created);
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     try {
       await login(email, password);
     } catch (err) {
-      setError(err.message);
+      // O cliente de API sempre lança Error; o fallback cobre erros não padrão.
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
@@ -9,7 +10,7 @@ export default function Cadastro() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     if (password.length < 8) {
@@ -24,7 +25,8 @@ export default function Cadastro() {
       await api.post('/auth/register', { displayName, email, password });
       navigate('/login', { state: { created: true } });
     } catch (err) {
-      setError(err.message);
+      // O cliente de API sempre lança Error; o fallback cobre erros não padrão.
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
