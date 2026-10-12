@@ -3,24 +3,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Registrar from './Registrar';
 import { renderWithAuth } from '../test/test-utils';
 
-function jsonResponse(body, status = 200) {
-  return new Response(JSON.stringify(body), { status });
+function jsonResponse(body: any, status = 200) {
+  return new Response(JSON.stringify(body), { status }) as any;
 }
 
 const mockUser = { id: 'u1', email: 'a@example.com', displayName: 'Teste', timezone: 'America/Sao_Paulo', shareWithFriends: true };
 
 describe('tela de Registrar sono', () => {
-  let fetchMock;
-  let posts;
+  let fetchMock: any;
+  let posts: any[] = [];
 
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
     posts = [];
-    fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
+    fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any, options: any = {}) => {
       if (String(url).includes('/me')) return jsonResponse(mockUser);
       if (options.method === 'POST') {
-        const body = JSON.parse(options.body);
+        const body = JSON.parse(options.body as any);
         posts.push(body);
         return jsonResponse({ id: 'novo-id', ...body }, 201);
       }
@@ -36,14 +36,14 @@ describe('tela de Registrar sono', () => {
     openScreen();
     const start = await screen.findByLabelText('Dormiu às');
     const end = screen.getByLabelText('Acordou às');
-    expect(start.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
-    expect(new Date(end.value).getTime()).toBeGreaterThan(new Date(start.value).getTime());
+    expect((start as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect(new Date((end as HTMLInputElement).value).getTime()).toBeGreaterThan(new Date((start as HTMLInputElement).value).getTime());
   });
 
   it('salva o registro e mostra nos últimos registros', async () => {
-    fetchMock.mockImplementation(async (url, options = {}) => {
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       if (options.method === 'POST') {
-        const body = JSON.parse(options.body);
+        const body = JSON.parse(options.body as any);
         posts.push(body);
         return jsonResponse({ id: 'novo-id', ...body }, 201);
       }
@@ -120,12 +120,12 @@ describe('tela de Registrar sono', () => {
 
   it('não cria duplicata quando o envio é clicado duas vezes (#99)', async () => {
     let liberarPost;
-    fetchMock.mockImplementation(async (url, options = {}) => {
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       if (String(url).includes('/me')) return jsonResponse(mockUser);
       if (options.method === 'POST') {
-        const body = JSON.parse(options.body);
+        const body = JSON.parse(options.body as any);
         posts.push(body);
-        await new Promise((resolver) => {
+        await new Promise((resolver: any) => {
           liberarPost = resolver;
         });
         return jsonResponse({ id: 'novo-id', ...body }, 201);
@@ -151,14 +151,14 @@ describe('tela de Registrar sono', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Salvando…' }));
     expect(posts).toHaveLength(1);
 
-    liberarPost();
+    liberarPost!();
     expect(await screen.findByRole('status')).toHaveTextContent('Noite registrada');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Salvar registro' })).toBeEnabled());
     expect(posts).toHaveLength(1);
   });
 
   it('exibe a mensagem de sobreposição vinda do servidor (409)', async () => {
-    fetchMock.mockImplementation(async (url, options = {}) => {
+    fetchMock!.mockImplementation(async (url: any, options: any = {}) => {
       if (String(url).includes('/me')) return jsonResponse(mockUser);
       if (options.method === 'POST') {
         return jsonResponse({ detail: 'Este período se sobrepõe a um registro existente.' }, 409);
