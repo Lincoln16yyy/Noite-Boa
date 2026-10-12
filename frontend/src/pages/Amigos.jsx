@@ -13,17 +13,6 @@ const fieldStyle = {
   boxSizing: 'border-box',
 };
 
-const buttonStyle = {
-  minHeight: '48px',
-  fontSize: '16px',
-  fontWeight: 700,
-  borderRadius: '10px',
-  border: 'none',
-  background: 'var(--btn-primary-bg)',
-  color: 'var(--btn-primary-text)',
-  cursor: 'pointer',
-};
-
 const smallButtonStyle = {
   minHeight: '44px',
   padding: '0 0.9rem',

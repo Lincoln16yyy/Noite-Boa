@@ -44,6 +44,7 @@ Se um comando ainda não existe (estrutura inicial), diga isso no PR e não inve
 - Não altere `.github/workflows/`, configurações de segurança ou permissões, a menos que a issue peça.
 - Não force push na `main`; não faça merge do próprio PR.
 - Não apague testes para fazer o CI passar.
+- Nunca pule (`it.skip`, `describe.skip`), comente ou apague teste para deixar o CI verde.
 
 ## Segurança (checklist rápido)
 - Toda rota de dados do usuário filtra pelo usuário autenticado.
