@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { formatHours, formatMinutes } from '../lib/dashboard';
@@ -10,7 +11,7 @@ import styles from './Dashboard.module.css';
 const SleepChart = lazy(() => import('../components/SleepChart'));
 
 // Estilos usando tokens CSS (ver docs/identidade-visual.md)
-const sectionStyle = {
+const sectionStyle: React.CSSProperties = {
   background: 'var(--color-noite)',
   borderRadius: '28px',
   padding: '1.5rem',
@@ -22,7 +23,7 @@ const sectionStyle = {
   border: '1px solid var(--color-indigo)',
 };
 
-const metricCardStyle = {
+const metricCardStyle: React.CSSProperties = {
   background: 'var(--color-nevoa)',
   border: '1px solid var(--color-indigo)',
   borderRadius: '20px',
@@ -32,7 +33,7 @@ const metricCardStyle = {
   gap: '0.35rem',
 };
 
-const metricTitleStyle = {
+const metricTitleStyle: CSSProperties = {
   fontSize: '14px',
   fontWeight: 600,
   color: 'var(--color-indigo)',
@@ -40,20 +41,20 @@ const metricTitleStyle = {
   letterSpacing: '0.5px',
 };
 
-const metricValueStyle = {
+const metricValueStyle: CSSProperties = {
   fontSize: '36px',
   fontWeight: 800,
   color: 'var(--color-noite)',
   lineHeight: 1.1,
 };
 
-const metricHintStyle = {
+const metricHintStyle: CSSProperties = {
   fontSize: '13px',
   color: 'var(--color-indigo)',
   opacity: 0.7,
 };
 
-const periodToggleStyle = (active) => ({
+const periodToggleStyle = (active: boolean): CSSProperties => ({
   minHeight: '48px',
   padding: '0 1rem',
   fontSize: '15px',
@@ -156,7 +157,7 @@ const goalLineStyle = {
   marginTop: '0.75rem',
 };
 
-function Metric({ title, value, hint }) {
+function Metric({ title, value, hint }: { title: string; value: string; hint?: string }) {
   return (
     <div style={metricCardStyle}>
       <div style={metricTitleStyle}>{title}</div>
@@ -169,23 +170,23 @@ function Metric({ title, value, hint }) {
 export default function Dashboard() {
   const { user } = useAuth();
   const [days, setDays] = useState(7);
-  const [summary, setSummary] = useState(null);
-  const [goal, setGoal] = useState(null);
+  const [summary, setSummary] = useState<any>(null);
+  const [goal, setGoal] = useState<any>(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [errorMessage, setErrorMessage] = useState('');
 
-  const load = useCallback(async (selectedDays, signal) => {
+  const load = useCallback(async (selectedDays: number, signal?: AbortSignal) => {
     setStatus('loading');
     setErrorMessage('');
     try {
       const [summaryData, goalData] = await Promise.all([
-        api.get(`/stats/summary?days=${selectedDays}`, { signal }),
-        api.get('/goal', { signal }),
+        api.get(`/stats/summary?days=${selectedDays}`),
+        api.get('/goal'),
       ]);
       setSummary(summaryData);
       setGoal(goalData);
       setStatus('ready');
-    } catch (err) {
+    } catch (err: any) {
       if (err.name === 'AbortError') return; // ignora cancelamento
       setErrorMessage(err.message);
       setStatus('error');
@@ -205,7 +206,7 @@ export default function Dashboard() {
     <div className={styles.container}>
       <h1 style={{ fontSize: '28px', fontWeight: 800, marginBottom: '0.5rem' }}>Dashboard</h1>
 
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }} role="group" aria-label="Período">
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' } as CSSProperties} role="group" aria-label="Período">
         {[7, 30].map((value) => (
           <button
             key={value}
@@ -220,7 +221,7 @@ export default function Dashboard() {
       </div>
 
       {status === 'loading' && (
-        <div style={loadingStyle}>
+        <div style={loadingStyle as CSSProperties}>
           <p>Carregando…</p>
           <LoadingWarning isLoading={true} />
         </div>
@@ -236,7 +237,7 @@ export default function Dashboard() {
       )}
 
       {isEmpty && (
-        <div style={emptyStateStyle}>
+        <div style={emptyStateStyle as CSSProperties}>
           <p style={{ margin: 0, fontSize: '17px', fontWeight: 600, color: 'var(--color-noite)' }}>Sem dados nos últimos {days} dias.</p>
           <p style={{ margin: 0, color: 'var(--color-indigo)', opacity: 0.8 }}>
             Registre uma noite de sono para ver sua média, consistência e dívida de sono.

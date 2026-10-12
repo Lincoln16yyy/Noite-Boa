@@ -31,7 +31,7 @@ const cardStyle = {
   marginBottom: '0.5rem',
 };
 
-const rowStyle = { display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' };
+const rowStyle: React.CSSProperties = { display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' };
 
 const mutedTextStyle = { color: 'var(--text-muted)', fontSize: '15px' };
 
@@ -41,10 +41,10 @@ const mutedTextStyle = { color: 'var(--text-muted)', fontSize: '15px' };
  * e o ranking só mostra nº de noites e % dos dias — nunca horários ou durações.
  */
 export default function Amigos() {
-  const [me, setMe] = useState(null);
-  const [amigos, setAmigos] = useState([]);
-  const [convites, setConvites] = useState({ sent: [], received: [] });
-  const [ranking, setRanking] = useState([]);
+  const [me, setMe] = useState<any>(null);
+  const [amigos, setAmigos] = useState<any[]>([]);
+  const [convites, setConvites] = useState<any>({ sent: [], received: [] });
+  const [ranking, setRanking] = useState<any[]>([]);
   const [dias, setDias] = useState(7);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
@@ -52,7 +52,7 @@ export default function Amigos() {
   const [success, setSuccess] = useState('');
 
   async function carregar(periodo = dias) {
-    const [meData, amigosData, convitesData, rankingData] = await Promise.all([
+    const [meData, amigosData, convitesData, rankingData]: any = await Promise.all([
       api.get('/me'),
       api.get('/friends'),
       api.get('/friends/requests'),
@@ -66,7 +66,7 @@ export default function Amigos() {
 
   useEffect(() => {
     carregar()
-      .catch((err) => setError(err.message))
+      .catch((err: any) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
