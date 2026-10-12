@@ -67,6 +67,10 @@ jobs:
           TZ=UTC npm test --if-present
           TZ=America/Sao_Paulo npm test --if-present
           npm run build
+      - name: Typecheck (TypeScript)
+        if: hashFiles('frontend/package-lock.json') != ''
+        working-directory: frontend
+        run: npm run typecheck --if-present
       - name: Frontend ainda não criado
         if: hashFiles('frontend/package-lock.json') == ''
         run: echo "frontend/package-lock.json não existe ainda, pulando."

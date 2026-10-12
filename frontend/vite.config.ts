@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite';
+// vitest/config reexporta o defineConfig do Vite já com a tipagem da opção `test`.
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 // https://vite.dev/config/
