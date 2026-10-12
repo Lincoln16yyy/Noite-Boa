@@ -1,0 +1,13 @@
+{
+  "name": "e2e-smoke",
+  "private": true,
+  "type": "module",
+  "description": "Teste de fumaça E2E do front-end com a API simulada (issue #159)",
+  "scripts": {
+    "smoke": "node smoke.mjs"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^153.0.0",
+    "puppeteer-core": "^25.13.0"
+  }
+}
