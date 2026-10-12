@@ -5,13 +5,36 @@ import {
   tocarRuido,
   tocando as tocandoRuido,
 } from './noise';
+import type { TipoRuido } from './noise';
 
 /**
  * Catálogo de sons de relaxamento (issue #91):
  * - Ambiências CC0 (fase 2): arquivos sob demanda em /audio/, preload="none";
  * - Ruídos Web Audio API (fase 1): sintetizados no cliente, zero tráfego.
  */
-export const SONS_DISPONIVEIS = [
+
+/** Ambiência reproduzida por um elemento <audio> nativo. */
+export interface SomAmbiencia {
+  id: string;
+  nome: string;
+  descricao: string;
+  categoria: 'ambiencia';
+  arquivo: string;
+}
+
+/** Ruído sintetizado pela Web Audio API. */
+export interface SomRuido {
+  id: string;
+  nome: string;
+  descricao: string;
+  categoria: 'ruido';
+  tipoRuido: TipoRuido;
+}
+
+/** Um item do catálogo de sons. */
+export type Som = SomAmbiencia | SomRuido;
+
+export const SONS_DISPONIVEIS: readonly Som[] = [
   {
     id: 'chuva',
     nome: 'Chuva',
@@ -56,18 +79,18 @@ export const SONS_DISPONIVEIS = [
   },
 ];
 
-let elementoAudio = null;
-let somAtivo = null;
+let elementoAudio: HTMLAudioElement | null = null;
+let somAtivo: Som | null = null;
 
-export function suportaWebAudio() {
+export function suportaWebAudio(): boolean {
   return suportaWebAudioApi();
 }
 
-export function suportaElementoAudio() {
+export function suportaElementoAudio(): boolean {
   return typeof window !== 'undefined' && typeof window.Audio === 'function';
 }
 
-function obterElementoAudio() {
+function obterElementoAudio(): HTMLAudioElement {
   if (!elementoAudio) {
     const AudioConstructor = window.Audio;
     elementoAudio = new AudioConstructor();
@@ -85,7 +108,7 @@ function obterElementoAudio() {
  * @param {number} volume - Fração de 0 a 1
  * @returns {Promise<void>}
  */
-export async function tocarSom(id, volume = 0.5) {
+export async function tocarSom(id: string, volume = 0.5): Promise<void> {
   const som = SONS_DISPONIVEIS.find((item) => item.id === id);
   if (!som) {
     throw new Error(`Som não encontrado: ${id}`);
@@ -125,7 +148,7 @@ export async function tocarSom(id, volume = 0.5) {
 /**
  * Para qualquer som em reprodução (Web Audio ou elemento nativo de áudio).
  */
-export function pararSom() {
+export function pararSom(): void {
   if (somAtivo?.categoria === 'ruido' || tocandoRuido()) {
     pararRuido();
   }
@@ -143,7 +166,7 @@ export function pararSom() {
 /**
  * Ajusta o volume (0 a 1) do som ativo no momento.
  */
-export function ajustarVolume(volume) {
+export function ajustarVolume(volume: number): void {
   const v = Math.max(0, Math.min(1, volume));
   if (somAtivo?.categoria === 'ruido') {
     ajustarVolumeRuido(v);
@@ -156,7 +179,7 @@ export function ajustarVolume(volume) {
 /**
  * Indica se há áudio reproduzindo ativamente no momento.
  */
-export function estaTocando() {
+export function estaTocando(): boolean {
   if (somAtivo?.categoria === 'ruido') {
     return tocandoRuido();
   }
@@ -169,14 +192,14 @@ export function estaTocando() {
 /**
  * Retorna o descritor do som que está selecionado/ativo.
  */
-export function obterSomAtivo() {
+export function obterSomAtivo(): Som | null {
   return somAtivo;
 }
 
 /**
  * Utilitário interno para limpeza completa do estado entre baterias de testes.
  */
-export function _resetarEstadoParaTestes() {
+export function _resetarEstadoParaTestes(): void {
   pararSom();
   elementoAudio = null;
   somAtivo = null;

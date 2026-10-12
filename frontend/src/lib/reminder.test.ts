@@ -12,15 +12,20 @@ import {
 
 class NotificationFake {
   static permission = 'granted';
-  static chamadas = [];
+  static chamadas: Array<{ titulo: string; [key: string]: unknown }> = [];
   static requestPermission = vi.fn();
 
-  constructor(titulo, opcoes) {
+  constructor(titulo: string, opcoes?: NotificationOptions) {
     NotificationFake.chamadas.push({ titulo, ...opcoes });
   }
 }
 
-function jsonResponse(body) {
+/** Instala um duplo de teste em window.Notification (sem exigir o tipo real). */
+function instalarNotification(fake: unknown): void {
+  Object.defineProperty(window, 'Notification', { value: fake, configurable: true, writable: true });
+}
+
+function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200 });
 }
 
@@ -30,15 +35,15 @@ describe('lembrete de dormir', () => {
     NotificationFake.permission = 'granted';
     NotificationFake.chamadas = [];
     NotificationFake.requestPermission = vi.fn().mockResolvedValue('granted');
-    window.Notification = NotificationFake;
+    instalarNotification(NotificationFake);
   });
 
   afterEach(() => {
     cancelarLembrete();
     vi.useRealTimers();
     vi.restoreAllMocks();
-    delete window.Notification;
-    delete window.navigator.serviceWorker;
+    Reflect.deleteProperty(window, 'Notification');
+    Reflect.deleteProperty(window.navigator, 'serviceWorker');
   });
 
   it('guarda a preferência apenas neste dispositivo', () => {
@@ -89,7 +94,7 @@ describe('lembrete de dormir', () => {
         throw new TypeError('não suportado fora de um service worker');
       }
     }
-    window.Notification = NotificationMovel;
+    instalarNotification(NotificationMovel);
     const showNotification = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(window.navigator, 'serviceWorker', {
       configurable: true,
@@ -107,11 +112,11 @@ describe('lembrete de dormir', () => {
   it('não quebra quando o construtor falha e não há service worker', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 0, 5, 22, 59, 30));
-    window.Notification = class {
+    instalarNotification(class {
       constructor() {
         throw new Error('sem suporte');
       }
-    };
+    });
 
     agendarLembrete('23:00');
     await vi.advanceTimersByTimeAsync(61 * 1000); // não deve lançar
@@ -155,7 +160,7 @@ describe('lembrete de dormir', () => {
   });
 
   it('informa quando o navegador não suporta notificação', () => {
-    delete window.Notification;
+    Reflect.deleteProperty(window, 'Notification');
     expect(suportaNotificacao()).toBe(false);
     expect(permissaoNotificacao()).toBe('unsupported');
   });

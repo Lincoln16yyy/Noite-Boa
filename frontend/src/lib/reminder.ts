@@ -1,4 +1,5 @@
 import { api } from '../api/client';
+import type { Goal } from '../api/types';
 
 /**
  * Lembrete de hora de dormir (issue #38) — melhor esforço.
@@ -7,29 +8,29 @@ import { api } from '../api/client';
  * aberto (aba aberta ou instalado). Aqui NÃO prometemos alarme.
  */
 const CHAVE = 'noiteboa.lembrete';
-let timer = null;
+let timer: number | null = null;
 
 /** Preferência fica neste dispositivo (localStorage), não na conta. */
-export function lembreteAtivo() {
+export function lembreteAtivo(): boolean {
   return localStorage.getItem(CHAVE) === '1';
 }
 
-export function setLembreteAtivo(ativo) {
+export function setLembreteAtivo(ativo: boolean): void {
   if (ativo) localStorage.setItem(CHAVE, '1');
   else localStorage.removeItem(CHAVE);
 }
 
-export function suportaNotificacao() {
+export function suportaNotificacao(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
 
 /** 'default' | 'granted' | 'denied' | 'unsupported' */
-export function permissaoNotificacao() {
+export function permissaoNotificacao(): NotificationPermission | 'unsupported' {
   return suportaNotificacao() ? window.Notification.permission : 'unsupported';
 }
 
 /** ms até a próxima ocorrência de "HH:MM" no relógio local (se já passou, amanhã). */
-export function msAte(hora, agora = new Date()) {
+export function msAte(hora: string, agora: Date = new Date()): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec(String(hora).trim());
   if (!m) return null;
   const alvo = new Date(agora);
@@ -38,8 +39,8 @@ export function msAte(hora, agora = new Date()) {
   return alvo.getTime() - agora.getTime();
 }
 
-async function notificar(titulo, corpo) {
-  const opcoes = { body: corpo, icon: '/icon-192.png', badge: '/icon-192.png' };
+async function notificar(titulo: string, corpo: string): Promise<void> {
+  const opcoes: NotificationOptions = { body: corpo, icon: '/icon-192.png', badge: '/icon-192.png' };
 
   // 1) Service worker já registrado: é o caminho suportado no Chrome/Android
   //    (new Notification lança lá). getRegistration() não pendura quando não
@@ -65,7 +66,7 @@ async function notificar(titulo, corpo) {
 }
 
 /** Agenda o disparo na próxima ocorrência de `hora` e rearma para o dia seguinte. */
-export function agendarLembrete(hora) {
+export function agendarLembrete(hora: string): boolean {
   cancelarLembrete();
   const atraso = msAte(hora);
   if (atraso === null) return false;
@@ -77,7 +78,7 @@ export function agendarLembrete(hora) {
   return true;
 }
 
-export function cancelarLembrete() {
+export function cancelarLembrete(): void {
   if (timer !== null) {
     window.clearTimeout(timer);
     timer = null;
@@ -88,10 +89,10 @@ export function cancelarLembrete() {
  * Liga o lembrete na abertura do app: só se a preferência estiver ativa,
  * a permissão de notificação concedida e a meta tiver horário de dormir.
  */
-export async function iniciarLembrete() {
+export async function iniciarLembrete(): Promise<boolean> {
   if (!lembreteAtivo() || permissaoNotificacao() !== 'granted') return false;
   try {
-    const goal = await api.get('/goal');
+    const goal = await api.get<Goal>('/goal');
     if (!goal?.bedtime) return false;
     return agendarLembrete(String(goal.bedtime).slice(0, 5));
   } catch {
