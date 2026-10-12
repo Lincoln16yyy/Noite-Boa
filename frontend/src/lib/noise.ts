@@ -7,19 +7,35 @@
  * o autoplay é bloqueado pelos navegadores.
  */
 
+// Safari antigo expõe o prefixo `webkitAudioContext`, que não está em lib.dom.
+declare global {
+  interface Window {
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
+
+/** Tipos de ruído sintetizados no cliente. */
+export type TipoRuido = 'branco' | 'rosa' | 'marrom';
+
+/** Catálogo de ruídos disponíveis (id + rótulo). */
+export interface TipoRuidoInfo {
+  id: TipoRuido;
+  nome: string;
+}
+
 const SEGUNDOS_BUFFER = 2;
 
-let contexto = null;
-let fonteAtual = null;
-let ganhoAtual = null;
+let contexto: AudioContext | null = null;
+let fonteAtual: AudioBufferSourceNode | null = null;
+let ganhoAtual: GainNode | null = null;
 
-export const TIPOS_RUIDO = [
+export const TIPOS_RUIDO: readonly TipoRuidoInfo[] = [
   { id: 'branco', nome: 'Ruído branco' },
   { id: 'rosa', nome: 'Ruído rosa' },
   { id: 'marrom', nome: 'Ruído marrom' },
 ];
 
-export function suportaAudio() {
+export function suportaAudio(): boolean {
   return (
     typeof window !== 'undefined' &&
     (typeof window.AudioContext === 'function' ||
@@ -33,7 +49,7 @@ export function suportaAudio() {
  * - rosa: filtro de Paul Kellet (curva suave, "chuva");
  * - marrom: integração do sinal (grave, "ondas").
  */
-export function amostrasRuido(tipo, quantidade) {
+export function amostrasRuido(tipo: TipoRuido, quantidade: number): Float32Array {
   const dados = new Float32Array(quantidade);
   if (tipo === 'branco') {
     for (let i = 0; i < quantidade; i += 1) {
@@ -71,7 +87,7 @@ export function amostrasRuido(tipo, quantidade) {
   return dados;
 }
 
-function contextoAudio() {
+function contextoAudio(): AudioContext {
   if (!contexto) {
     const Classe = window.AudioContext || window.webkitAudioContext;
     if (!Classe) throw new Error('Web Audio API indisponível neste navegador');
@@ -85,7 +101,7 @@ function contextoAudio() {
  * Deve ser chamado a partir de gesto do usuário (política de autoplay).
  * @throws {Error} se a Web Audio API não estiver disponível.
  */
-export function tocarRuido(tipo, volume = 0.5) {
+export function tocarRuido(tipo: TipoRuido, volume = 0.5): void {
   pararRuido();
   const ctx = contextoAudio();
   if (ctx.state === 'suspended') ctx.resume();
@@ -104,7 +120,7 @@ export function tocarRuido(tipo, volume = 0.5) {
 }
 
 /** Para a reprodução atual (se houver) e libera os nós. */
-export function pararRuido() {
+export function pararRuido(): void {
   if (fonteAtual) {
     try {
       fonteAtual.stop();
@@ -121,11 +137,11 @@ export function pararRuido() {
 }
 
 /** Ajusta o volume (0 a 1) do que estiver tocando; sem efeito se parado. */
-export function ajustarVolume(volume) {
+export function ajustarVolume(volume: number): void {
   if (ganhoAtual) ganhoAtual.gain.value = volume;
 }
 
 /** true se há som tocando agora. */
-export function tocando() {
+export function tocando(): boolean {
   return fonteAtual !== null;
 }

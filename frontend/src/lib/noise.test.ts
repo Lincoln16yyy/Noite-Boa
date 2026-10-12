@@ -33,9 +33,14 @@ async function carregarModulo() {
   return import('./noise');
 }
 
+/** Instala um duplo de teste em window.AudioContext (sem exigir o tipo real). */
+function instalarAudioContext(fake: unknown): void {
+  Object.defineProperty(window, 'AudioContext', { value: fake, configurable: true, writable: true });
+}
+
 describe('gerador de ruído (Web Audio API)', () => {
   beforeEach(() => {
-    delete window.AudioContext;
+    Reflect.deleteProperty(window, 'AudioContext');
     delete window.webkitAudioContext;
   });
 
@@ -56,7 +61,7 @@ describe('gerador de ruído (Web Audio API)', () => {
 
     it('gera amostras de ruído rosa e marrom não nulas e limitadas', async () => {
       const { amostrasRuido } = await carregarModulo();
-      for (const tipo of ['rosa', 'marrom']) {
+      for (const tipo of ['rosa', 'marrom'] as const) {
         const amostras = amostrasRuido(tipo, 4000);
         expect(amostras.some((v) => v !== 0)).toBe(true);
         for (const valor of amostras) {
@@ -67,6 +72,7 @@ describe('gerador de ruído (Web Audio API)', () => {
 
     it('rejeita tipo de ruído desconhecido', async () => {
       const { amostrasRuido } = await carregarModulo();
+      // @ts-expect-error 'sereia' não é um TipoRuido — exercita o erro em runtime
       expect(() => amostrasRuido('sereia', 10)).toThrow(/desconhecido/i);
     });
   });
@@ -78,7 +84,7 @@ describe('gerador de ruído (Web Audio API)', () => {
     });
 
     it('retorna true com AudioContext', async () => {
-      window.AudioContext = AudioContextFake;
+      instalarAudioContext(AudioContextFake);
       const { suportaAudio } = await carregarModulo();
       expect(suportaAudio()).toBe(true);
     });
@@ -86,7 +92,7 @@ describe('gerador de ruído (Web Audio API)', () => {
 
   describe('tocar/parar/volume', () => {
     beforeEach(() => {
-      window.AudioContext = AudioContextFake;
+      instalarAudioContext(AudioContextFake);
     });
 
     it('tocarRuido cria fonte em loop ligada ao destino', async () => {
@@ -104,23 +110,23 @@ describe('gerador de ruído (Web Audio API)', () => {
     });
 
     it('tocarRuido duas vezes para a fonte anterior (sem som órfão)', async () => {
-      let instancia;
+      const instancias: AudioContextFake[] = [];
       class ContextoComRegistro extends AudioContextFake {
         constructor() {
           super();
-          instancia = this;
+          instancias.push(this);
         }
       }
-      window.AudioContext = ContextoComRegistro;
+      instalarAudioContext(ContextoComRegistro);
       const { tocarRuido } = await carregarModulo();
       tocarRuido('branco');
-      const primeiraFonte = instancia.createBufferSource.mock.results[0].value;
+      const primeiraFonte = instancias[0].createBufferSource.mock.results[0].value;
       tocarRuido('rosa');
       expect(primeiraFonte.stop).toHaveBeenCalled();
     });
 
     it('lança erro claro sem suporte a Web Audio', async () => {
-      delete window.AudioContext;
+      Reflect.deleteProperty(window, 'AudioContext');
       delete window.webkitAudioContext;
       const { tocarRuido } = await carregarModulo();
       expect(() => tocarRuido('rosa')).toThrow(/Web Audio API/i);
@@ -132,18 +138,18 @@ describe('gerador de ruído (Web Audio API)', () => {
     });
 
     it('resume o contexto suspenso ao tocar (liberação por gesto)', async () => {
-      let instancia;
+      const instancias: AudioContextFake[] = [];
       class ContextoSuspenso extends AudioContextFake {
         constructor() {
           super();
           this.state = 'suspended';
-          instancia = this;
+          instancias.push(this);
         }
       }
-      window.AudioContext = ContextoSuspenso;
+      instalarAudioContext(ContextoSuspenso);
       const { tocarRuido } = await carregarModulo();
       tocarRuido('rosa');
-      expect(instancia.resume).toHaveBeenCalled();
+      expect(instancias[0].resume).toHaveBeenCalled();
     });
   });
 });

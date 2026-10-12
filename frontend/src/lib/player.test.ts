@@ -27,11 +27,16 @@ class AudioFake {
   });
 }
 
+/** Instala um duplo de teste em window.Audio (sem exigir o HTMLAudioElement real). */
+function instalarAudio(fake: unknown): void {
+  Object.defineProperty(window, 'Audio', { value: fake, configurable: true, writable: true });
+}
+
 describe('player de sons (ruídos e ambiências CC0)', () => {
   beforeEach(() => {
     _resetarEstadoParaTestes();
     vi.restoreAllMocks();
-    window.Audio = AudioFake;
+    instalarAudio(AudioFake);
   });
 
   describe('catálogo de sons', () => {
@@ -62,7 +67,7 @@ describe('player de sons (ruídos e ambiências CC0)', () => {
 
     it('suportaElementoAudio retorna false se window.Audio não existir', () => {
       const originalAudio = window.Audio;
-      delete window.Audio;
+      Reflect.deleteProperty(window, 'Audio');
       expect(suportaElementoAudio()).toBe(false);
       window.Audio = originalAudio;
     });
@@ -80,8 +85,8 @@ describe('player de sons (ruídos e ambiências CC0)', () => {
 
       const ativo = obterSomAtivo();
       expect(ativo).not.toBeNull();
-      expect(ativo.id).toBe('chuva');
-      expect(ativo.arquivo).toBe('/audio/rain.mp3');
+      expect(ativo?.id).toBe('chuva');
+      expect(ativo && 'arquivo' in ativo ? ativo.arquivo : undefined).toBe('/audio/rain.mp3');
       expect(estaTocando()).toBe(true);
     });
 
@@ -102,9 +107,9 @@ describe('player de sons (ruídos e ambiências CC0)', () => {
     });
 
     it('trata falha de carregamento do arquivo sem quebrar o estado', async () => {
-      window.Audio = class extends AudioFake {
+      instalarAudio(class extends AudioFake {
         play = vi.fn().mockRejectedValue(new Error('Falha de rede ao baixar o áudio'));
-      };
+      });
 
       await expect(tocarSom('chuva', 0.5)).rejects.toThrow(/Falha de rede/i);
       expect(estaTocando()).toBe(false);
