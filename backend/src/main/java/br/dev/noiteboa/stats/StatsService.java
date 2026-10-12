@@ -4,15 +4,10 @@ import br.dev.noiteboa.auth.User;
 import br.dev.noiteboa.auth.UserRepository;
 import br.dev.noiteboa.sleep.SleepLog;
 import br.dev.noiteboa.sleep.SleepLogRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -22,17 +17,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.TreeMap;
-import java.util.UUID;
-import java.util.concurrent.Callable;
 
 @Service
 public class StatsService {
 
-    private static final Logger log = LoggerFactory.getLogger(StatsService.class);
     private static final int TARGET_MINUTES = 8 * 60; // será substituído pela meta na fase #25
-    private static final int MAX_RETRIES = 3;
-    private static final long INITIAL_BACKOFF_MS = 200;
-    private static final double BACKOFF_MULTIPLIER = 2.0;
 
     private final SleepLogRepository sleepLogRepository;
     private final UserRepository userRepository;
@@ -46,7 +35,7 @@ public class StatsService {
     }
 
     public Summary summary(String email, int days) {
-        return retryWithBackoff(() -> doSummary(email, days), MAX_RETRIES, INITIAL_BACKOFF_MS, BACKOFF_MULTIPLIER);
+        return doSummary(email, days);
     }
 
     private Summary doSummary(String email, int days) {
@@ -54,9 +43,12 @@ public class StatsService {
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.UNAUTHORIZED));
         ZoneId zone = ZoneId.of(user.getTimezone() != null ? user.getTimezone() : "America/Sao_Paulo");
-        
-        // Busca logs com retry em caso de falha transitória de conexão
-        List<SleepLog> logs = fetchLogsWithRetry(user.getId(), days, zone);
+
+        // A janela (agora - days) cobre também a dívida de sono (hoje-6 a
+        // ontem), pois days é sempre 7 ou 30 (#98): o limite é aplicado na
+        // consulta, sem carregar o histórico inteiro.
+        List<SleepLog> logs = sleepLogRepository.findByUserIdAndSleepStartGreaterThanOrderBySleepStartDesc(
+                user.getId(), OffsetDateTime.now().minusDays(days));
         
         // agrupar minutos dormidos e horário de dormir por dia local (do início do sono)
         Map<LocalDate, Long> minutesSleptByDate = new TreeMap<>();
@@ -133,54 +125,6 @@ public class StatsService {
         daily.sort(Comparator.comparing(DayStats::getDate));
 
         return new Summary(days, Math.round(avgHours * 100.0) / 100.0, Math.round(consistency * 100.0) / 100.0, debtMinutes, daily);
-    }
-
-    /**
-     * Busca logs com retry exponencial para lidar com falhas transitórias de conexão
-     * (ex.: pool de conexões Neon, SSL handshake timeout, conexões ociosas).
-     */
-    @Retryable(
-        retryFor = { org.springframework.dao.DataAccessResourceFailureException.class,
-                     org.springframework.transaction.CannotCreateTransactionException.class,
-                     org.springframework.jdbc.CannotGetJdbcConnectionException.class,
-                     java.net.SocketTimeoutException.class,
-                     javax.net.ssl.SSLException.class },
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 200, multiplier = 2, random = true)
-    )
-    private List<SleepLog> fetchLogsWithRetry(UUID userId, int days, ZoneId zone) {
-        // A janela (agora - days) cobre também a dívida de sono (hoje-6 a
-        // ontem), pois days é sempre 7 ou 30 (#98): o limite é aplicado na
-        // consulta, sem carregar o histórico inteiro.
-        return sleepLogRepository.findByUserIdAndSleepStartGreaterThanOrderBySleepStartDesc(
-            userId, OffsetDateTime.now().minusDays(days));
-    }
-
-    private <T> T retryWithBackoff(Callable<T> task, int maxAttempts, long initialBackoffMs, double multiplier) {
-        Exception lastException = null;
-        long backoffMs = initialBackoffMs;
-        
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
-                return task.call();
-            } catch (Exception e) {
-                lastException = e;
-                if (attempt < maxAttempts) {
-                    log.warn("Tentativa {} falhou, retrying em {}ms: {}", attempt, backoffMs, e.getMessage());
-                    try {
-                        Thread.sleep(backoffMs);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException("Interrompido durante retry", ie);
-                    }
-                    backoffMs = (long) (backoffMs * multiplier);
-                } else {
-                    log.error("Todas as {} tentativas falharam", maxAttempts, e);
-                    throw new RuntimeException("Falha após " + maxAttempts + " tentativas", e);
-                }
-            }
-        }
-        throw new RuntimeException("Falha após " + maxAttempts + " tentativas", lastException);
     }
 
     public record Summary(int days, double averageHours, double consistencyMinutes, long sleepDebtMinutes, List<DayStats> daily) {}
