@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
+import type { Goal, StatsSummary } from '../api/types';
 import { formatHours, formatMinutes } from '../lib/dashboard';
 import { useAuth } from '../context/AuthContext';
 import LoadingWarning from '../components/LoadingWarning';
@@ -170,8 +171,8 @@ function Metric({ title, value, hint }: { title: string; value: string; hint?: s
 export default function Dashboard() {
   const { user } = useAuth();
   const [days, setDays] = useState(7);
-  const [summary, setSummary] = useState<any>(null);
-  const [goal, setGoal] = useState<any>(null);
+  const [summary, setSummary] = useState<StatsSummary | null>(null);
+  const [goal, setGoal] = useState<Goal | null>(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -180,15 +181,15 @@ export default function Dashboard() {
     setErrorMessage('');
     try {
       const [summaryData, goalData] = await Promise.all([
-        api.get(`/stats/summary?days=${selectedDays}`),
-        api.get('/goal'),
+        api.get<StatsSummary>(`/stats/summary?days=${selectedDays}`),
+        api.get<Goal>('/goal'),
       ]);
       setSummary(summaryData);
       setGoal(goalData);
       setStatus('ready');
-    } catch (err: any) {
-      if (err.name === 'AbortError') return; // ignora cancelamento
-      setErrorMessage(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return; // ignora cancelamento
+      setErrorMessage(err instanceof Error ? err.message : String(err));
       setStatus('error');
     }
   }, []);
@@ -199,7 +200,7 @@ export default function Dashboard() {
     return () => controller.abort(); // cancela requisição anterior ao trocar de período
   }, [days, load]);
 
-  const goalHours = goal ? goal.targetMinutes / 60 : 8;
+  const goalHours = goal ? (goal.targetMinutes ?? 0) / 60 : 8;
   const isEmpty = status === 'ready' && (!summary?.daily || summary.daily.length === 0);
 
   return (
@@ -254,7 +255,7 @@ export default function Dashboard() {
           <section aria-label="Resumo do sono" style={sectionStyle} className={styles.resumo}>
             <div className={styles.resumoTexto}>
               <div style={mainLabelStyle}>Média de {days} dias</div>
-              <div style={mainNumberStyle}>{formatHours(summary.averageHours)}</div>
+              <div style={mainNumberStyle}>{formatHours(summary.averageHours ?? 0)}</div>
               <div style={mainSubtitleStyle}>por noite registrada</div>
               <div style={goalLineStyle}>Meta: {goalHours}h por noite</div>
             </div>
@@ -271,12 +272,12 @@ export default function Dashboard() {
           <div style={gridStyle}>
             <Metric
               title={`Consistência (${days} dias)`}
-              value={`±${Math.round(summary.consistencyMinutes)} min`}
+              value={`±${Math.round(summary.consistencyMinutes ?? 0)} min`}
               hint="variação do horário de dormir; quanto menor, melhor"
             />
             <Metric
               title="Dívida de sono (7 noites)"
-              value={formatMinutes(summary.sleepDebtMinutes)}
+              value={formatMinutes(summary.sleepDebtMinutes ?? 0)}
               hint={`falta para a meta de ${goalHours}h por noite`}
             />
           </div>

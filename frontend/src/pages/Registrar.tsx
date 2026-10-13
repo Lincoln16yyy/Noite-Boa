@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, CSSProperties } from 'react';
 import { api } from '../api/client';
+import type { SleepLog, SleepLogPage } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import {
   formatDuration,
@@ -33,7 +34,7 @@ export default function Registrar() {
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [saving, setSaving] = useState<boolean>(false);
-  const [recent, setRecent] = useState<any[]>([]);
+  const [recent, setRecent] = useState<SleepLog[]>([]);
   const [recentLoaded, setRecentLoaded] = useState<boolean>(false);
   const digitouRef = useRef(false); // não repor o digitado quando o fuso do perfil chegar (#102)
 
@@ -45,7 +46,7 @@ export default function Registrar() {
 
   const loadRecent = useCallback(async () => {
     try {
-      const page: any = await api.get('/sleep-logs?page=0&size=5');
+      const page = await api.get<SleepLogPage>('/sleep-logs?page=0&size=5');
       setRecent(page.content ?? []);
     } catch {
       setRecent([]);
@@ -79,13 +80,13 @@ export default function Registrar() {
 
     setSaving(true);
     try {
-      const created: any = await api.post('/sleep-logs', toApiPayload(form, fuso));
-      setSuccess(`Noite registrada: ${formatDuration(created.sleepStart, created.sleepEnd)} de sono.`);
+      const created = await api.post<SleepLog>('/sleep-logs', toApiPayload(form, fuso));
+      setSuccess(`Noite registrada: ${formatDuration(created.sleepStart ?? '', created.sleepEnd ?? '')} de sono.`);
       applyDefaults();
       setQuality(0);
       setNotes('');
       await loadRecent();
-    } catch (err: any) {
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
     } finally {
@@ -187,9 +188,9 @@ export default function Registrar() {
               }}
             >
               <strong>
-                {formatLocal(log.sleepStart, fuso)} → {formatLocal(log.sleepEnd, fuso)}
+                {formatLocal(log.sleepStart ?? '', fuso)} → {formatLocal(log.sleepEnd ?? '', fuso)}
               </strong>{' '}
-              · {formatDuration(log.sleepStart, log.sleepEnd)} · nota {log.quality}
+              · {formatDuration(log.sleepStart ?? '', log.sleepEnd ?? '')} · nota {log.quality}
               {log.notes && <div style={{ color: 'var(--text-muted)' }}>{log.notes}</div>}
             </li>
           ))}

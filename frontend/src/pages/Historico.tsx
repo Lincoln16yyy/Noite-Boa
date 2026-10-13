@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent, CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
+import type { SleepLog as SleepLogApi, SleepLogPage } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import {
   formatDuration,
@@ -20,8 +21,23 @@ export interface SleepLog {
   id: string;
   sleepStart: ISODateTime;
   sleepEnd: ISODateTime;
-  quality: 1 | 2 | 3 | 4 | 5;
+  quality: number;
   notes?: string | null;
+}
+
+/**
+ * Converte o registro da API (campos opcionais) no formato da tela
+ * (campos obrigatórios). A API garante estes campos em registros
+ * persistidos; os fallbacks protegem contra uma resposta malformada.
+ */
+function paraTela(log: SleepLogApi): SleepLog {
+  return {
+    id: log.id ?? '',
+    sleepStart: log.sleepStart ?? '',
+    sleepEnd: log.sleepEnd ?? '',
+    quality: log.quality ?? 0,
+    notes: log.notes ?? null,
+  };
 }
 
 const PAGE_SIZE = 10;
@@ -82,8 +98,8 @@ export default function Historico() {
     setLoading(true);
     setError('');
     try {
-      const data: any = await api.get(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`);
-      const content = data.content ?? [];
+      const data = await api.get<SleepLogPage>(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`);
+      const content = (data.content ?? []).map(paraTela);
       if (content.length === 0 && p > 0) {
         setPage(p - 1); // página ficou vazia após excluir: volta uma
         return;
@@ -91,8 +107,8 @@ export default function Historico() {
       setLogs(content);
       setTotalPages(data.totalPages ?? 0);
       setTotalElements(data.totalElements ?? 0);
-    } catch (err: any) {
-      if (err.name === 'AbortError') return; // ignora cancelamento
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return; // ignora cancelamento
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
     } finally {
@@ -131,7 +147,7 @@ export default function Historico() {
       await api.put(`/sleep-logs/${editingId}`, toApiPayload(edit, fuso));
       setEditingId(null);
       await load(page);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       setEditError(message);
     } finally {
@@ -146,7 +162,7 @@ export default function Historico() {
       await api.delete(`/sleep-logs/${id}`);
       setConfirmId(null);
       await load(page);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
     } finally {
