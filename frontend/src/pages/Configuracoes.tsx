@@ -19,13 +19,13 @@ const TIMEZONES =
     : ['America/Sao_Paulo', 'America/New_York', 'Europe/Lisbon', 'UTC'];
 
 /** "23:00:00" (LocalTime da API) → "23:00" (input type=time) */
-const toTimeInput = (value) => (value ? String(value).slice(0, 5) : '');
+const toTimeInput = (value: any) => (value ? String(value).slice(0, 5) : '');
 
 export default function Configuracoes() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const fusoAparelho = fusoDoAparelho();
-  const [me, setMe] = useState(null);
+  const [me, setMe] = useState<any>(null);
   const [hours, setHours] = useState('');
   const [bedtime, setBedtime] = useState('');
   const [wakeTime, setWakeTime] = useState('');
@@ -44,15 +44,15 @@ export default function Configuracoes() {
     let active = true;
     (async () => {
       try {
-        const [meData, goalData] = await Promise.all([api.get('/me'), api.get('/goal')]);
+        const [meData, goalData]: any = await Promise.all([api.get('/me'), api.get('/goal')]);
         if (!active) return;
         setMe(meData);
-        setHours(String(goalData.targetMinutes / 60));
-        setBedtime(toTimeInput(goalData.bedtime));
-        setWakeTime(toTimeInput(goalData.wakeTime));
-        setTimezone(meData.timezone || 'America/Sao_Paulo');
-      } catch (err) {
-        if (active) setError(err.message);
+        setHours(String(goalData?.targetMinutes / 60));
+        setBedtime(toTimeInput(goalData?.bedtime));
+        setWakeTime(toTimeInput(goalData?.wakeTime));
+        setTimezone(meData?.timezone || 'America/Sao_Paulo');
+      } catch (err: any) {
+        if (active) setError(err instanceof Error ? err.message : String(err));
       } finally {
         if (active) setLoading(false);
       }
@@ -62,7 +62,7 @@ export default function Configuracoes() {
     };
   }, []);
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: any) {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -94,8 +94,8 @@ export default function Configuracoes() {
         if (bedtime) agendarLembrete(bedtime);
         else cancelarLembrete();
       }
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
@@ -107,12 +107,12 @@ export default function Configuracoes() {
     setSuccess('');
     setSaving(true);
     try {
-      const updatedMe = await api.put('/me', { timezone: fusoAparelho });
+      const updatedMe: any = await api.put('/me', { timezone: fusoAparelho });
       setMe(updatedMe);
       setTimezone(updatedMe.timezone);
       setSuccess('Fuso horário atualizado para o do aparelho.');
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
@@ -143,14 +143,14 @@ export default function Configuracoes() {
       // Avisa o AuthProvider para derrubar o usuário da sessão
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       navigate('/?deleted=true');
-    } catch (err) {
-      setDeleteError(err.message);
+    } catch (err: any) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
       setDeleting(false);
     }
   }
 
   /** Ativa/desativa o lembrete. A permissão só é pedida aqui, com clique explícito. */
-  async function alternarLembrete(e) {
+  async function alternarLembrete(e: any) {
     const querAtivar = e.target.checked;
     setMsgLembrete('');
     if (!querAtivar) {

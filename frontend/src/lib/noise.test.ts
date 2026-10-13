@@ -6,7 +6,7 @@ class AudioContextFake {
   sampleRate = 8000;
   destination = { id: 'destination' };
   resume = vi.fn();
-  createBuffer = vi.fn((canais, amostras) => {
+  createBuffer = vi.fn((_canais, amostras) => {
     const dados = new Float32Array(amostras);
     return {
       length: amostras,

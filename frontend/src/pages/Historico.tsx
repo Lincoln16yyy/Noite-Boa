@@ -78,7 +78,7 @@ export default function Historico() {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
 
-  const load = useCallback(async (p: number, signal?: AbortSignal) => {
+  const load = useCallback(async (p: number) => {
     setLoading(true);
     setError('');
     try {
@@ -101,9 +101,9 @@ export default function Historico() {
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    load(page, controller.signal);
-    return () => controller.abort(); // cancela requisição anterior ao trocar de página
+    load(page);
+    // Note: sem AbortController pois a API não suporta cancelamento nativo ainda
+    // TODO: adicionar suporte a AbortSignal na API quando necessário
   }, [page, load]);
 
   function startEdit(log: SleepLog) {

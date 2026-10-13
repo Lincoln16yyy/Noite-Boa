@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { formatHours, formatMinutes } from '../lib/dashboard';
@@ -22,7 +23,7 @@ const sectionStyle = {
   border: '1px solid var(--color-indigo)',
 };
 
-const metricCardStyle = {
+const metricCardStyle: CSSProperties = {
   background: 'var(--color-nevoa)',
   border: '1px solid var(--color-indigo)',
   borderRadius: '20px',
@@ -53,7 +54,7 @@ const metricHintStyle = {
   opacity: 0.7,
 };
 
-const periodToggleStyle = (active) => ({
+const periodToggleStyle = (active: boolean): CSSProperties => ({
   minHeight: '48px',
   padding: '0 1rem',
   fontSize: '15px',
@@ -80,7 +81,7 @@ const buttonStyle = {
   transition: 'background 0.15s, transform 0.1s',
 };
 
-const emptyStateStyle = {
+const emptyStateStyle: CSSProperties = {
   background: 'var(--color-nevoa)',
   border: '1px solid var(--color-lavanda)',
   borderRadius: '20px',
@@ -92,7 +93,7 @@ const emptyStateStyle = {
   textAlign: 'left',
 };
 
-const errorStateStyle = {
+const errorStateStyle: CSSProperties = {
   background: 'var(--color-nevoa)',
   border: '2px solid var(--color-erro)',
   borderRadius: '20px',
@@ -100,7 +101,7 @@ const errorStateStyle = {
   color: 'var(--color-erro-texto)',
 };
 
-const loadingStyle = {
+const loadingStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: '0.75rem',
@@ -156,7 +157,7 @@ const goalLineStyle = {
   marginTop: '0.75rem',
 };
 
-function Metric({ title, value, hint }) {
+function Metric({ title, value, hint }: { title: string; value: string; hint?: string }) {
   return (
     <div style={metricCardStyle}>
       <div style={metricTitleStyle}>{title}</div>
@@ -169,12 +170,12 @@ function Metric({ title, value, hint }) {
 export default function Dashboard() {
   const { user } = useAuth();
   const [days, setDays] = useState(7);
-  const [summary, setSummary] = useState(null);
-  const [goal, setGoal] = useState(null);
+  const [summary, setSummary] = useState<any>(null);
+  const [goal, setGoal] = useState<any>(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [errorMessage, setErrorMessage] = useState('');
 
-  const load = useCallback(async (selectedDays, signal) => {
+  const load = useCallback(async (selectedDays: number, signal?: AbortSignal) => {
     setStatus('loading');
     setErrorMessage('');
     try {
@@ -185,9 +186,9 @@ export default function Dashboard() {
       setSummary(summaryData);
       setGoal(goalData);
       setStatus('ready');
-    } catch (err) {
+    } catch (err: any) {
       if (err.name === 'AbortError') return; // ignora cancelamento
-      setErrorMessage(err.message);
+      setErrorMessage(err instanceof Error ? err.message : String(err));
       setStatus('error');
     }
   }, []);
@@ -229,7 +230,7 @@ export default function Dashboard() {
       {status === 'error' && (
         <div role="alert" style={errorStateStyle}>
           <p style={{ marginTop: 0, marginBottom: '1rem' }}>Não foi possível carregar as estatísticas: {errorMessage}</p>
-          <button type="button" style={buttonStyle} onClick={() => load(days)}>
+          <button type="button" style={buttonStyle} onClick={() => load(days, new AbortController().signal)}>
             Tentar novamente
           </button>
         </div>

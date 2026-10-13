@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Amigos from './Amigos';
 import { renderWithAuth } from '../test/test-utils';
 
-function jsonResponse(body, status = 200) {
-  return new Response(JSON.stringify(body), { status });
+function jsonResponse(body: any, status = 200) {
+  return new Response(JSON.stringify(body), { status }) as any;
 }
 
 const ME = {
@@ -41,12 +41,12 @@ const RANKING_30 = {
 const mockUser = ME;
 
 describe('tela de Amigos', () => {
-  let fetchMock;
+  let fetchMock: any;
 
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
-    fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
+    fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);
       const method = options.method ?? 'GET';
       if (path.includes('/api/me') && method === 'PUT') {
@@ -74,9 +74,9 @@ describe('tela de Amigos', () => {
     renderWithAuth(<Amigos />, { user: mockUser, route: '/amigos' });
   }
 
-  function calls(method, pathFragment) {
+  function calls(method: string, pathFragment: string) {
     return fetchMock.mock.calls.filter(
-      ([url, options]) => (options?.method ?? 'GET') === method && String(url).includes(pathFragment),
+      ([url, options]: any) => (options?.method ?? 'GET') === method && String(url).includes(pathFragment),
     );
   }
 
@@ -162,7 +162,7 @@ describe('tela de Amigos', () => {
   });
 
   it('erro da API aparece como alerta sem quebrar a tela', async () => {
-    fetchMock.mockImplementation(async (url, options = {}) => {
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);
       const method = options.method ?? 'GET';
       if (path.includes('/friends/requests') && method === 'POST') {

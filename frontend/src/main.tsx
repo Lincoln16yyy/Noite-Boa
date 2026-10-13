@@ -7,7 +7,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import './styles/tokens.css';
 import './styles/base.css';
 
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
       <AuthProvider>
