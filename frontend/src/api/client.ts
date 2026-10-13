@@ -106,7 +106,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     window.clearTimeout(timeoutId);
 
     if (err instanceof Error && (err.name === 'AbortError' || isNetworkError(err))) {
-      throw new Error('Não foi possível conectar ao servidor. Verifique sua conexão ou tente novamente mais tarde.');
+      throw new Error(
+        'Não foi possível conectar ao servidor. Verifique sua conexão ou tente novamente mais tarde.',
+        { cause: err },
+      );
     }
     throw err;
   }

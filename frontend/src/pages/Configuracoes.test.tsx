@@ -29,6 +29,10 @@ const ME = { id: 'u1', email: 'ana@exemplo.com', displayName: 'Ana', timezone: '
 const GOAL = { targetMinutes: 480, bedtime: '23:00:00', wakeTime: '07:00:00' };
 const mockUser = ME;
 
+function openScreen() {
+  return renderWithAuth(<Configuracoes />, { user: mockUser, route: '/configuracoes' });
+}
+
 describe('tela de Configurações', () => {
   let fetchMock: any;
 
@@ -60,10 +64,6 @@ describe('tela de Configurações', () => {
     (cancelarLembrete as any).mockClear();
     (window as any).Notification = undefined;
   });
-
-  function openScreen() {
-    return renderWithAuth(<Configuracoes />, { user: mockUser, route: '/configuracoes' });
-  }
 
   function calls(method: string, pathFragment: string) {
     return fetchMock.mock.calls.filter(([url, options]: any) => (options?.method ?? 'GET') === method && String(url).includes(pathFragment));

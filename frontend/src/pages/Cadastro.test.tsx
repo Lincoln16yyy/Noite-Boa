@@ -5,26 +5,26 @@ import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import Cadastro from './Cadastro';
 
+const renderCadastro = () => {
+  return render(
+    <MemoryRouter initialEntries={['/cadastro']}>
+      <ThemeProvider>
+        <AuthProvider>
+          <Routes>
+            <Route path="/cadastro" element={<Cadastro />} />
+            <Route path="/login" element={<h1>Login</h1>} />
+          </Routes>
+        </AuthProvider>
+      </ThemeProvider>
+    </MemoryRouter>,
+  );
+};
+
 describe('tela de Cadastro', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
   });
-
-  const renderCadastro = () => {
-    return render(
-      <MemoryRouter initialEntries={['/cadastro']}>
-        <ThemeProvider>
-          <AuthProvider>
-            <Routes>
-              <Route path="/cadastro" element={<Cadastro />} />
-              <Route path="/login" element={<h1>Login</h1>} />
-            </Routes>
-          </AuthProvider>
-        </ThemeProvider>
-      </MemoryRouter>,
-    );
-  };
 
   it('cria a conta e leva para o login', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {

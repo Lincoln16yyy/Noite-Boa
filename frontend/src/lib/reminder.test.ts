@@ -29,6 +29,11 @@ function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200 });
 }
 
+/** Duplo de Notification cujo construtor falha — simula browser sem suporte. */
+function FailingNotification(): never {
+  throw new Error('sem suporte');
+}
+
 describe('lembrete de dormir', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -112,11 +117,7 @@ describe('lembrete de dormir', () => {
   it('não quebra quando o construtor falha e não há service worker', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 0, 5, 22, 59, 30));
-    instalarNotification(class {
-      constructor() {
-        throw new Error('sem suporte');
-      }
-    });
+    instalarNotification(FailingNotification);
 
     agendarLembrete('23:00');
     await vi.advanceTimersByTimeAsync(61 * 1000); // não deve lançar

@@ -22,6 +22,10 @@ function pageResponse(content: any[], totalPages = 1) {
 
 const mockUser = { id: 'u1', email: 'a@example.com', displayName: 'Teste', timezone: 'America/Sao_Paulo', shareWithFriends: true };
 
+function openScreen() {
+  renderWithAuth(<Historico />, { user: mockUser, route: '/historico' });
+}
+
 describe('tela de Histórico', () => {
   let fetchMock: any;
   let state: any;
@@ -51,10 +55,6 @@ describe('tela de Histórico', () => {
       return jsonResponse(pageResponse(pageParam === 0 ? state.logs : []));
     });
   });
-
-  function openScreen() {
-    renderWithAuth(<Historico />, { user: mockUser, route: '/historico' });
-  }
 
   it('lista as noites registradas com duração, nota e observação', async () => {
     openScreen();
