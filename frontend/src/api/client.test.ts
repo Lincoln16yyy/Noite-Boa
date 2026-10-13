@@ -1,11 +1,11 @@
 import { vi } from 'vitest';
-import { api, setTimeout } from './client';
+import { api, setRequestTimeout } from './client';
 
 describe('api client', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
-    setTimeout(30000); // reset to default
+    setRequestTimeout(30000); // reset to default
   });
 
   it('attaches token when present', async () => {
@@ -48,9 +48,9 @@ describe('api client', () => {
     await expect(api.get('/me')).rejects.toThrow('Não foi possível conectar ao servidor');
   });
 
-  it('permite configurar timeout via setTimeout', () => {
-    setTimeout(5000);
+  it('permite configurar timeout via setRequestTimeout', () => {
+    setRequestTimeout(5000);
     // não testa internamente, mas garante que a função existe e é exportada
-    expect(typeof setTimeout).toBe('function');
+    expect(typeof setRequestTimeout).toBe('function');
   });
 });

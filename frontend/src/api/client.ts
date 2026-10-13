@@ -1,6 +1,6 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
-/** Tempo padrão de timeout (ms) — pode ser alterado via `api.setTimeout(ms)` */
+/** Tempo padrão de timeout (ms) — pode ser alterado via `api.setRequestTimeout(ms)` */
 let requestTimeout = 30000;
 
 /** Erro no formato ProblemDetail (RFC 7807) que o back-end devolve. */
@@ -31,11 +31,10 @@ export function clearSession(): void {
 /**
  * Configura o timeout global (ms) — usado em testes para simular timeout rápido.
  *
- * O tipo de retorno `undefined` existe só para casar com o `clearTimeout` de
- * `request()` (ver o `@ts-expect-error` lá). Em runtime a função não devolve
- * nada — comportamento inalterado.
+ * Renomeado de `setTimeout` para evitar sombreamento do `window.setTimeout`
+ * global (issue #204, bug da #186).
  */
-export function setTimeout(ms: number): undefined {
+export function setRequestTimeout(ms: number): void {
   requestTimeout = ms;
 }
 
@@ -64,12 +63,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   // Permite passar signal externo para cancelamento (ex.: AbortController do efeito React)
   const externalSignal = options.signal;
   const controller = new AbortController();
-  // NOTA (issue #186): este `setTimeout` local sombreia o global, então a
-  // chamada de 2 argumentos abaixo invoca a função de configuração, e não o
-  // timer do navegador — o timeout interno NÃO dispara. É um bug conhecido,
-  // preservado de propósito aqui (regra: migração não muda comportamento).
-  // @ts-expect-error chamada de 2 args invoca a função de configuração (bug da #186)
-  const timeoutId = setTimeout(() => controller.abort(), requestTimeout);
+  // Usa window.setTimeout explicitamente para evitar sombreamento do
+  // setTimeout do módulo (issue #186, #204).
+  const timeoutId = window.setTimeout(() => controller.abort(), requestTimeout);
 
   // Se houver signal externo, aborta o controller interno quando ele disparar
   if (externalSignal) {
@@ -87,7 +83,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       signal: controller.signal,
     });
 
-    clearTimeout(timeoutId);
+    window.clearTimeout(timeoutId);
 
     if (!response.ok) {
       const message = await readProblemMessage(response);
@@ -107,7 +103,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (response.status === 204) return null as T; // 204 = sem corpo; quem chama tipa como void
     return (await response.json()) as T; // corpo JSON do recurso (tipo informado por quem chama)
   } catch (err) {
-    clearTimeout(timeoutId);
+    window.clearTimeout(timeoutId);
 
     if (err instanceof Error && (err.name === 'AbortError' || isNetworkError(err))) {
       throw new Error('Não foi possível conectar ao servidor. Verifique sua conexão ou tente novamente mais tarde.');
@@ -123,4 +119,5 @@ export const api = {
   put: <T>(path: string, body?: unknown): Promise<T> =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   delete: <T = void>(path: string): Promise<T> => request<T>(path, { method: 'DELETE' }),
+  setRequestTimeout,
 };
