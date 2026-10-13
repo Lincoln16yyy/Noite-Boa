@@ -13,6 +13,7 @@ import {
 } from '../lib/sleep';
 import LoadingWarning from '../components/LoadingWarning';
 import QualitySelector from '../components/QualitySelector';
+import { Button, Field } from '../components/ui';
 
 export type ISODateTime = string;
 export type LocalDateTimeInput = string;
@@ -50,27 +51,6 @@ const cardStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: '0.5rem',
-};
-
-const fieldStyle: CSSProperties = {
-  width: '100%',
-  minHeight: '48px',
-  fontSize: '16px',
-  padding: '0.6rem 0.75rem',
-  border: '1px solid var(--input-border)',
-  borderRadius: '10px',
-  background: 'var(--input-bg)',
-  boxSizing: 'border-box',
-};
-
-const smallButtonStyle: CSSProperties = {
-  minHeight: '44px',
-  padding: '0 0.9rem',
-  fontSize: '15px',
-  borderRadius: '10px',
-  border: '1px solid var(--border-color)',
-  background: 'var(--bg-secondary)',
-  cursor: 'pointer',
 };
 
 export default function Historico() {
@@ -177,9 +157,9 @@ export default function Historico() {
       {error && (
         <div role="alert" style={{ ...cardStyle, borderColor: 'var(--color-erro)', marginBottom: '0.75rem' }}>
           <p style={{ marginTop: 0, color: 'var(--color-erro-texto)' }}>{error}</p>
-          <button type="button" style={smallButtonStyle} onClick={() => load(page)}>
+          <Button variant="secondary" onClick={() => load(page)}>
             Tentar novamente
-          </button>
+          </Button>
         </div>
       )}
 
@@ -218,32 +198,26 @@ export default function Historico() {
                   </span>
                   {log.notes && <span style={{ color: 'var(--text-muted)' }}>{log.notes}</span>}
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button type="button" style={smallButtonStyle} onClick={() => startEdit(log)}>
+                    <Button variant="secondary" onClick={() => startEdit(log)}>
                       Editar
-                    </button>
+                    </Button>
                     {confirmId === log.id ? (
                       <>
-                        <button
-                          type="button"
+                        <Button
+                          variant="danger"
                           onClick={() => remove(log.id)}
                           disabled={deleting}
-                          style={{
-                            ...smallButtonStyle,
-                            background: 'var(--color-erro-texto)',
-                            color: '#FFFFFF',
-                            border: 'none',
-                          }}
                         >
                           {deleting ? 'Excluindo…' : 'Sim, excluir'}
-                        </button>
-                        <button type="button" style={smallButtonStyle} onClick={() => setConfirmId(null)}>
+                        </Button>
+                        <Button variant="secondary" onClick={() => setConfirmId(null)}>
                           Cancelar
-                        </button>
+                        </Button>
                       </>
                     ) : (
-                      <button type="button" style={smallButtonStyle} onClick={() => setConfirmId(log.id)}>
+                      <Button variant="secondary" onClick={() => setConfirmId(log.id)}>
                         Excluir
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </>
@@ -251,32 +225,27 @@ export default function Historico() {
 
               {editing && (
                 <form onSubmit={saveEdit} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                    Dormiu às
-                    <input
-                      type="datetime-local"
-                      style={fieldStyle}
-                      value={edit.sleepStart}
-                      onChange={(e) => setEdit({ ...edit, sleepStart: e.target.value })}
-                      required
-                    />
-                  </label>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                    Acordou às
-                    <input
-                      type="datetime-local"
-                      style={fieldStyle}
-                      value={edit.sleepEnd}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) => setEdit({ ...edit, sleepEnd: e.target.value })}
-                      required
-                    />
-                  </label>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                  <Field
+                    label="Dormiu às"
+                    type="datetime-local"
+                    value={edit.sleepStart}
+                    onChange={(e) => setEdit({ ...edit, sleepStart: e.target.value })}
+                    required
+                  />
+                  <Field
+                    label="Acordou às"
+                    type="datetime-local"
+                    value={edit.sleepEnd}
+                    onChange={(e) => setEdit({ ...edit, sleepEnd: e.target.value })}
+                    required
+                  />
+                  <label className="ui-field">
                     Observação (opcional)
                     <textarea
+                      className="field"
                       rows={2}
                       maxLength={2000}
-                      style={{ ...fieldStyle, minHeight: '64px', resize: 'vertical' }}
+                      style={{ minHeight: '64px', resize: 'vertical' }}
                       value={edit.notes}
                       onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setEdit({ ...edit, notes: e.target.value })}
                     />
@@ -294,22 +263,12 @@ export default function Historico() {
                     </p>
                   )}
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                      type="submit"
-                      disabled={savingEdit}
-                      style={{
-                        ...smallButtonStyle,
-                        background: 'var(--color-noite)',
-                        color: 'var(--color-luar)',
-                        border: 'none',
-                        fontWeight: 700,
-                      }}
-                    >
+                    <Button type="submit" variant="primary" loading={savingEdit}>
                       {savingEdit ? 'Salvando…' : 'Salvar'}
-                    </button>
-                    <button type="button" style={smallButtonStyle} onClick={() => setEditingId(null)}>
+                    </Button>
+                    <Button variant="secondary" onClick={() => setEditingId(null)}>
                       Cancelar
-                    </button>
+                    </Button>
                   </div>
                 </form>
               )}
@@ -321,25 +280,23 @@ export default function Historico() {
 
       {!loading && totalElements > 0 && (
         <nav aria-label="Paginação" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '1rem' }}>
-          <button
-            type="button"
-            style={{ ...smallButtonStyle, opacity: page === 0 ? 0.5 : 1 }}
+          <Button
+            variant="secondary"
             disabled={page === 0}
             onClick={() => setPage(page - 1)}
           >
             Anterior
-          </button>
+          </Button>
           <span style={{ color: 'var(--text-muted)' }}>
             Página {page + 1} de {Math.max(totalPages, 1)} · {totalElements} noite{totalElements === 1 ? '' : 's'}
           </span>
-          <button
-            type="button"
-            style={{ ...smallButtonStyle, opacity: page + 1 >= totalPages ? 0.5 : 1 }}
+          <Button
+            variant="secondary"
             disabled={page + 1 >= totalPages}
             onClick={() => setPage(page + 1)}
           >
             Próxima
-          </button>
+          </Button>
         </nav>
       )}
     </div>

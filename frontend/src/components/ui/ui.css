@@ -1,0 +1,297 @@
+/* Componentes base do visual v2 (issue #208).
+   Estados de todos os componentes: hover, foco visível (anel Âmbar de 2 px),
+   pressionado e desabilitado; alvos mínimos de 44 px (WCAG 2.5.5).
+   Só tokens — nenhuma cor hexadecimal solta (docs/design/direcao-visual.md). */
+
+/* ===== Button ===== */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 0.9rem;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease,
+    filter 0.15s ease;
+}
+
+.ui-btn:focus-visible {
+  outline: 2px solid var(--color-ambar);
+  outline-offset: 2px;
+}
+
+.ui-btn:active:not(:disabled) {
+  transform: scale(0.98); /* botão afunda ao pressionar (seção 6 do guia) */
+}
+
+.ui-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Variantes */
+.ui-btn--primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: transparent;
+}
+
+.ui-btn--primary:hover:not(:disabled) {
+  filter: brightness(0.93);
+}
+
+.ui-btn--secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--card-border);
+}
+
+.ui-btn--secondary:hover:not(:disabled) {
+  border-color: var(--color-indigo);
+}
+
+.ui-btn--ghost {
+  background: var(--btn-ghost-bg);
+  color: var(--btn-ghost-text);
+  border-color: var(--btn-ghost-border);
+}
+
+.ui-btn--ghost:hover:not(:disabled) {
+  background: var(--btn-ghost-border);
+  color: var(--btn-primary-text);
+}
+
+.ui-btn--danger {
+  background: var(--color-erro);
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.ui-btn--danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+/* Tamanhos (alvo mínimo de 44 px nos dois) */
+.ui-btn--sm {
+  min-height: 44px;
+  font-size: 15px;
+}
+
+.ui-btn--md {
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  font-size: 16px;
+  border-radius: var(--radius-pill);
+}
+
+/* Indicador de carregamento */
+.ui-btn__spinner {
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: ui-btn-spin 0.7s linear infinite;
+}
+
+@keyframes ui-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== IconButton ===== */
+.ui-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.ui-icon-btn:focus-visible {
+  outline: 2px solid var(--color-ambar);
+  outline-offset: 2px;
+}
+
+.ui-icon-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.ui-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== Card (superfície v2 — seção 2 do guia) ===== */
+.ui-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--surface-radius);
+  padding: var(--surface-padding);
+  box-shadow: var(--surface-shadow);
+  color: var(--text-primary);
+}
+
+/* ===== Chip (pílula com estado selecionado) ===== */
+.ui-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 1rem;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--card-border);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ui-chip:hover:not(:disabled) {
+  border-color: var(--color-indigo);
+}
+
+.ui-chip:focus-visible {
+  outline: 2px solid var(--color-ambar);
+  outline-offset: 2px;
+}
+
+.ui-chip:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.ui-chip[aria-pressed="true"] {
+  background: var(--toggle-active-bg);
+  color: var(--toggle-active-text);
+  border-color: var(--toggle-active-bg);
+  font-weight: 700;
+}
+
+.ui-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== ProgressBar (8 px, trilho e preenchimento por meta) ===== */
+.ui-progress {
+  width: 100%;
+  height: var(--progress-height);
+  background: var(--progress-track);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.ui-progress__fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width 0.4s ease;
+}
+
+.ui-progress__fill--within {
+  background: var(--within-meta-graphic);
+}
+
+.ui-progress__fill--below {
+  background: var(--below-meta-graphic);
+}
+
+/* ===== Ring (anel de progresso) ===== */
+.ui-ring {
+  position: relative;
+  display: inline-block;
+}
+
+.ui-ring__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ui-ring__track {
+  stroke: var(--progress-track);
+  fill: none;
+}
+
+.ui-ring__value {
+  stroke: var(--accent);
+  fill: none;
+  transition: stroke-dashoffset 0.6s ease;
+}
+
+.ui-ring__value--within {
+  stroke: var(--within-meta-graphic);
+}
+
+.ui-ring__value--below {
+  stroke: var(--below-meta-graphic);
+}
+
+.ui-ring__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* ===== Field (label + input + erro) ===== */
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ui-field__label {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ui-field__erro {
+  font-size: var(--fs-sm);
+  color: var(--color-erro-texto);
+}
+
+/* Movimento: respeita prefers-reduced-motion (seção 6 do guia) */
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn,
+  .ui-icon-btn,
+  .ui-chip,
+  .ui-progress__fill,
+  .ui-ring__value {
+    transition: none;
+  }
+
+  .ui-btn:active:not(:disabled),
+  .ui-icon-btn:active:not(:disabled),
+  .ui-chip:active:not(:disabled) {
+    transform: none;
+  }
+
+  .ui-btn__spinner {
+    animation: none;
+    border-top-color: currentColor;
+    opacity: 0.5;
+  }
+}

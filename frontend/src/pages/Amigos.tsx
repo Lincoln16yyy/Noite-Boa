@@ -1,29 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { ChangeEvent, CSSProperties, FormEvent } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import { api } from '../api/client';
 import type { Friend, FriendRequests, RankingEntry, SendResult, User } from '../api/types';
 import LoadingWarning from '../components/LoadingWarning';
-
-const fieldStyle: CSSProperties = {
-  width: '100%',
-  minHeight: '48px',
-  fontSize: '16px',
-  padding: '0.6rem 0.75rem',
-  border: '1px solid var(--input-border)',
-  borderRadius: '10px',
-  background: 'var(--input-bg)',
-  boxSizing: 'border-box',
-};
-
-const smallButtonStyle = {
-  minHeight: '44px',
-  padding: '0 0.9rem',
-  fontSize: '15px',
-  borderRadius: '10px',
-  border: '1px solid var(--card-border)',
-  background: 'var(--bg-secondary)',
-  cursor: 'pointer',
-};
+import { Button, Chip, Field } from '../components/ui';
 
 const cardStyle = {
   background: 'var(--card-bg)',
@@ -164,20 +144,18 @@ export default function Amigos() {
       <section aria-label="Convidar" style={{ marginBottom: '1.5rem' }}>
         <h2 style={{ fontSize: '18px' }}>Convidar alguém</h2>
         <form onSubmit={enviarConvite} style={{ ...rowStyle, marginTop: '0.5rem' }}>
-          <label style={{ flex: '1 1 220px' }}>
-            E-mail do amigo
-            <input
-              type="email"
-              style={fieldStyle}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="amigo@exemplo.com"
-              required
-            />
-          </label>
-          <button type="submit" style={{ ...smallButtonStyle, alignSelf: 'flex-end' }}>
+          <Field
+            label="E-mail do amigo"
+            type="email"
+            style={{ flex: '1 1 220px' }}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="amigo@exemplo.com"
+            required
+          />
+          <Button type="submit" variant="primary" style={{ alignSelf: 'flex-end' }}>
             Enviar convite
-          </button>
+          </Button>
         </form>
         <p style={{ ...mutedTextStyle, marginTop: '0.35rem' }}>
           Não confirmamos se o e-mail tem conta (por privacidade). Se tiver, o convite só vira amizade quando a pessoa aceitar.
@@ -187,9 +165,9 @@ export default function Amigos() {
       {error && (
         <div role="alert" style={{ ...cardStyle, borderColor: 'var(--color-erro)', marginBottom: '0.75rem' }}>
           <p style={{ marginTop: 0, color: 'var(--color-erro-texto)' }}>{error}</p>
-          <button type="button" style={smallButtonStyle} onClick={() => carregar(dias)}>
+          <Button variant="secondary" onClick={() => carregar(dias)}>
             Tentar novamente
-          </button>
+          </Button>
         </div>
       )}
       {success && (
@@ -205,9 +183,8 @@ export default function Amigos() {
           <div key={convite.id} style={cardStyle}>
             <div style={rowStyle}>
               <span style={{ flex: '1 1 160px', fontWeight: 700 }}>{convite.friend?.displayName}</span>
-              <button
-                type="button"
-                style={smallButtonStyle}
+              <Button
+                variant="primary"
                 onClick={() =>
                   executar(
                     () => api.post(`/friends/requests/${convite.id}/accept`),
@@ -216,10 +193,9 @@ export default function Amigos() {
                 }
               >
                 Aceitar
-              </button>
-              <button
-                type="button"
-                style={{ ...smallButtonStyle, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--card-border)' }}
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() =>
                   executar(
                     () => api.post(`/friends/requests/${convite.id}/decline`),
@@ -228,7 +204,7 @@ export default function Amigos() {
                 }
               >
                 Recusar
-              </button>
+              </Button>
             </div>
           </div>
         ))}
@@ -242,9 +218,8 @@ export default function Amigos() {
             <div style={rowStyle}>
               <span style={{ flex: '1 1 160px', fontWeight: 700 }}>{convite.friend?.displayName}</span>
               <span style={mutedTextStyle}>aguardando resposta</span>
-              <button
-                type="button"
-                style={{ ...smallButtonStyle, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--card-border)' }}
+              <Button
+                variant="secondary"
                 onClick={() =>
                   executar(
                     () => api.delete(`/friends/requests/${convite.id}`),
@@ -253,7 +228,7 @@ export default function Amigos() {
                 }
               >
                 Cancelar
-              </button>
+              </Button>
             </div>
           </div>
         ))}
@@ -267,9 +242,8 @@ export default function Amigos() {
             <div style={rowStyle}>
               <span style={{ flex: '1 1 160px', fontWeight: 700 }}>{amigo.displayName}</span>
               {!amigo.sharesData && <span style={mutedTextStyle}>não compartilha dados</span>}
-              <button
-                type="button"
-                style={{ ...smallButtonStyle, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--card-border)' }}
+              <Button
+                variant="secondary"
                 onClick={() =>
                   executar(
                     () => api.delete(`/friends/${amigo.id}`),
@@ -278,7 +252,7 @@ export default function Amigos() {
                 }
               >
                 Remover
-              </button>
+              </Button>
             </div>
           </div>
         ))}
@@ -289,23 +263,16 @@ export default function Amigos() {
           <h2 style={{ fontSize: '18px', margin: 0 }}>Ranking de noites registradas</h2>
           <div style={rowStyle}>
             {[7, 30].map((opcao) => (
-              <button
+              <Chip
                 key={opcao}
-                type="button"
-                aria-pressed={dias === opcao}
+                selected={dias === opcao}
                 onClick={() => {
                   const controller = new AbortController();
                   trocarPeriodo(opcao, controller.signal);
                 }}
-                style={{
-                  ...smallButtonStyle,
-                  background: dias === opcao ? 'var(--color-noite)' : 'var(--bg-secondary)',
-                  color: dias === opcao ? 'var(--color-luar)' : 'var(--text-primary)',
-                  border: '1px solid var(--card-border)',
-                }}
               >
                 {opcao} dias
-              </button>
+              </Chip>
             ))}
           </div>
         </div>
