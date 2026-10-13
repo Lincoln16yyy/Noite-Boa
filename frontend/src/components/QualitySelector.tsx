@@ -1,23 +1,23 @@
 import { useId } from 'react';
 import type { CSSProperties } from 'react';
 
-/** Uma nota de qualidade do sono (1-5) com rótulo e emoji. */
+/** Uma nota de qualidade do sono (1-5) com rótulo e número. */
 export interface QualityOption {
   value: number;
   label: string;
   shortLabel: string;
-  emoji: string;
 }
 
 /**
- * Rótulos de qualidade com emojis discretos
+ * Rótulos de qualidade (sem emoji — a interface usa só ícones SVG de traço,
+ * issue #209; o número grande vem do mockup do Registrar).
  */
 export const QUALITY_OPTIONS: QualityOption[] = [
-  { value: 1, label: 'Péssima', shortLabel: '1', emoji: '😫' },
-  { value: 2, label: 'Ruim', shortLabel: '2', emoji: '😕' },
-  { value: 3, label: 'Ok', shortLabel: '3', emoji: '😐' },
-  { value: 4, label: 'Boa', shortLabel: '4', emoji: '🙂' },
-  { value: 5, label: 'Ótima', shortLabel: '5', emoji: '😄' },
+  { value: 1, label: 'Péssima', shortLabel: '1' },
+  { value: 2, label: 'Ruim', shortLabel: '2' },
+  { value: 3, label: 'Ok', shortLabel: '3' },
+  { value: 4, label: 'Boa', shortLabel: '4' },
+  { value: 5, label: 'Ótima', shortLabel: '5' },
 ];
 
 /** Props de `QualitySelector`. */
@@ -38,7 +38,7 @@ export interface QualitySelectorProps {
 
 /**
  * Seletor de qualidade de sono acessível.
- * Radiogroup nativo com rótulos visuais (emoji + texto curto) e títulos completos.
+ * Radiogroup nativo com rótulos visuais (número + texto curto) e títulos completos.
  * Usa tokens CSS da identidade visual.
  */
 export default function QualitySelector({
@@ -70,10 +70,7 @@ export default function QualitySelector({
               aria-label={`${option.label} (${option.value})`}
             />
             <span style={buttonStyle(option.value === value)}>
-              <span style={{ fontSize: '20px', lineHeight: 1, display: 'block', marginBottom: '2px' }}>
-                {option.emoji}
-              </span>
-              <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <span style={{ fontSize: '18px', fontWeight: 800, lineHeight: 1, display: 'block' }}>
                 {option.shortLabel}
               </span>
               <span style={{ fontSize: '11px', fontWeight: 400, opacity: 0.7, marginTop: '2px', textAlign: 'center', overflowWrap: 'anywhere', lineHeight: 1.1 }}>

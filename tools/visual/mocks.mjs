@@ -51,6 +51,7 @@ export const telas = [
   ['home', '/', false],
   ['login', '/login', false],
   ['cadastro', '/cadastro', false],
+  ['hoje', '/hoje', true],
   ['registrar', '/registrar', true],
   ['historico', '/historico', true],
   ['dashboard', '/dashboard', true],

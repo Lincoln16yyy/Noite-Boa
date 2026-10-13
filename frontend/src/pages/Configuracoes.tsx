@@ -324,21 +324,21 @@ export default function Configuracoes() {
             onClick={() => setTheme('light')}
             style={{ flex: '1 1 auto', minWidth: 'fit-content', whiteSpace: 'nowrap' }}
           >
-            ☀️ Claro
+            Claro
           </Chip>
           <Chip
             selected={theme === 'dark'}
             onClick={() => setTheme('dark')}
             style={{ flex: '1 1 auto', minWidth: 'fit-content', whiteSpace: 'nowrap' }}
           >
-            🌙 Escuro
+            Escuro
           </Chip>
           <Chip
             selected={theme === 'auto'}
             onClick={() => setTheme('auto')}
             style={{ flex: '1 1 auto', minWidth: 'fit-content', whiteSpace: 'nowrap' }}
           >
-            🤖 Automático
+            Automático
           </Chip>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '0.5rem' }}>

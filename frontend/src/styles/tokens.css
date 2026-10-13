@@ -132,6 +132,13 @@
   --overline-size: 0.75rem;    /* 12px */
   --overline-weight: 800;
   --overline-tracking: 0.12em;
+
+  /* --- Barra inferior (seção 2 do guia) ---
+     A barra é escura nos DOIS temas (marca); por isso ativo/inativo são os
+     mesmos valores nos dois lados — contraste conferido na seção 8. */
+  --tab-active: var(--color-luar);
+  --tab-inactive: #8B88C9;     /* 5,52:1 sobre a barra escura */
+  --tabbar-bg: rgba(21, 20, 46, 0.94);
 }
 
 /* --- TEMA CLARO (paridade — seção 3 do guia) --- */
@@ -149,7 +156,8 @@
   --bar-below-gradient: linear-gradient(180deg, #D98A2B 0%, #B8690A 100%);
   --bar-within-gradient: linear-gradient(180deg, #5A57D6 0%, #3F3CBB 100%);
   --progress-track: rgba(63, 60, 187, 0.15);
-  --tabbar-bg: #FFFFFF;
+  /* --tabbar-bg: a barra inferior é escura nos dois temas (definido no
+     bloco compartilhado acima) — ativo/inativo também valem nos dois. */
 }
 
 /* --- TEMA ESCURO (padrão do visual v2) --- */

@@ -1,9 +1,21 @@
 import { Button, Card, Chip, Field, IconButton, ProgressBar, Ring } from '../components/ui';
+import {
+  BarChartIcon,
+  ClockIcon,
+  ListIcon,
+  MoonIcon,
+  MoreIcon,
+  PlusIcon,
+  StarIcon,
+  TrashIcon,
+  UsersIcon,
+} from '../components/ui/icons';
 
 /**
- * Vitrine dos componentes base (issue #208) — SÓ em desenvolvimento
- * (`import.meta.env.DEV`; a rota nem existe no build de produção).
- * Mostra todos os componentes e estados para inspeção visual nos dois temas.
+ * Vitrine dos componentes base (issue #208) e dos ícones de traço (issue
+ * #209) — SÓ em desenvolvimento (`import.meta.env.DEV`; a rota nem existe no
+ * build de produção). Mostra todos os componentes e estados para inspeção
+ * visual nos dois temas.
  */
 export default function Vitrine() {
   return (
@@ -43,11 +55,15 @@ export default function Vitrine() {
       <section aria-label="IconButton" style={{ marginBottom: '1.5rem' }}>
         <h2>IconButton</h2>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <IconButton aria-label="Fechar aviso">✕</IconButton>
-          <IconButton aria-label="Reproduzir" disabled>
-            ▶
+          <IconButton aria-label="Excluir registro">
+            <TrashIcon />
           </IconButton>
-          <IconButton aria-label="Mais opções">⋯</IconButton>
+          <IconButton aria-label="Registrar noite" disabled>
+            <PlusIcon />
+          </IconButton>
+          <IconButton aria-label="Mais opções">
+            <MoreIcon />
+          </IconButton>
         </div>
       </section>
 
@@ -102,6 +118,33 @@ export default function Vitrine() {
             Superfície v2 com tokens <code>--surface</code> nos dois temas.
           </p>
         </Card>
+      </section>
+
+      <section aria-label="Ícones" style={{ marginBottom: '1.5rem' }}>
+        <h2>Ícones de traço (24 px)</h2>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          {(
+            [
+              ['Hoje (lua)', MoonIcon],
+              ['Registrar', PlusIcon],
+              ['Histórico', ListIcon],
+              ['Dashboard', BarChartIcon],
+              ['Amigos', UsersIcon],
+              ['Mais', MoreIcon],
+              ['Estrela', StarIcon],
+              ['Relógio', ClockIcon],
+              ['Lixeira', TrashIcon],
+            ] as const
+          ).map(([nome, Icone]) => (
+            <span
+              key={nome}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', fontSize: '11px' }}
+            >
+              <Icone />
+              {nome}
+            </span>
+          ))}
+        </div>
       </section>
     </div>
   );
