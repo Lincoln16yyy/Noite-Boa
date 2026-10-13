@@ -64,12 +64,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   // Permite passar signal externo para cancelamento (ex.: AbortController do efeito React)
   const externalSignal = options.signal;
   const controller = new AbortController();
-  // NOTA (issue #186): este `setTimeout` local sombreia o global, então a
-  // chamada de 2 argumentos abaixo invoca a função de configuração, e não o
-  // timer do navegador — o timeout interno NÃO dispara. É um bug conhecido,
-  // preservado de propósito aqui (regra: migração não muda comportamento).
-  // @ts-expect-error chamada de 2 args invoca a função de configuração (bug da #186)
-  const timeoutId = setTimeout(() => controller.abort(), requestTimeout);
+  // Usa window.setTimeout explicitamente para evitar sombreamento do
+  // setTimeout do módulo (issue #186).
+  const timeoutId = window.setTimeout(() => controller.abort(), requestTimeout);
 
   // Se houver signal externo, aborta o controller interno quando ele disparar
   if (externalSignal) {
@@ -87,7 +84,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       signal: controller.signal,
     });
 
-    clearTimeout(timeoutId);
+    window.clearTimeout(timeoutId);
 
     if (!response.ok) {
       const message = await readProblemMessage(response);
@@ -107,7 +104,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (response.status === 204) return null as T; // 204 = sem corpo; quem chama tipa como void
     return (await response.json()) as T; // corpo JSON do recurso (tipo informado por quem chama)
   } catch (err) {
-    clearTimeout(timeoutId);
+    window.clearTimeout(timeoutId);
 
     if (err instanceof Error && (err.name === 'AbortError' || isNetworkError(err))) {
       throw new Error('Não foi possível conectar ao servidor. Verifique sua conexão ou tente novamente mais tarde.');
