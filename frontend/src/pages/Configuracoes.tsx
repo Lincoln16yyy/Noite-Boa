@@ -14,6 +14,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { fusoDoAparelho } from '../lib/fuso';
 import LoadingWarning from '../components/LoadingWarning';
+import { Chip } from '../components/ui';
 
 const TIMEZONES =
   typeof Intl.supportedValuesOf === 'function'
@@ -318,36 +319,27 @@ export default function Configuracoes() {
           Escolha a aparência do app. No modo automático, segue a preferência do sistema.
         </p>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            role="radio"
-            aria-pressed={theme === 'light'}
+          <Chip
+            selected={theme === 'light'}
             onClick={() => setTheme('light')}
-            className="toggle"
             style={{ flex: '1 1 auto', minWidth: 'fit-content', whiteSpace: 'nowrap' }}
           >
             ☀️ Claro
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-pressed={theme === 'dark'}
+          </Chip>
+          <Chip
+            selected={theme === 'dark'}
             onClick={() => setTheme('dark')}
-            className="toggle"
             style={{ flex: '1 1 auto', minWidth: 'fit-content', whiteSpace: 'nowrap' }}
           >
             🌙 Escuro
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-pressed={theme === 'auto'}
+          </Chip>
+          <Chip
+            selected={theme === 'auto'}
             onClick={() => setTheme('auto')}
-            className="toggle"
             style={{ flex: '1 1 auto', minWidth: 'fit-content', whiteSpace: 'nowrap' }}
           >
             🤖 Automático
-          </button>
+          </Chip>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '0.5rem' }}>
           Atual: {theme === 'light' ? 'Claro' : theme === 'dark' ? 'Escuro' : 'Automático'}

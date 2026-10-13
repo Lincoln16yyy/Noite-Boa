@@ -11,6 +11,7 @@ import Configuracoes from './pages/Configuracoes';
 import Amigos from './pages/Amigos';
 import Sons from './pages/Sons';
 import ProtectedRoute from './auth/ProtectedRoute';
+import Vitrine from './pages/Vitrine';
 
 export default function App() {
   return (
@@ -21,6 +22,8 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/privacidade" element={<Privacidade />} />
+          {/* Vitrine dos componentes base: só existe no dev (issue #208). */}
+          {import.meta.env.DEV && <Route path="/vitrine" element={<Vitrine />} />}
           <Route element={<ProtectedRoute />}>
             <Route path="/registrar" element={<Registrar />} />
             <Route path="/historico" element={<Historico />} />

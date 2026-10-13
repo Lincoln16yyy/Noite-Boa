@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChangeEvent, FormEvent, CSSProperties } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import { api } from '../api/client';
 import type { SleepLog, SleepLogPage } from '../api/types';
 import { useAuth } from '../context/AuthContext';
@@ -12,17 +12,6 @@ import {
 } from '../lib/sleep';
 import LoadingWarning from '../components/LoadingWarning';
 import QualitySelector from '../components/QualitySelector';
-
-const fieldStyle = {
-  width: '100%',
-  minHeight: '48px',
-  fontSize: '16px',
-  padding: '0.6rem 0.75rem',
-  border: '1px solid var(--input-border)',
-  borderRadius: '10px',
-  background: 'var(--input-bg)',
-  boxSizing: 'border-box',
-};
 
 export default function Registrar() {
   const { user } = useAuth();
@@ -138,7 +127,8 @@ export default function Registrar() {
             rows={3}
             maxLength={2000}
             placeholder="Ex.: acordei várias vezes"
-            style={{ ...fieldStyle, minHeight: '80px', resize: 'vertical' } as CSSProperties}
+            className="field"
+            style={{ minHeight: '80px', resize: 'vertical' }}
             value={notes}
             onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
           />
