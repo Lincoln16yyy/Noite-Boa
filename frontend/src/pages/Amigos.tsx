@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { api } from '../api/client';
 import LoadingWarning from '../components/LoadingWarning';
 
-const fieldStyle = {
+const fieldStyle: CSSProperties = {
   width: '100%',
   minHeight: '48px',
   fontSize: '16px',
@@ -71,23 +72,23 @@ export default function Amigos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function alternarCompartilhar(e) {
+  async function alternarCompartilhar(e: any) {
     const compartilhar = e.target.checked;
     setError('');
     try {
       const atualizado = await api.put('/me', { shareWithFriends: compartilhar });
       setMe(atualizado);
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
-  async function enviarConvite(e) {
+  async function enviarConvite(e: any) {
     e.preventDefault();
     setError('');
     setSuccess('');
     try {
-      const resultado = await api.post('/friends/requests', { email });
+      const resultado: any = await api.post('/friends/requests', { email });
       setEmail('');
       setSuccess(
         resultado.status === 'accepted'
@@ -95,29 +96,29 @@ export default function Amigos() {
           : 'Se este e-mail tiver conta, o convite foi enviado.',
       );
       await carregar();
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
-  async function executar(acao, aoPronto) {
+  async function executar(acao: () => Promise<any>, aoPronto: () => Promise<any>) {
     setError('');
     try {
       await acao();
       await aoPronto();
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
-  async function trocarPeriodo(novosDias, signal) {
+  async function trocarPeriodo(novosDias: number, signal?: AbortSignal) {
     setDias(novosDias);
     try {
-      const resultado = await api.get(`/friends/ranking?days=${novosDias}`, { signal });
+      const resultado: any = await api.get(`/friends/ranking?days=${novosDias}`);
       setRanking(resultado.ranking);
-    } catch (err) {
+    } catch (err: any) {
       if (err.name === 'AbortError') return; // ignora cancelamento
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -199,7 +200,7 @@ export default function Amigos() {
       <section aria-label="Convites recebidos" style={{ marginBottom: '1.5rem' }}>
         <h2 style={{ fontSize: '18px' }}>Convites recebidos</h2>
         {convites.received.length === 0 && <p style={mutedTextStyle}>Nenhum convite recebido.</p>}
-        {convites.received.map((convite) => (
+        {convites.received.map((convite: any) => (
           <div key={convite.id} style={cardStyle}>
             <div style={rowStyle}>
               <span style={{ flex: '1 1 160px', fontWeight: 700 }}>{convite.friend.displayName}</span>
@@ -235,7 +236,7 @@ export default function Amigos() {
       <section aria-label="Convites enviados" style={{ marginBottom: '1.5rem' }}>
         <h2 style={{ fontSize: '18px' }}>Convites enviados</h2>
         {convites.sent.length === 0 && <p style={mutedTextStyle}>Nenhum convite enviado.</p>}
-        {convites.sent.map((convite) => (
+        {convites.sent.map((convite: any) => (
           <div key={convite.id} style={cardStyle}>
             <div style={rowStyle}>
               <span style={{ flex: '1 1 160px', fontWeight: 700 }}>{convite.friend.displayName}</span>

@@ -44,15 +44,15 @@ export default function Configuracoes() {
     let active = true;
     (async () => {
       try {
-        const [meData, goalData] = await Promise.all([api.get('/me'), api.get('/goal')]);
+        const [meData, goalData]: any = await Promise.all([api.get('/me'), api.get('/goal')]);
         if (!active) return;
         setMe(meData);
-        setHours(String(goalData.targetMinutes / 60));
-        setBedtime(toTimeInput(goalData.bedtime));
-        setWakeTime(toTimeInput(goalData.wakeTime));
-        setTimezone(meData.timezone || 'America/Sao_Paulo');
-      } catch (err) {
-        if (active) setError(err.message);
+        setHours(String(goalData?.targetMinutes / 60));
+        setBedtime(toTimeInput(goalData?.bedtime));
+        setWakeTime(toTimeInput(goalData?.wakeTime));
+        setTimezone(meData?.timezone || 'America/Sao_Paulo');
+      } catch (err: any) {
+        if (active) setError(err instanceof Error ? err.message : String(err));
       } finally {
         if (active) setLoading(false);
       }
@@ -94,8 +94,8 @@ export default function Configuracoes() {
         if (bedtime) agendarLembrete(bedtime);
         else cancelarLembrete();
       }
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
@@ -111,8 +111,8 @@ export default function Configuracoes() {
       setMe(updatedMe);
       setTimezone(updatedMe.timezone);
       setSuccess('Fuso horário atualizado para o do aparelho.');
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
