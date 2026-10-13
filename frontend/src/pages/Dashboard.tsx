@@ -175,7 +175,7 @@ export default function Dashboard() {
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [errorMessage, setErrorMessage] = useState('');
 
-  const load = useCallback(async (selectedDays: number, signal?: AbortSignal) => {
+  const load = useCallback(async (selectedDays: number, _signal?: AbortSignal) => {
     setStatus('loading');
     setErrorMessage('');
     try {

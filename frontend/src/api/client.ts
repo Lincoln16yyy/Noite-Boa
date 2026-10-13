@@ -31,11 +31,10 @@ export function clearSession(): void {
 /**
  * Configura o timeout global (ms) — usado em testes para simular timeout rápido.
  *
- * O tipo de retorno `undefined` existe só para casar com o `clearTimeout` de
- * `request()` (ver o `@ts-expect-error` lá). Em runtime a função não devolve
- * nada — comportamento inalterado.
+ * Renomeado de `setTimeout` para evitar sombreamento do `window.setTimeout`
+ * global (issue #186, #204).
  */
-export function setTimeout(ms: number): undefined {
+export function setRequestTimeout(ms: number): void {
   requestTimeout = ms;
 }
 
@@ -120,4 +119,5 @@ export const api = {
   put: <T>(path: string, body?: unknown): Promise<T> =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   delete: <T = void>(path: string): Promise<T> => request<T>(path, { method: 'DELETE' }),
+  setRequestTimeout,
 };
