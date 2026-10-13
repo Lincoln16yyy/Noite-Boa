@@ -19,6 +19,10 @@ const summary30 = { ...summary7, days: 30, averageHours: 6.25 };
 
 const mockUser = { id: 'u1', email: 'a@example.com', displayName: 'Teste', timezone: 'America/Sao_Paulo', shareWithFriends: true };
 
+function openScreen() {
+  renderWithAuth(<Dashboard />, { user: mockUser, route: '/dashboard' });
+}
+
 describe('Dashboard', () => {
   let fetchMock: any;
   let currentSummary: any;
@@ -36,10 +40,6 @@ describe('Dashboard', () => {
       return jsonResponse({});
     });
   });
-
-  function openScreen() {
-    renderWithAuth(<Dashboard />, { user: mockUser, route: '/dashboard' });
-  }
 
   it('mostra estado vazio com atalho para registrar', async () => {
     currentSummary = { ...summary7, daily: [] };

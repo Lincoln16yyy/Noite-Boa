@@ -40,6 +40,10 @@ const RANKING_30 = {
 
 const mockUser = ME;
 
+function openScreen() {
+  renderWithAuth(<Amigos />, { user: mockUser, route: '/amigos' });
+}
+
 describe('tela de Amigos', () => {
   let fetchMock: any;
 
@@ -69,10 +73,6 @@ describe('tela de Amigos', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-
-  function openScreen() {
-    renderWithAuth(<Amigos />, { user: mockUser, route: '/amigos' });
-  }
 
   function calls(method: string, pathFragment: string) {
     return fetchMock.mock.calls.filter(

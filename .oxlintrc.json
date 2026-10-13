@@ -3,7 +3,7 @@
   "rules": {
     "no-explicit-any": "warn",
     "ban-ts-comment": ["error", { "ts-expect-error": "allow-with-description" }],
-    "no-underscore-dangle": ["error", { "allow": ["__fusoAparelho"] }]
+    "no-underscore-dangle": ["error", { "allow": ["__fusoAparelho", "_resetarEstadoParaTestes"] }]
   },
   "categories": {
     "correctness": "error",

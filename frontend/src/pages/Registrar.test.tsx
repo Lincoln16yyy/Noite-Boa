@@ -9,6 +9,10 @@ function jsonResponse(body: any, status = 200) {
 
 const mockUser = { id: 'u1', email: 'a@example.com', displayName: 'Teste', timezone: 'America/Sao_Paulo', shareWithFriends: true };
 
+function openScreen() {
+  renderWithAuth(<Registrar />, { user: mockUser, route: '/registrar' });
+}
+
 describe('tela de Registrar sono', () => {
   let fetchMock: any;
   let posts: any[] = [];
@@ -27,10 +31,6 @@ describe('tela de Registrar sono', () => {
       return jsonResponse({ content: [], totalElements: 0 });
     });
   });
-
-  function openScreen() {
-    renderWithAuth(<Registrar />, { user: mockUser, route: '/registrar' });
-  }
 
   it('preenche os padrões inteligentes (ontem à noite / hoje de manhã)', async () => {
     openScreen();
