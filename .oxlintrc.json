@@ -1,0 +1,16 @@
+{
+  "$schema": "https://oxlint.dev/schema.json",
+  "rules": {
+    "no-explicit-any": "error",
+    "ban-ts-comment": ["error", { "ts-expect-error": "allow-with-description" }],
+    "no-underscore-dangle": ["error", { "allow": ["__fusoAparelho"] }]
+  },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "warn",
+    "style": "warn",
+    "perf": "warn",
+    "nursery": "off"
+  }
+}
