@@ -27,7 +27,7 @@ docs/       ADRs e documentação
 ```bash
 docker compose up -d          # sobe o PostgreSQL local
 cd backend && mvn -B verify   # compila, roda testes
-cd frontend && npm ci && npm run lint && npm test && npm run build
+cd frontend && npm ci && npm run typecheck && npm run lint && npm test && npm run build
 ```
 Se um comando ainda não existe (estrutura inicial), diga isso no PR e não invente.
 

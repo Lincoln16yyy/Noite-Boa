@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc --noEmit && vite build",
     "lint": "oxlint",
     "typecheck": "tsc --noEmit",
     "gen:api": "openapi-typescript ${API_DOCS_URL:-http://localhost:8080/v3/api-docs} -o src/api/schema.d.ts",

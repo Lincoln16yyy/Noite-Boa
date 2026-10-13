@@ -1,8 +1,17 @@
 {
   "$schema": "https://oxlint.dev/schema.json",
   "rules": {
-    "no-explicit-any": "warn",
-    "ban-ts-comment": ["error", { "ts-expect-error": "allow-with-description" }],
+    "no-explicit-any": "error",
+    "ban-ts-comment": [
+      "error",
+      {
+        "ts-expect-error": "allow-with-description",
+        "ts-ignore": true,
+        "ts-nocheck": true,
+        "ts-check": false,
+        "minimumDescriptionLength": 10
+      }
+    ],
     "no-underscore-dangle": ["error", { "allow": ["__fusoAparelho", "_resetarEstadoParaTestes"] }]
   },
   "categories": {
@@ -12,5 +21,13 @@
     "style": "warn",
     "perf": "warn",
     "nursery": "off"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**/*.ts", "**/test/**/*.tsx", "**/setupTests.ts"],
+      "rules": {
+        "no-explicit-any": "off"
+      }
+    }
+  ]
 }

@@ -9,7 +9,7 @@ Não julgue interface só pelo código. Renderize, olhe e compare com `docs/iden
 
 ## Como rodar
 ```bash
-cd frontend && npm ci && npm run build
+cd frontend && npm ci && npm run typecheck && npm run build
 npx vite preview --port 4173 &          # sobe o app compilado
 cd ../tools/visual && npm ci
 node screenshots.mjs                     # prints em tools/visual/out/
