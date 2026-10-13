@@ -41,8 +41,8 @@ Consequência para a issue #113: a tarefa "renomear pacote Java e serviço" fico
 | README, telas, `<title>`, manifest, notificação, cache SW, `package.json` | Noite Boa |
 | Pacote Java `br.dev.noiteboa` e serviço Render `noiteboa-api` | Noite Boa (não mudam) |
 | Logo do cabeçalho (`frontend/public/logo-horizontal-light.svg`) | Ainda o wordmark antigo "Sleep Well" → issue de implementação aberta pela #113 |
-| Repositório GitHub `Lincoln16yyy/Sleep-Well` | Pendência humana (rename mantém redirect dos links antigos) |
-| Projeto/URL da Vercel `sleep-well.vercel.app` | Pendência humana (rename muda o domínio de preview e as referências em `docs/deploy.md`) |
+| Repositório GitHub `Lincoln16yyy/Noite-Boa` | ✅ Concluído (rename mantém redirect dos links antigos) |
+| Projeto/URL da Vercel `noiteboa.vercel.app` | Pendência humana (rename muda o domínio de preview e as referências em `docs/deploy.md`) |
 
 ## Consequências
 

@@ -17,7 +17,7 @@ de como fazer. Valores entre `<chaves>` são placeholders — substitua pelos se
 ## Passo 1 — Subir o back-end pela Blueprint (render.yaml)
 
 1. No dashboard da Render: **New → Blueprint**.
-2. Conecte o repositório `Lincoln16yyy/Sleep-Well` (branch `main`).
+2. Conecte o repositório `Lincoln16yyy/Noite-Boa` (branch `main`).
 3. A Render lê o `render.yaml` da raiz e propõe o serviço `noiteboa-api`
    (Docker, `backend/Dockerfile`, health check `/actuator/health`).
 4. **Região:** escolha a mesma região do seu projeto Neon (ex.: Neon em Ohio →

@@ -37,7 +37,7 @@ jobs:
       TRIGGER_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
       GITHUB_TOKEN: ${{ github.token }} # somente leitura (contents: read) — para consultar o HEAD da main
       API_URL: https://noiteboa-api.onrender.com
-      FRONT_URL: https://sleep-well-gray.vercel.app
+      FRONT_URL: https://noiteboa.vercel.app
     steps:
       - name: Secret RENDER_API_KEY configurado?
         run: |
