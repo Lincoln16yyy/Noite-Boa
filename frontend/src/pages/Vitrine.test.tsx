@@ -7,7 +7,9 @@ describe('Vitrine dos componentes base (issue #208, só dev)', () => {
     render(<Vitrine />);
     expect(screen.getByRole('heading', { name: 'Vitrine de componentes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Primário' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Fechar aviso' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Excluir registro' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Registrar noite' })).toBeInTheDocument();
+    expect(screen.getByText('Ícones de traço (24 px)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '7 dias' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('E-mail')).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Ação/destaque' })).toBeInTheDocument();

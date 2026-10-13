@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { mockMe, renderWithAuth } from '../test/test-utils';
 import Layout from './Layout';
 import type { User } from '../api/types';
@@ -70,24 +70,60 @@ describe('Layout — navegação responsiva (issue #157)', () => {
     await renderLayout({ celular: false, user: usuario, route: '/dashboard' });
 
     const cabecalho = screen.getByRole('banner');
+    expect(within(cabecalho).getByRole('link', { name: 'Hoje' })).toBeInTheDocument();
     expect(within(cabecalho).getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
     expect(within(cabecalho).getByRole('button', { name: 'Sair da conta' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Mais opções' })).not.toBeInTheDocument();
   });
 
-  it('celular (390px): cabeçalho só com logo e barra inferior com as abas', async () => {
+  it('celular (390px): cabeçalho com saudação + lua e barra inferior com as abas', async () => {
     await renderLayout({ celular: true, user: usuario, route: '/dashboard' });
 
     const cabecalho = screen.getByRole('banner');
+    // Sem links de navegação nem Sair no cabeçalho: nada duplicado.
     expect(within(cabecalho).queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
     expect(within(cabecalho).queryByRole('button', { name: 'Sair da conta' })).not.toBeInTheDocument();
+    // Saudação por horário (fuso do perfil) + primeiro nome (issue #209).
+    expect(within(cabecalho).getByText(/^(Bom dia|Boa tarde|Boa noite),$/)).toBeInTheDocument();
+    expect(within(cabecalho).getByText('Teste')).toBeInTheDocument();
 
-    // Barra inferior: 4 abas + "Mais".
+    // Barra inferior: 5 abas (Hoje é a primeira) + "Mais".
+    expect(screen.getByRole('link', { name: 'Hoje' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Registrar' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Histórico' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Amigos' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mais opções' })).toBeInTheDocument();
+    // Sem emoji como ícone: as abas têm SVG com traço (decorativo).
+    const svgAba = screen.getByRole('link', { name: 'Hoje' }).querySelector('svg');
+    expect(svgAba).toHaveAttribute('aria-hidden', 'true');
+    expect(svgAba).toHaveAttribute('stroke', 'currentColor');
+  });
+
+  it('marca a aba corrente com aria-current="page" e a cor de ativo', async () => {
+    await renderLayout({ celular: true, user: usuario, route: '/historico' });
+
+    const ativa = screen.getByRole('link', { name: 'Histórico' });
+    expect(ativa).toHaveAttribute('aria-current', 'page');
+    expect(ativa.style.color).toBe('var(--tab-active)');
+
+    const inativa = screen.getByRole('link', { name: 'Amigos' });
+    expect(inativa).not.toHaveAttribute('aria-current');
+    expect(inativa.style.color).toBe('var(--tab-inactive)');
+  });
+
+  it('o menu "Mais" abre Sons, Configurações e Sair e fecha ao escolher', async () => {
+    await renderLayout({ celular: true, user: usuario, route: '/hoje' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mais opções' }));
+
+    const menu = screen.getByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: 'Sons' })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: 'Configurações' })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: 'Sair' })).toBeInTheDocument();
+
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Sons' }));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
   it('visitante no celular mantém Entrar/Cadastrar e não vê barra inferior', async () => {
