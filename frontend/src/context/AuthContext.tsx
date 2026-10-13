@@ -57,15 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(async (displayName: string, email: string, password: string) => {
     const res = await api.post<RegisterResult>('/auth/register', { displayName, email, password });
-    // NOTA (issue #188): `RegisterResponse` NÃO tem `accessToken` (só o /login
-    // tem), então esta função sempre lança. É um bug conhecido (sem consumidor no
-    // app), preservado de propósito (regra: migração não muda comportamento).
-    // @ts-expect-error `RegisterResponse` não devolve accessToken (bug da #188)
-    if (res?.accessToken) {
-      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
-      return res;
-    }
-    throw new Error('Cadastro falhou');
+    return res;
   }, []);
 
   const logout = useCallback(() => {
