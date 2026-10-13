@@ -72,14 +72,15 @@ Abra http://localhost:5173, crie uma conta e registre uma noite.
 Verificações e build:
 
 ```bash
-npm run lint      # lint (oxlint)
-npm test          # testes (vitest)
-npm run build     # build de produção em frontend/dist
+npm run typecheck # checagem de tipos (tsc --noEmit)
+npm run lint # lint (oxlint)
+npm test # testes (vitest)
+npm run build # typecheck + build de produção em frontend/dist
 ```
 
 ### O que a CI roda
 
-O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa, em cada PR: `mvn -B verify` (com PostgreSQL 16 como serviço), `npm ci && npm run lint && npm test && npm run build` e um **teste de fumaça E2E** no navegador ([`tools/e2e`](tools/e2e)). **Só faça o merge com tudo verde.**
+O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa, em cada PR: `mvn -B verify` (com PostgreSQL 16 como serviço), `npm ci && npm run typecheck && npm run lint && npm test && npm run build` e um **teste de fumaça E2E** no navegador ([`tools/e2e`](tools/e2e)). **Só faça o merge com tudo verde.**
 
 ### Teste de fumaça E2E
 

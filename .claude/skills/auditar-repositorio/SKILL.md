@@ -9,7 +9,7 @@ Objetivo: dizer a verdade sobre o estado do código, com provas, sem inventar e 
 
 ## 1. Descubra o que dá para verificar
 - Anote o commit (`git log -1 --format='%h %ad %s'`).
-- Rode o que for possível e registre o resultado: `cd frontend && npm ci && npm run lint && npm test && npm run build`; `cd backend && mvn -B verify` (precisa de Postgres; se não der, diga que não rodou).
+- Rode o que for possível e registre o resultado: `cd frontend && npm ci && npm run typecheck && npm run lint && npm test && npm run build`; `cd backend && mvn -B verify` (precisa de Postgres; se não der, diga que não rodou).
 - Liste o que NÃO deu para rodar. Isso entra no relatório.
 
 ## 2. Leia nesta ordem

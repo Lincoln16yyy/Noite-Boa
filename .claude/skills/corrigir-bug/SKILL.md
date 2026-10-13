@@ -11,7 +11,7 @@ description: Corrige um bug deste repositório do jeito certo - reproduz com tes
 3. **Se não reproduz:** não chute a causa. Adicione instrumentação mínima e segura (log com stack, sem dado pessoal), publique, e documente na issue o que observar. Foi o caso do erro 500 intermitente do dashboard.
 4. **Ache a causa-raiz**, não o sintoma. Pergunte "por que isso aconteceu?" até chegar numa regra errada, validação ausente ou suposição falsa.
 5. **Menor correção.** Altere só o necessário. Não aproveite para refatorar. Outra coisa estranha vira outra issue.
-6. **Rode o teste de novo** (agora passa) e depois a suíte completa (`mvn -B verify`; `npm run lint && npm test && npm run build`).
+6. **Rode o teste de novo** (agora passa) e depois a suíte completa (`mvn -B verify`; `npm run typecheck && npm run lint && npm test && npm run build`).
 7. **Teste de regressão e bordas.** Cubra o caso do bug e os vizinhos (vazio, limite, usuário novo, usuário de outro dono).
 8. **Atualize a documentação** se mudou rota, regra ou texto exibido (`PLANO.md`, README, política de privacidade quando afeta dados).
 9. **PR com evidência:** "antes" (teste falhando ou print), "depois" (teste passando ou print), o que NÃO foi verificado, e `Closes #N`.

@@ -48,7 +48,7 @@ O escopo entre parênteses (`frontend`, `backend`, `docs`...) é opcional, mas r
 docker compose up -d               # PostgreSQL local
 
 cd backend && mvn -B verify        # compila + testes
-cd frontend && npm ci && npm run lint && npm test && npm run build
+cd frontend && npm ci && npm run typecheck && npm run lint && npm test && npm run build
 ```
 
 A CI (`.github/workflows/ci.yml`) roda exatamente isso em todo PR. **Não desative nem apague testes para fazer o CI passar.**
