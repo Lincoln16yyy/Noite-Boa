@@ -314,3 +314,61 @@ header nav a {
   outline: 3px solid var(--border-focus);
   outline-offset: 2px;
 }
+
+/* ===== Fundo noturno (issue #207) =====
+   Camada fixa atrás do conteúdo, decorativa (aria-hidden no componente).
+   O gradiente/estrelas aparecem só no tema escuro; no claro fica neutro. */
+.night-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--bg-night);
+}
+
+/* Brilho suave no topo da cena */
+.night-background::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 42% at 50% -6%, rgba(185, 182, 255, 0.18) 0%, transparent 62%);
+}
+
+/* Estrelas discretas (pontos raros e tênues) */
+.night-background::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 18% 14%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 72% 22%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 44% 9%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 86% 38%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 8% 44%, rgba(255, 255, 255, 0.28), transparent),
+    radial-gradient(1px 1px at 60% 52%, rgba(255, 255, 255, 0.22), transparent);
+}
+
+/* Tema claro: sem brilho nem estrelas (fundo Névoa chapado) */
+[data-theme="light"] .night-background::before,
+[data-theme="light"] .night-background::after {
+  display: none;
+}
+
+/* ===== Rótulo (overline) e números de destaque — escala v2 ===== */
+.overline {
+  font-size: var(--overline-size);
+  font-weight: var(--overline-weight);
+  letter-spacing: var(--overline-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.display-number {
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.display-lg { font-size: var(--fs-display-lg); }
+.display-md { font-size: var(--fs-display-md); }
+.display-sm { font-size: var(--fs-display-sm); }

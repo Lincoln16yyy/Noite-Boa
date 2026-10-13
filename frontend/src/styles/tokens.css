@@ -105,6 +105,69 @@
   --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.40);
 }
 
+/* ============================================================
+   VISUAL V2 (issue #207) — tokens semânticos (seção 2 do guia
+   docs/design/direcao-visual.md). CAMADA NOVA, puramente aditiva:
+   os tokens acima continuam intactos enquanto as telas são
+   migradas uma a uma. Blocos separados mesclam sem tocar nos
+   existentes.
+   ============================================================ */
+
+:root {
+  /* --- Medidas compartilhadas (iguais nos dois temas) --- */
+  --surface-radius: 24px;      /* raio do cartão (superfície) */
+  --surface-padding: 18px;     /* padding do cartão */
+  --screen-margin: 20px;       /* margem lateral das telas */
+  --progress-height: 8px;      /* barra de progresso */
+  --btn-height: 54px;          /* botão principal (pílula) */
+  --tabbar-height: 78px;       /* barra inferior */
+  --chart-bar-radius: 10px;    /* raio das barras do gráfico */
+
+  /* --- Escala tipográfica de destaque (Nunito 800) --- */
+  --fs-display-lg: 64px;       /* número gigante de tela inteira */
+  --fs-display-md: 56px;       /* média principal do cartão */
+  --fs-display-sm: 30px;       /* número em cartão pequeno */
+
+  /* --- Rótulo (overline) --- */
+  --overline-size: 0.75rem;    /* 12px */
+  --overline-weight: 800;
+  --overline-tracking: 0.12em;
+}
+
+/* --- TEMA CLARO (paridade — seção 3 do guia) --- */
+:root {
+  --bg-night: var(--color-nevoa);              /* sem gradiente no claro */
+  --surface: #FFFFFF;                          /* cartões brancos */
+  --surface-border: rgba(63, 60, 187, 0.18);   /* Índigo sutil */
+  --surface-shadow: 0 8px 24px rgba(21, 20, 46, 0.08);
+  --accent: var(--color-ambar);                /* botão principal continua Âmbar */
+  --accent-text: var(--color-noite);           /* texto sobre o Âmbar */
+  /* Em fundo claro, "abaixo da meta" usa Âmbar ESCURO e "dentro da meta"
+     usa Índigo — SÓ em elementos gráficos, nunca em texto (4,15:1). */
+  --below-meta-graphic: #B8690A;
+  --within-meta-graphic: var(--color-indigo);
+  --bar-below-gradient: linear-gradient(180deg, #D98A2B 0%, #B8690A 100%);
+  --bar-within-gradient: linear-gradient(180deg, #5A57D6 0%, #3F3CBB 100%);
+  --progress-track: rgba(63, 60, 187, 0.15);
+  --tabbar-bg: #FFFFFF;
+}
+
+/* --- TEMA ESCURO (padrão do visual v2) --- */
+[data-theme="dark"] {
+  --bg-night: radial-gradient(120% 60% at 50% -10%, #3A3796 0%, #1E1C52 38%, #15142E 75%);
+  --surface: rgba(255, 255, 255, 0.06);        /* superfície translúcida */
+  --surface-border: rgba(185, 182, 255, 0.22); /* Lavanda sutil */
+  --surface-shadow: 0 8px 24px rgba(0, 0, 0, 0.40);
+  --accent: var(--color-ambar);
+  --accent-text: var(--color-noite);
+  --below-meta-graphic: var(--color-ambar);     /* Âmbar no escuro */
+  --within-meta-graphic: var(--color-lavanda);  /* Lavanda no escuro */
+  --bar-below-gradient: linear-gradient(180deg, #FFD27A 0%, #FFB347 100%);
+  --bar-within-gradient: linear-gradient(180deg, #D9D6FF 0%, #8B88C9 100%);
+  --progress-track: rgba(185, 182, 255, 0.2);
+  --tabbar-bg: rgba(21, 20, 46, 0.94);
+}
+
 /* Respeita preferência do sistema se não houver preferência explícita */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -142,5 +205,23 @@
     --toggle-active-bg: var(--color-ambar);
     --toggle-active-text: var(--color-noite);
     --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.40);
+  }
+}
+
+/* Fallback do sistema para os tokens v2 (tema escuro sem escolha explícita) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-night: radial-gradient(120% 60% at 50% -10%, #3A3796 0%, #1E1C52 38%, #15142E 75%);
+    --surface: rgba(255, 255, 255, 0.06);
+    --surface-border: rgba(185, 182, 255, 0.22);
+    --surface-shadow: 0 8px 24px rgba(0, 0, 0, 0.40);
+    --accent: var(--color-ambar);
+    --accent-text: var(--color-noite);
+    --below-meta-graphic: var(--color-ambar);
+    --within-meta-graphic: var(--color-lavanda);
+    --bar-below-gradient: linear-gradient(180deg, #FFD27A 0%, #FFB347 100%);
+    --bar-within-gradient: linear-gradient(180deg, #D9D6FF 0%, #8B88C9 100%);
+    --progress-track: rgba(185, 182, 255, 0.2);
+    --tabbar-bg: rgba(21, 20, 46, 0.94);
   }
 }

@@ -2,6 +2,7 @@ import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import NightBackground from '../components/NightBackground';
 
 /** Item do menu de navegação (desktop). */
 interface MenuItem {
@@ -79,6 +80,7 @@ export default function Layout() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
+        <NightBackground />
         <header style={{ padding: '1rem', background: 'var(--color-noite)' }}>
           <img src="/logo-horizontal-dark.svg" alt="Noite Boa" style={{ height: '40px', width: 'auto' }} />
         </header>
@@ -129,6 +131,7 @@ export default function Layout() {
 
   return (
     <div style={{ fontFamily: 'var(--font-sans)', background: 'var(--bg-primary)', minHeight: '100vh', display: 'flex', flexDirection: 'column', color: 'var(--text-primary)' }}>
+      <NightBackground />
       {/* Header desktop */}
       <header
         style={{
