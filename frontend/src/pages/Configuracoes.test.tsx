@@ -17,11 +17,11 @@ vi.mock('../lib/reminder', () => ({
 // controla o fuso do aparelho nos testes (issue #102): o default é o do perfil
 vi.mock('../lib/fuso', async (importOriginal) => ({
   ...(await importOriginal()),
-  fusoDoAparelho: () => globalThis.__fusoAparelho ?? 'America/Sao_Paulo',
+  fusoDoAparelho: () => (globalThis as any).__fusoAparelho ?? 'America/Sao_Paulo',
 }));
 
 
-function jsonResponse(body, status = 200) {
+function jsonResponse(body: any, status = 200) {
   return new Response(JSON.stringify(body), { status });
 }
 
@@ -30,24 +30,24 @@ const GOAL = { targetMinutes: 480, bedtime: '23:00:00', wakeTime: '07:00:00' };
 const mockUser = ME;
 
 describe('tela de Configurações', () => {
-  let fetchMock;
+  let fetchMock: any;
 
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
-    globalThis.__fusoAparelho = 'America/Sao_Paulo';
-    agendarLembrete.mockClear();
-    cancelarLembrete.mockClear();
-    setLembreteAtivo.mockClear();
-    lembreteAtivo.mockReturnValue(false);
-    permissaoNotificacao.mockReturnValue('granted');
+    (globalThis as any).__fusoAparelho = 'America/Sao_Paulo';
+    (agendarLembrete as any).mockClear();
+    (cancelarLembrete as any).mockClear();
+    (setLembreteAtivo as any).mockClear();
+    (lembreteAtivo as any).mockReturnValue(false);
+    (permissaoNotificacao as any).mockReturnValue('granted');
     fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
       const path = String(url);
       if (path.includes('/goal') && options.method === 'PUT') {
-        return jsonResponse(JSON.parse(options.body));
+        return jsonResponse(JSON.parse(options.body as any));
       }
       if (path.includes('/me') && options.method === 'PUT') {
-        return jsonResponse({ ...ME, ...JSON.parse(options.body) });
+        return jsonResponse({ ...ME, ...JSON.parse(options.body as any) });
       }
       if (path.includes('/me')) {
         return jsonResponse(ME);
@@ -57,16 +57,16 @@ describe('tela de Configurações', () => {
   });
 
   afterEach(() => {
-    cancelarLembrete.mockClear();
-    delete window.Notification;
+    (cancelarLembrete as any).mockClear();
+    (window as any).Notification = undefined;
   });
 
   function openScreen() {
     return renderWithAuth(<Configuracoes />, { user: mockUser, route: '/configuracoes' });
   }
 
-  function calls(method, pathFragment) {
-    return fetchMock.mock.calls.filter(([url, options]) => (options?.method ?? 'GET') === method && String(url).includes(pathFragment));
+  function calls(method: string, pathFragment: string) {
+    return fetchMock.mock.calls.filter(([url, options]: any) => (options?.method ?? 'GET') === method && String(url).includes(pathFragment));
   }
 
   it('carrega a meta e o fuso da API', async () => {
@@ -130,8 +130,8 @@ describe('tela de Configurações', () => {
   });
 
   it('não ativa o lembrete quando a notificação é negada', async () => {
-    permissaoNotificacao.mockReturnValue('denied');
-    window.Notification = { requestPermission: vi.fn().mockResolvedValue('denied') };
+    (permissaoNotificacao as any).mockReturnValue('denied');
+    (window as any).Notification = { requestPermission: vi.fn().mockResolvedValue('denied') };
     openScreen();
     fireEvent.click(await screen.findByLabelText(/Avisar às/));
     await waitFor(() =>
@@ -145,14 +145,14 @@ describe('tela de Configurações', () => {
     openScreen();
     fireEvent.click(await screen.findByLabelText(/Avisar às/));
     await waitFor(() => expect(agendarLembrete).toHaveBeenCalled());
-    cancelarLembrete.mockClear();
+    (cancelarLembrete as any).mockClear();
     fireEvent.click(screen.getByLabelText(/Avisar às/));
     await waitFor(() => expect(cancelarLembrete).toHaveBeenCalled());
     expect(setLembreteAtivo).toHaveBeenCalledWith(false);
   });
 
   it('pede o horário de dormir quando a meta não tem', async () => {
-    fetchMock.mockImplementation(async (url) => {
+    fetchMock.mockImplementation(async (url: any) => {
       if (String(url).includes('/me')) return jsonResponse(ME);
       return jsonResponse({ targetMinutes: 480, bedtime: null, wakeTime: null });
     });
@@ -162,7 +162,7 @@ describe('tela de Configurações', () => {
   });
 
   it('reagenda o lembrete quando o horário de dormir muda', async () => {
-    lembreteAtivo.mockReturnValue(true);
+    (lembreteAtivo as any).mockReturnValue(true);
     openScreen();
     fireEvent.change(await screen.findByLabelText('Horário de dormir'), { target: { value: '22:30' } });
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
@@ -171,7 +171,7 @@ describe('tela de Configurações', () => {
   });
 
   it('cancela o lembrete se o horário de dormir for removido', async () => {
-    lembreteAtivo.mockReturnValue(true);
+    (lembreteAtivo as any).mockReturnValue(true);
     openScreen();
     fireEvent.change(await screen.findByLabelText('Horário de dormir'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
@@ -198,7 +198,7 @@ describe('tela de Configurações', () => {
   });
 
   it('exclui a conta com confirmação por e-mail e leva para a página inicial', async () => {
-    fetchMock.mockImplementation(async (url, options = {}) => {
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);
       if (path.includes('/me') && options.method === 'DELETE') {
         return new Response(null, { status: 204 });
@@ -221,7 +221,7 @@ describe('tela de Configurações', () => {
   });
 
   it('exclui a conta com confirmação EXCLUIR', async () => {
-    fetchMock.mockImplementation(async (url, options = {}) => {
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);
       if (path.includes('/me') && options.method === 'DELETE') {
         return new Response(null, { status: 204 });
@@ -237,7 +237,7 @@ describe('tela de Configurações', () => {
   });
 
   it('mantém a sessão e mostra erro quando a exclusão falha no servidor', async () => {
-    fetchMock.mockImplementation(async (url, options = {}) => {
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);
       if (path.includes('/me') && options.method === 'DELETE') {
         return jsonResponse({ detail: 'Erro interno. Tente novamente.' }, 500);
@@ -256,7 +256,7 @@ describe('tela de Configurações', () => {
   });
 
   it('mostra o aviso quando o fuso do aparelho difere do perfil (issue #102)', async () => {
-    globalThis.__fusoAparelho = 'Asia/Tokyo'; // perfil: America/Sao_Paulo
+    (globalThis as any).__fusoAparelho = 'Asia/Tokyo'; // perfil: America/Sao_Paulo
     openScreen();
 
     const aviso = await screen.findByText(/Este aparelho está em/);
@@ -275,7 +275,7 @@ describe('tela de Configurações', () => {
   });
 
   it('não mostra o aviso quando os fusos são iguais (issue #102)', async () => {
-    globalThis.__fusoAparelho = 'America/Sao_Paulo'; // igual ao perfil
+    (globalThis as any).__fusoAparelho = 'America/Sao_Paulo'; // igual ao perfil
     openScreen();
 
     await screen.findByText('Fuso horário');
