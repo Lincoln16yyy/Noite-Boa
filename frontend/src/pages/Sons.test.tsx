@@ -127,8 +127,8 @@ describe('tela de Sons', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Tocar som' }));
     const alerta = await screen.findByRole('alert');
-    expect(alerta).toHaveTextContent(/não foi possível iniciar o som neste navegador/i);
-    expect(alerta).toHaveTextContent(/tente as opções de ambiência/i);
+    expect(alerta!).toHaveTextContent(/não foi possível iniciar o som neste navegador/i);
+    expect(alerta!).toHaveTextContent(/tente as opções de ambiência/i);
   });
 
   it('para o som ao desmontar a página (cleanup)', async () => {
@@ -155,7 +155,7 @@ describe('tela de Sons', () => {
     // passa a mostrar "Pausar som" (ver useLayoutEffect em Sons.jsx, issue #150).
     expect(player.pararSom).toHaveBeenCalled();
     expect(player.tocarSom).not.toHaveBeenCalled();
-    expect(await screen.findByRole('button', { name: 'Tocar som' })).toBeInTheDocument();
+    expect((await screen.findByRole('button', { name: 'Tocar som' })) as HTMLElement).toBeInTheDocument();
 
     Object.defineProperty(document, 'hidden', { value: false, configurable: true });
   });
