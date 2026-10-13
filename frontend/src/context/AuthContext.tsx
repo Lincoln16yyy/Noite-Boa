@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { api, clearSession } from '../api/client';
 import type { LoginResult, RegisterResult, User } from '../api/types';
@@ -22,15 +22,25 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  // Evita setState após o desmonte (o /me pendente pode responder tarde e o
+  // jsdom já ter sido desmontado nos testes — "window is not defined").
+  const montado = useRef(true);
+
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+    };
+  }, []);
 
   const refreshUser = useCallback(async () => {
     try {
       const me = await api.get<User>('/me');
-      setUser(me);
+      if (montado.current) setUser(me);
     } catch {
-      setUser(null);
+      if (montado.current) setUser(null);
     } finally {
-      setLoading(false);
+      if (montado.current) setLoading(false);
     }
   }, []);
 
