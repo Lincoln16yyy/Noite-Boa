@@ -65,3 +65,21 @@ Button (primary, ghost, danger, loading, disabled), Card, Chip/pill (7 dias | 30
 
 ## 7. Regras de copy
 Português do Brasil, frases curtas, sem culpa ("Que tal dormir um pouco mais cedo hoje?"), sem exclamação em excesso, sem jargão. Evite emoji na interface (use os ícones SVG de traço).
+
+## 8. Contraste (WCAG) — verificado na fundação (issue #207)
+Mínimos: **4,5:1 em texto** e **3:1 em elementos gráficos**. Pares conferidos (ferramenta de luminância relativa WCAG):
+
+| Par | Razão | Uso |
+|---|---|---|
+| Lavanda `#B9B6FF` / Noite `#15142E` | 9,56:1 | texto secundário no escuro |
+| Luar `#FFE9B5` / Noite `#15142E` | 15,00:1 | texto principal no escuro |
+| Âmbar `#FFB347` / Noite `#15142E` | 10,07:1 | ação principal / abaixo da meta no escuro |
+| Sucesso `#2FBF9B` / Noite `#15142E` | 7,72:1 | "dentro da meta" no escuro |
+| Erro `#E5484D` / Noite `#15142E` | 4,58:1 | alertas no escuro |
+| Aba inativa `#8B88C9` / Noite `#15142E` | 5,52:1 | ícones/texto inativos na barra inferior |
+| Noite `#15142E` / Âmbar `#FFB347` | 10,07:1 | texto do botão primário |
+| Índigo `#3F3CBB` / branco `#FFFFFF` | 8,15:1 | destaques no tema claro |
+| Noite `#15142E` / branco `#FFFFFF` | 17,93:1 | texto principal no claro |
+| Âmbar escuro `#B8690A` / branco `#FFFFFF` | 4,15:1 | **só elementos gráficos** no claro (nunca texto) |
+
+> O Âmbar escuro `#B8690A` fica abaixo de 4,5:1 para texto, por isso a regra da seção 3: em fundo claro, "abaixo da meta" usa-o **apenas em barras e ícones** (3:1 gráfico), nunca em texto.
