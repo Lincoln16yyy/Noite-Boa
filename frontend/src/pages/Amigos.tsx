@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { api } from '../api/client';
+import { Friend, FriendRequest, RankingEntry, User, Goal } from '../api/types';
 import LoadingWarning from '../components/LoadingWarning';
 
-const fieldStyle = {
+const fieldStyle: CSSProperties = {
   width: '100%',
   minHeight: '48px',
   fontSize: '16px',
@@ -13,7 +15,7 @@ const fieldStyle = {
   boxSizing: 'border-box',
 };
 
-const smallButtonStyle = {
+const smallButtonStyle: CSSProperties = {
   minHeight: '44px',
   padding: '0 0.9rem',
   fontSize: '15px',
@@ -23,7 +25,7 @@ const smallButtonStyle = {
   cursor: 'pointer',
 };
 
-const cardStyle = {
+const cardStyle: CSSProperties = {
   background: 'var(--card-bg)',
   border: '1px solid var(--card-border)',
   borderRadius: '12px',
@@ -41,10 +43,10 @@ const mutedTextStyle = { color: 'var(--text-muted)', fontSize: '15px' };
  * e o ranking só mostra nº de noites e % dos dias — nunca horários ou durações.
  */
 export default function Amigos() {
-  const [me, setMe] = useState<any>(null);
-  const [amigos, setAmigos] = useState<any[]>([]);
-  const [convites, setConvites] = useState<any>({ sent: [], received: [] });
-  const [ranking, setRanking] = useState<any[]>([]);
+  const [me, setMe] = useState<User | null>(null);
+  const [amigos, setAmigos] = useState<Friend[]>([]);
+  const [convites, setConvites] = useState<{ sent: FriendRequest[]; received: FriendRequest[] }>({ sent: [], received: [] });
+  const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [dias, setDias] = useState(7);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
@@ -52,11 +54,11 @@ export default function Amigos() {
   const [success, setSuccess] = useState('');
 
   async function carregar(periodo = dias) {
-    const [meData, amigosData, convitesData, rankingData]: any = await Promise.all([
-      api.get('/me'),
-      api.get('/friends'),
-      api.get('/friends/requests'),
-      api.get(`/friends/ranking?days=${periodo}`),
+    const [meData, amigosData, convitesData, rankingData] = await Promise.all([
+      api.get<User>('/me'),
+      api.get<Friend[]>('/friends'),
+      api.get<{ sent: FriendRequest[]; received: FriendRequest[] }>('/friends/requests'),
+      api.get<{ ranking: RankingEntry[] }>(`/friends/ranking?days=${periodo}`),
     ]);
     setMe(meData);
     setAmigos(amigosData);
@@ -66,28 +68,28 @@ export default function Amigos() {
 
   useEffect(() => {
     carregar()
-      .catch((err: any) => setError(err instanceof Error ? err.message : String(err)))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function alternarCompartilhar(e) {
+  async function alternarCompartilhar(e: React.ChangeEvent<HTMLInputElement>) {
     const compartilhar = e.target.checked;
     setError('');
     try {
-      const atualizado = await api.put('/me', { shareWithFriends: compartilhar });
+      const atualizado = await api.put<User>('/me', { shareWithFriends: compartilhar });
       setMe(atualizado);
     } catch (err) {
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
-  async function enviarConvite(e) {
+  async function enviarConvite(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     setSuccess('');
     try {
-      const resultado = await api.post('/friends/requests', { email });
+      const resultado = await api.post<{ status: string; friend: Friend }>('/friends/requests', { email });
       setEmail('');
       setSuccess(
         resultado.status === 'accepted'
@@ -96,28 +98,28 @@ export default function Amigos() {
       );
       await carregar();
     } catch (err) {
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
-  async function executar(acao, aoPronto) {
+  async function executar(acao: () => Promise<unknown>, aoPronto: () => Promise<unknown>) {
     setError('');
     try {
       await acao();
       await aoPronto();
     } catch (err) {
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
-  async function trocarPeriodo(novosDias, signal) {
+  async function trocarPeriodo(novosDias: number, _signal?: AbortSignal) {
     setDias(novosDias);
     try {
-      const resultado = await api.get(`/friends/ranking?days=${novosDias}`, { signal });
+      const resultado = await api.get<{ ranking: RankingEntry[] }>(`/friends/ranking?days=${novosDias}`);
       setRanking(resultado.ranking);
-    } catch (err) {
-      if (err.name === 'AbortError') return; // ignora cancelamento
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return; // ignora cancelamento
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -168,7 +170,7 @@ export default function Amigos() {
               type="email"
               style={fieldStyle}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
               placeholder="amigo@exemplo.com"
               required
             />
@@ -202,7 +204,7 @@ export default function Amigos() {
         {convites.received.map((convite) => (
           <div key={convite.id} style={cardStyle}>
             <div style={rowStyle}>
-              <span style={{ flex: '1 1 160px', fontWeight: 700 }}>{convite.friend.displayName}</span>
+              <span style={{ flex: '1 1 160px', fontWeight: 700 }}>{convite.friend?.displayName ?? 'Desconhecido'}</span>
               <button
                 type="button"
                 style={smallButtonStyle}
@@ -238,7 +240,7 @@ export default function Amigos() {
         {convites.sent.map((convite) => (
           <div key={convite.id} style={cardStyle}>
             <div style={rowStyle}>
-              <span style={{ flex: '1 1 160px', fontWeight: 700 }}>{convite.friend.displayName}</span>
+              <span style={{ flex: '1 1 160px', fontWeight: 700 }}>{convite.friend?.displayName ?? 'Desconhecido'}</span>
               <span style={mutedTextStyle}>aguardando resposta</span>
               <button
                 type="button"

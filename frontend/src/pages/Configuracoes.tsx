@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, clearSession } from '../api/client';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../lib/reminder';
 import { useTheme } from '../context/ThemeContext';
 import { fusoDoAparelho } from '../lib/fuso';
+import { Goal, User } from '../api/types';
 import LoadingWarning from '../components/LoadingWarning';
 
 const TIMEZONES =
@@ -19,13 +21,13 @@ const TIMEZONES =
     : ['America/Sao_Paulo', 'America/New_York', 'Europe/Lisbon', 'UTC'];
 
 /** "23:00:00" (LocalTime da API) → "23:00" (input type=time) */
-const toTimeInput = (value: any) => (value ? String(value).slice(0, 5) : '');
+const toTimeInput = (value: unknown) => (value ? String(value).slice(0, 5) : '');
 
 export default function Configuracoes() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const fusoAparelho = fusoDoAparelho();
-  const [me, setMe] = useState<any>(null);
+  const [me, setMe] = useState<User | null>(null);
   const [hours, setHours] = useState('');
   const [bedtime, setBedtime] = useState('');
   const [wakeTime, setWakeTime] = useState('');
@@ -44,15 +46,18 @@ export default function Configuracoes() {
     let active = true;
     (async () => {
       try {
-        const [meData, goalData] = await Promise.all([api.get('/me'), api.get('/goal')]);
+        const [meData, goalData]: [User, Goal] = await Promise.all([
+          api.get<User>('/me'),
+          api.get<Goal>('/goal'),
+        ]);
         if (!active) return;
         setMe(meData);
-        setHours(String(goalData.targetMinutes / 60));
+        setHours(String((goalData.targetMinutes ?? 480) / 60));
         setBedtime(toTimeInput(goalData.bedtime));
         setWakeTime(toTimeInput(goalData.wakeTime));
         setTimezone(meData.timezone || 'America/Sao_Paulo');
-      } catch (err) {
-        if (active) setError(err.message);
+      } catch (err: unknown) {
+        if (active) setError(err instanceof Error ? err.message : String(err));
       } finally {
         if (active) setLoading(false);
       }
@@ -62,7 +67,7 @@ export default function Configuracoes() {
     };
   }, []);
 
-  async function handleSubmit(e: any) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -94,8 +99,8 @@ export default function Configuracoes() {
         if (bedtime) agendarLembrete(bedtime);
         else cancelarLembrete();
       }
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
@@ -107,12 +112,12 @@ export default function Configuracoes() {
     setSuccess('');
     setSaving(true);
     try {
-      const updatedMe: any = await api.put('/me', { timezone: fusoAparelho });
+      const updatedMe: User = await api.put<User>('/me', { timezone: fusoAparelho });
       setMe(updatedMe);
-      setTimezone(updatedMe.timezone);
+      setTimezone(updatedMe.timezone ?? 'America/Sao_Paulo');
       setSuccess('Fuso horário atualizado para o do aparelho.');
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
@@ -143,14 +148,14 @@ export default function Configuracoes() {
       // Avisa o AuthProvider para derrubar o usuário da sessão
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       navigate('/?deleted=true');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setDeleteError(err instanceof Error ? err.message : String(err));
       setDeleting(false);
     }
   }
 
   /** Ativa/desativa o lembrete. A permissão só é pedida aqui, com clique explícito. */
-  async function alternarLembrete(e: any) {
+  async function alternarLembrete(e: React.ChangeEvent<HTMLInputElement>) {
     const querAtivar = e.target.checked;
     setMsgLembrete('');
     if (!querAtivar) {
