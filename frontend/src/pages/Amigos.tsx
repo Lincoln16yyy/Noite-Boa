@@ -111,7 +111,7 @@ export default function Amigos() {
     }
   }
 
-  async function trocarPeriodo(novosDias: number, signal?: AbortSignal) {
+  async function trocarPeriodo(novosDias: number, _signal?: AbortSignal) {
     setDias(novosDias);
     try {
       const resultado: any = await api.get(`/friends/ranking?days=${novosDias}`);

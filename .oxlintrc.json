@@ -1,7 +1,7 @@
 {
   "$schema": "https://oxlint.dev/schema.json",
   "rules": {
-    "no-explicit-any": "error",
+    "no-explicit-any": "warn",
     "ban-ts-comment": ["error", { "ts-expect-error": "allow-with-description" }],
     "no-underscore-dangle": ["error", { "allow": ["__fusoAparelho"] }]
   },

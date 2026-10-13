@@ -41,7 +41,7 @@ describe('tela de Registrar sono', () => {
   });
 
   it('salva o registro e mostra nos últimos registros', async () => {
-    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+    fetchMock.mockImplementation(async (_url: any, options: any = {}) => {
       if (options.method === 'POST') {
         const body = JSON.parse(options.body as any);
         posts.push(body);

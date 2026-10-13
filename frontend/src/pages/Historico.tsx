@@ -78,7 +78,7 @@ export default function Historico() {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
 
-  const load = useCallback(async (p: number, signal?: AbortSignal) => {
+  const load = useCallback(async (p: number, _signal?: AbortSignal) => {
     setLoading(true);
     setError('');
     try {
