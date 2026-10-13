@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard';
 import { renderWithAuth } from '../test/test-utils';
 
-function jsonResponse(body, status = 200) {
-  return new Response(JSON.stringify(body), { status });
+function jsonResponse(body: any, status = 200) {
+  return new Response(JSON.stringify(body), { status }) as any;
 }
 
 const summary7 = {
@@ -20,8 +20,8 @@ const summary30 = { ...summary7, days: 30, averageHours: 6.25 };
 const mockUser = { id: 'u1', email: 'a@example.com', displayName: 'Teste', timezone: 'America/Sao_Paulo', shareWithFriends: true };
 
 describe('Dashboard', () => {
-  let fetchMock;
-  let currentSummary;
+  let fetchMock: any;
+  let currentSummary: any;
 
   beforeEach(() => {
     localStorage.clear();
@@ -58,7 +58,7 @@ describe('Dashboard', () => {
     expect(screen.getByText('3h30')).toBeInTheDocument(); // dívida (210 min)
     expect(await screen.findByRole('img', { name: /Gráfico de barras/ })).toBeInTheDocument();
     expect(
-      fetchMock.mock.calls.some(([url]) => String(url).includes('/stats/summary?days=7')),
+      fetchMock.mock.calls.some(([url]: any) => String(url).includes('/stats/summary?days=7')),
     ).toBe(true);
   });
 
@@ -70,13 +70,13 @@ describe('Dashboard', () => {
 
     expect(await screen.findByText('6h15')).toBeInTheDocument(); // média 6.25 h
     await waitFor(() =>
-      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('days=30'))).toBe(true),
+      expect(fetchMock.mock.calls.some(([url]: any) => String(url).includes('days=30'))).toBe(true),
     );
     expect(screen.getByRole('button', { name: '30 dias' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('mostra erro com opção de tentar novamente', async () => {
-    fetchMock.mockImplementation(async (url) => {
+    fetchMock.mockImplementation(async (url: any) => {
       if (String(url).includes('/goal')) return jsonResponse({ targetMinutes: 480 });
       return jsonResponse({ detail: 'algo quebrou' }, 500);
     });
@@ -84,7 +84,7 @@ describe('Dashboard', () => {
     openScreen();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('algo quebrou');
-    fetchMock.mockImplementation(async (url) => {
+    fetchMock.mockImplementation(async (url: any) => {
       if (String(url).includes('/goal')) return jsonResponse({ targetMinutes: 480 });
       return jsonResponse(summary7);
     });

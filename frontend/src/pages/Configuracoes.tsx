@@ -19,13 +19,13 @@ const TIMEZONES =
     : ['America/Sao_Paulo', 'America/New_York', 'Europe/Lisbon', 'UTC'];
 
 /** "23:00:00" (LocalTime da API) → "23:00" (input type=time) */
-const toTimeInput = (value) => (value ? String(value).slice(0, 5) : '');
+const toTimeInput = (value: any) => (value ? String(value).slice(0, 5) : '');
 
 export default function Configuracoes() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const fusoAparelho = fusoDoAparelho();
-  const [me, setMe] = useState(null);
+  const [me, setMe] = useState<any>(null);
   const [hours, setHours] = useState('');
   const [bedtime, setBedtime] = useState('');
   const [wakeTime, setWakeTime] = useState('');
@@ -62,7 +62,7 @@ export default function Configuracoes() {
     };
   }, []);
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: any) {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -107,7 +107,7 @@ export default function Configuracoes() {
     setSuccess('');
     setSaving(true);
     try {
-      const updatedMe = await api.put('/me', { timezone: fusoAparelho });
+      const updatedMe: any = await api.put('/me', { timezone: fusoAparelho });
       setMe(updatedMe);
       setTimezone(updatedMe.timezone);
       setSuccess('Fuso horário atualizado para o do aparelho.');
@@ -143,14 +143,14 @@ export default function Configuracoes() {
       // Avisa o AuthProvider para derrubar o usuário da sessão
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       navigate('/?deleted=true');
-    } catch (err) {
-      setDeleteError(err.message);
+    } catch (err: any) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
       setDeleting(false);
     }
   }
 
   /** Ativa/desativa o lembrete. A permissão só é pedida aqui, com clique explícito. */
-  async function alternarLembrete(e) {
+  async function alternarLembrete(e: any) {
     const querAtivar = e.target.checked;
     setMsgLembrete('');
     if (!querAtivar) {
