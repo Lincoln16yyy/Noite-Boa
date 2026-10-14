@@ -64,8 +64,35 @@ jdbc:postgresql://ep-exemplo-abc123.aws.neon.tech/neondb?sslmode=require
 1. Vercel → seu projeto → **Settings → Environment Variables**.
 2. Crie `VITE_API_URL` = `https://<servico-da-api>.onrender.com/api`
    (o nome do serviço + `.onrender.com` aparece na página do serviço na Render).
+   Marque os ambientes **Production** *e* **Preview** — o link de cada PR é um
+   ambiente Preview e, sem a variável nele, o app chama `localhost:8080` e o
+   navegador acusa `NetworkError when attempting to fetch resource`.
 3. Faça um **redeploy** do front-end (o Vite embute a URL no build — mudar a
-   variável sozinha não reaplica em deploy antigo).
+   variável sozinho não reaplica em deploy antigo).
+
+## Passo 3.5 — Liberar os domínios no CORS (Render)
+
+O back-end só aceita origens listadas em `CORS_ALLOWED_ORIGINS` (ou a legada
+`CORS_ALLOWED_ORIGIN`). Como cada branch de PR ganha um domínio novo
+(`https://noite-boa-git-<branch>-<time>.vercel.app`), a variável aceita
+**padrões** desde a issue #233:
+
+1. Render → serviço da API → **Environment** → `CORS_ALLOWED_ORIGINS`
+   (plural!) com, por exemplo:
+   ```
+   https://*.vercel.app,http://localhost:5173
+   ```
+   O padrão cobre produção e todos os previews de PR. Origens exatas também
+   podem entrar na lista, separadas por vírgula.
+2. **Redeploy** do back-end (env nova exige restart).
+3. Confirmação rápida do preflight:
+   ```bash
+   curl -s -o /dev/null -w "%{http_code}\n" -X OPTIONS \
+     https://<servico-da-api>.onrender.com/api/me \
+     -H "Origin: https://<dominio-do-front>" \
+     -H "Access-Control-Request-Method: GET"
+   # esperado: 200 (403 = origem fora da lista)
+   ```
 
 ## Passo 4 — Validação obrigatória (antes de considerar o deploy concluído)
 
