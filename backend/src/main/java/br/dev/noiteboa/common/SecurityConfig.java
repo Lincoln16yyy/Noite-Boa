@@ -43,11 +43,19 @@ public class SecurityConfig {
     }
 
     /**
-     * Configuração de CORS que aceita múltiplas origens separadas por vírgula.
+     * Configuração de CORS que aceita múltiplas origens separadas por vírgula,
+     * **inclusive padrões** (ex.: {@code https://*.vercel.app}).
      * Normaliza as origens: trim, remove barra final.
      * Ex.: "https://app.vercel.app, https://app2.vercel.app/" → ["https://app.vercel.app", "https://app2.vercel.app"]
      *
-     * Propriedade: cors.allowed-origins (ex.: "https://app.vercel.app,https://app2.vercel.app")
+     * Padrões são necessários porque cada branch de PR na Vercel ganha um
+     * domínio novo ({@code https://noite-boa-git-<branch>-<time>.vercel.app}):
+     * com origens exatas, a allowlist precisaria de uma URL nova a cada PR
+     * (issue #233). `setAllowedOriginPatterns` casa o padrão E continua
+     * aceitando as origens exatas informadas; `setAllowCredentials(true)` segue
+     * valendo porque o padrão não é o `*` genérico.
+     *
+     * Propriedade: cors.allowed-origins (ex.: "https://*.vercel.app,https://app.exemplo.com")
      * Padrão: "http://localhost:5173"
      */
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
@@ -61,7 +69,7 @@ public class SecurityConfig {
         }
 
         org.springframework.web.cors.CorsConfiguration config = new org.springframework.web.cors.CorsConfiguration();
-        config.setAllowedOrigins(allowedOrigins);
+        config.setAllowedOriginPatterns(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         config.setAllowCredentials(true);
