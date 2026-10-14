@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { Route, Routes } from 'react-router-dom';
 import { mockMe, renderWithAuth } from '../test/test-utils';
 import Layout from './Layout';
 import type { User } from '../api/types';
@@ -65,6 +66,22 @@ afterEach(() => {
   Object.defineProperty(window, 'matchMedia', { value: matchMediaOriginal, configurable: true, writable: true });
 });
 
+/**
+ * Issue #210: /hoje é a tela inicial do app logado. A rota-marcador prova o
+ * destino do redirecionamento sem sair do MemoryRouter.
+ */
+function renderLayoutComDestino(route: string) {
+  instalarMatchMedia(false);
+  mockMe(usuario);
+  return renderWithAuth(
+    <Routes>
+      <Route path="/hoje" element={<p>marcador hoje</p>} />
+      <Route path="*" element={<Layout />} />
+    </Routes>,
+    { user: usuario, route },
+  );
+}
+
 describe('Layout — navegação responsiva (issue #157)', () => {
   it('desktop (1280px): menu completo no cabeçalho e sem barra inferior', async () => {
     await renderLayout({ celular: false, user: usuario, route: '/dashboard' });
@@ -124,6 +141,18 @@ describe('Layout — navegação responsiva (issue #157)', () => {
 
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Sons' }));
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  // Issue #210: /hoje é a tela inicial do app logado — destino depois do login
+  // e da raiz.
+  it('logado em /login cai em /hoje', async () => {
+    renderLayoutComDestino('/login');
+    expect(await screen.findByText('marcador hoje')).toBeInTheDocument();
+  });
+
+  it('logado na raiz (/) cai em /hoje', async () => {
+    renderLayoutComDestino('/');
+    expect(await screen.findByText('marcador hoje')).toBeInTheDocument();
   });
 
   it('visitante no celular mantém Entrar/Cadastrar e não vê barra inferior', async () => {

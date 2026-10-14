@@ -225,6 +225,8 @@
   display: block;
   width: 100%;
   height: 100%;
+  /* Arco começa às 12h (sentido horário), como no mockup da tela Hoje. */
+  transform: rotate(-90deg);
 }
 
 .ui-ring__track {
