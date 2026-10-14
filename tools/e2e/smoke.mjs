@@ -185,8 +185,10 @@ try {
       pagina.click('button[type=submit]'),
     ]);
     if (pagina.url().includes('/login')) throw new Error('continuou em /login após o login');
-    // A tela Hoje mostra o anel da última noite com dados do mock.
-    if (!/ÚLTIMA NOITE/i.test(await texto())) throw new Error('a tela Hoje não carregou os dados da última noite');
+    // A tela Hoje busca /sleep-logs, /stats/summary e /goal: o waitFor acima
+    // só garante a URL. Espera o anel aparecer antes de julgar (issue #235 —
+    // sem isso o texto era lido antes dos dados e falhava por corrida).
+    await pagina.waitForFunction(() => /ÚLTIMA NOITE/i.test(document.body.innerText), { timeout: 10000 });
   });
 
   await verificar.check('recarregar mantém a sessão', async () => {
