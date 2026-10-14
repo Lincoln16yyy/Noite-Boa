@@ -176,20 +176,22 @@ try {
   });
 
   // Critério de aceite: falha se o login deixar o usuário em /login.
-  await verificar.check('login correto vai para /dashboard', async () => {
+  await verificar.check('login correto vai para /hoje', async () => {
     await irPara('/login');
     await pagina.type('input[type=email]', 'lincoln@example.com');
     await pagina.type('input[type=password]', 'segredo123');
     await Promise.all([
-      pagina.waitForFunction(() => location.pathname === '/dashboard', { timeout: 10000 }),
+      pagina.waitForFunction(() => location.pathname === '/hoje', { timeout: 10000 }),
       pagina.click('button[type=submit]'),
     ]);
     if (pagina.url().includes('/login')) throw new Error('continuou em /login após o login');
+    // A tela Hoje mostra o anel da última noite com dados do mock.
+    if (!/ÚLTIMA NOITE/i.test(await texto())) throw new Error('a tela Hoje não carregou os dados da última noite');
   });
 
   await verificar.check('recarregar mantém a sessão', async () => {
     await pagina.reload({ waitUntil: 'load', timeout: 30000 });
-    await pagina.waitForFunction(() => location.pathname === '/dashboard', { timeout: 10000 });
+    await pagina.waitForFunction(() => location.pathname === '/hoje', { timeout: 10000 });
     if (!/Sair/.test(await texto())) throw new Error('não achei "Sair" depois de recarregar (sessão caiu)');
   });
 

@@ -44,9 +44,10 @@ export default function Layout() {
     return <Navigate to="/login" replace />;
   }
 
-  // Redireciona rotas de auth se já logado
-  if (!loading && user && AUTH_ROUTES.includes(location.pathname)) {
-    return <Navigate to="/dashboard" replace />;
+  // Redireciona rotas de auth (login/cadastro) e a raiz quando já logado:
+  // /hoje é a tela inicial do app (issue #210).
+  if (!loading && user && (AUTH_ROUTES.includes(location.pathname) || location.pathname === '/')) {
+    return <Navigate to="/hoje" replace />;
   }
 
   // Mostra esqueleto enquanto carrega a sessão
