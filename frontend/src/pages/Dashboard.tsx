@@ -1,286 +1,340 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Goal, StatsSummary } from '../api/types';
-import { formatHours, formatMinutes } from '../lib/dashboard';
 import { useAuth } from '../context/AuthContext';
+import { Button, Card, Chip, ProgressBar } from '../components/ui';
+import {
+  barraConsistencia,
+  buildDailySeries,
+  dicaDashboard,
+  formatHours,
+  formatMinutes,
+  minutosQueFaltam,
+} from '../lib/dashboard';
+import { etiquetaDia, normalizarMeta } from '../lib/hoje';
 import LoadingWarning from '../components/LoadingWarning';
-import styles from './Dashboard.module.css';
 
-// Recharts pesa o bundle: o gráfico só carrega quando o dashboard precisa dele.
-const SleepChart = lazy(() => import('../components/SleepChart'));
+/**
+ * Dashboard v2 (issue #211) — fiel a docs/design/mockups/dashboard.png.
+ * Regras: seção 5 de docs/design/direcao-visual.md. Todos os números vêm da
+ * API; gradientes, raio e cores vêm dos tokens (`--bar-*-gradient`,
+ * `--chart-bar-radius`, `--below-meta-graphic`, `--within-meta-graphic`).
+ */
 
-// Estilos usando tokens CSS (ver docs/identidade-visual.md)
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--color-noite)',
-  borderRadius: '28px',
-  padding: '1.5rem',
-  marginBottom: '1.25rem',
-  boxShadow: 'var(--shadow-card)',
-  color: 'var(--color-luar)',
-  // Borda sutil: no modo escuro o cartão (fundo Noite) some contra o fundo da
-  // página (também Noite); a borda Índigo o separa (#158).
-  border: '1px solid var(--color-indigo)',
-};
+type Estado = 'carregando' | 'pronto' | 'erro';
 
-const metricCardStyle: React.CSSProperties = {
-  background: 'var(--color-nevoa)',
-  border: '1px solid var(--color-indigo)',
-  borderRadius: '20px',
-  padding: '1.25rem',
+const telaStyle: CSSProperties = {
+  maxWidth: '720px',
+  margin: '0 auto',
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.35rem',
+  gap: '1rem',
 };
 
-const metricTitleStyle: CSSProperties = {
-  fontSize: '14px',
-  fontWeight: 600,
-  color: 'var(--color-indigo)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-};
+const overlineStyle: CSSProperties = { margin: '0 0 0.5rem' };
 
-const metricValueStyle: CSSProperties = {
-  fontSize: '36px',
+const tituloStyle: CSSProperties = { margin: 0 };
+
+const mediaNumeroStyle: CSSProperties = {
+  fontSize: 'var(--fs-display-lg)', // 56 px+ (média é o número gigante)
   fontWeight: 800,
-  color: 'var(--color-noite)',
-  lineHeight: 1.1,
+  lineHeight: 1,
+  color: 'var(--color-luar)',
+  margin: 0,
+  fontVariantNumeric: 'tabular-nums',
 };
 
-const metricHintStyle: CSSProperties = {
-  fontSize: '13px',
-  color: 'var(--color-indigo)',
-  opacity: 0.7,
-};
-
-const periodToggleStyle = (active: boolean): CSSProperties => ({
-  minHeight: '48px',
-  padding: '0 1rem',
+const legendaStyle: CSSProperties = {
   fontSize: '15px',
-  fontWeight: active ? 700 : 400,
-  borderRadius: '999px',
-  // Tokens de TEMA: no modo escuro a pílula inativa não fica mais branca (#158).
-  border: active ? '2px solid var(--toggle-active-bg)' : '1px solid var(--toggle-border)',
-  background: active ? 'var(--toggle-active-bg)' : 'var(--toggle-bg)',
-  color: active ? 'var(--toggle-active-text)' : 'var(--text-secondary)',
-  cursor: 'pointer',
-  transition: 'all 0.15s ease',
-});
-
-const buttonStyle = {
-  minHeight: '48px',
-  padding: '0.75rem 1.5rem',
-  fontSize: '16px',
-  fontWeight: 700,
-  borderRadius: '999px',
-  border: 'none',
-  background: 'var(--color-ambar)',
-  color: 'var(--color-noite)',
-  cursor: 'pointer',
-  transition: 'background 0.15s, transform 0.1s',
+  color: 'var(--text-secondary)',
+  margin: '0.35rem 0 0',
 };
 
-const emptyStateStyle = {
-  background: 'var(--color-nevoa)',
-  border: '1px solid var(--color-lavanda)',
-  borderRadius: '20px',
-  padding: '2rem',
+const barrasAreaStyle: CSSProperties = {
+  position: 'relative',
+  height: '130px',
+  marginTop: '1.25rem',
+};
+
+const linhaMetaStyle: CSSProperties = {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  borderTop: '1px dashed var(--surface-border)',
+  // Anel de foco/legenda: a linha marca a altura da meta na área das barras.
+  pointerEvents: 'none',
+};
+
+const barrasLinhaStyle: CSSProperties = {
+  position: 'relative',
+  display: 'flex',
+  alignItems: 'flex-end',
+  gap: '0.375rem',
+  height: '100%',
+};
+
+const barraStyle: CSSProperties = {
+  flex: '1 1 0',
+  minWidth: 0,
+  maxWidth: '34px',
+  // Centraliza a barra no seu slot: a letra abaixo fica alinhada à barra.
+  margin: '0 auto',
+  borderRadius: 'var(--chart-bar-radius)', // raio 10 px (seção 2 do guia)
+};
+
+const letrasStyle: CSSProperties = {
+  display: 'flex',
+  gap: '0.375rem',
+  marginTop: '0.4rem',
+};
+
+const letraStyle: CSSProperties = {
+  flex: '1 1 0',
+  minWidth: 0,
+  textAlign: 'center',
+  fontSize: '12px',
+  color: 'var(--text-muted)',
+};
+
+const metaLegendaStyle: CSSProperties = {
+  margin: '0.5rem 0 0',
+  textAlign: 'right',
+  fontSize: '12px',
+  color: 'var(--text-muted)',
+};
+
+const metricasGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr',
+  gap: '1rem',
+};
+
+const metricaValorStyle: CSSProperties = {
+  fontSize: '28px',
+  fontWeight: 800,
+  lineHeight: 1.05,
+  margin: 0,
+  fontVariantNumeric: 'tabular-nums',
+};
+
+const metricaDicaStyle: CSSProperties = {
+  margin: '0.75rem 0 0',
+  fontSize: '15px',
+  lineHeight: 1.45,
+};
+
+const erroStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: '0.75rem',
   alignItems: 'flex-start',
-  textAlign: 'left',
 };
 
-const errorStateStyle = {
-  background: 'var(--color-nevoa)',
-  border: '2px solid var(--color-erro)',
-  borderRadius: '20px',
-  padding: '1.25rem',
-  color: 'var(--color-erro-texto)',
-};
-
-const loadingStyle = {
+const vazioStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.75rem',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '3rem',
-  color: 'var(--color-lavanda)',
+  gap: '0.5rem',
+  alignItems: 'flex-start',
 };
-
-const sectionTitleStyle = {
-  fontSize: '18px',
-  fontWeight: 800,
-  marginTop: 0,
-  marginBottom: '1rem',
-  color: 'var(--color-luar)',
-};
-
-const gridStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-  gap: '0.875rem',
-  marginBottom: '1.25rem',
-};
-
-const mainNumberStyle = {
-  fontSize: 'clamp(48px, 8vw, 72px)',
-  fontWeight: 800,
-  color: 'var(--color-luar)',
-  lineHeight: 1,
-  margin: 0,
-};
-
-const mainLabelStyle = {
-  fontSize: '15px',
-  fontWeight: 600,
-  color: 'var(--color-lavanda)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-  marginBottom: '0.25rem',
-};
-
-const mainSubtitleStyle = {
-  fontSize: '14px',
-  color: 'var(--color-lavanda)',
-  opacity: 0.7,
-  marginTop: '0.5rem',
-};
-
-const goalLineStyle = {
-  fontSize: '13px',
-  color: 'var(--color-ambar)',
-  fontWeight: 600,
-  marginTop: '0.75rem',
-};
-
-function Metric({ title, value, hint }: { title: string; value: string; hint?: string }) {
-  return (
-    <div style={metricCardStyle}>
-      <div style={metricTitleStyle}>{title}</div>
-      <div style={metricValueStyle}>{value}</div>
-      <div style={metricHintStyle}>{hint}</div>
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const fuso = user?.timezone ?? 'America/Sao_Paulo';
   const [days, setDays] = useState(7);
   const [summary, setSummary] = useState<StatsSummary | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
-  const [status, setStatus] = useState('loading'); // loading | ready | error
+  const [status, setStatus] = useState<Estado>('carregando');
   const [errorMessage, setErrorMessage] = useState('');
 
-  const load = useCallback(async (selectedDays: number, _signal?: AbortSignal) => {
-    setStatus('loading');
+  const load = useCallback(async () => {
+    setStatus('carregando');
     setErrorMessage('');
     try {
       const [summaryData, goalData] = await Promise.all([
-        api.get<StatsSummary>(`/stats/summary?days=${selectedDays}`),
+        api.get<StatsSummary>(`/stats/summary?days=${days}`),
         api.get<Goal>('/goal'),
       ]);
       setSummary(summaryData);
       setGoal(goalData);
-      setStatus('ready');
+      setStatus('pronto');
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return; // ignora cancelamento
       setErrorMessage(err instanceof Error ? err.message : String(err));
-      setStatus('error');
+      setStatus('erro');
     }
-  }, []);
+  }, [days]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    load(days, controller.signal);
-    return () => controller.abort(); // cancela requisição anterior ao trocar de período
-  }, [days, load]);
+    load();
+  }, [load]);
 
-  const goalHours = goal ? (goal.targetMinutes ?? 0) / 60 : 8;
-  const isEmpty = status === 'ready' && (!summary?.daily || summary.daily.length === 0);
+  const meta = normalizarMeta(goal);
+  const metaHoras = meta.minutos / 60;
+  const falta = minutosQueFaltam(summary?.averageHours ?? 0, meta.minutos);
+  const divida = Math.max(0, Math.round(summary?.sleepDebtMinutes ?? 0));
+  const consistencia = Math.round(summary?.consistencyMinutes ?? 0);
+
+  // Série das barras: dias do fuso do perfil (mesma série do back-end).
+  const serie = buildDailySeries(summary, days, new Date(), fuso);
+  const maiorNoite = serie.reduce((max, dia) => Math.max(max, dia.hours), 0);
+  const teto = Math.max(metaHoras, maiorNoite) || 1;
+  const posicaoMeta = (metaHoras / teto) * 100;
 
   return (
-    <div className={styles.container}>
-      <h1 style={{ fontSize: '28px', fontWeight: 800, marginBottom: '0.5rem' }}>Dashboard</h1>
+    <div style={telaStyle}>
+      {/* Título da tela: o cabeçalho compartilhado mostra a saudação (#209),
+          então overline + título vêm aqui, como no mockup. */}
+      <header>
+        <p className="overline" style={overlineStyle}>
+          Seu padrão
+        </p>
+        <h1 style={tituloStyle} className="display-number display-sm">
+          Dashboard
+        </h1>
+      </header>
 
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' } as CSSProperties} role="group" aria-label="Período">
+      <div style={{ display: 'flex', gap: '0.5rem' }} role="group" aria-label="Período">
         {[7, 30].map((value) => (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={days === value}
-            style={periodToggleStyle(days === value)}
-            onClick={() => setDays(value)}
-          >
+          <Chip key={value} selected={days === value} onClick={() => setDays(value)}>
             {value} dias
-          </button>
+          </Chip>
         ))}
       </div>
 
-      {status === 'loading' && (
-        <div style={loadingStyle as CSSProperties}>
+      {status === 'carregando' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
           <p>Carregando…</p>
           <LoadingWarning isLoading={true} />
         </div>
       )}
 
-      {status === 'error' && (
-        <div role="alert" style={errorStateStyle}>
-          <p style={{ marginTop: 0, marginBottom: '1rem' }}>Não foi possível carregar as estatísticas: {errorMessage}</p>
-          <button type="button" style={buttonStyle} onClick={() => load(days)}>
-            Tentar novamente
-          </button>
-        </div>
-      )}
-
-      {isEmpty && (
-        <div style={emptyStateStyle as CSSProperties}>
-          <p style={{ margin: 0, fontSize: '17px', fontWeight: 600, color: 'var(--color-noite)' }}>Sem dados nos últimos {days} dias.</p>
-          <p style={{ margin: 0, color: 'var(--color-indigo)', opacity: 0.8 }}>
-            Registre uma noite de sono para ver sua média, consistência e dívida de sono.
-          </p>
-          <Link to="/registrar" style={{ color: 'var(--color-ambar)', fontWeight: 700, textDecoration: 'none', marginTop: '0.25rem' }}>
-            Registrar uma noite →
-          </Link>
-        </div>
-      )}
-
-      {status === 'ready' && !isEmpty && summary && (
-        <>
-          {/* Cartão principal escuro com média grande + gráfico */}
-          <section aria-label="Resumo do sono" style={sectionStyle} className={styles.resumo}>
-            <div className={styles.resumoTexto}>
-              <div style={mainLabelStyle}>Média de {days} dias</div>
-              <div style={mainNumberStyle}>{formatHours(summary.averageHours ?? 0)}</div>
-              <div style={mainSubtitleStyle}>por noite registrada</div>
-              <div style={goalLineStyle}>Meta: {goalHours}h por noite</div>
-            </div>
-
-            <section aria-label="Horas dormidas por dia">
-              <h2 style={sectionTitleStyle}>Horas dormidas por dia</h2>
-              <Suspense fallback={<p style={{ color: 'var(--color-lavanda)' }}>Carregando gráfico…</p>}>
-                <SleepChart summary={summary} days={days} goalHours={goalHours} timeZone={user?.timezone} />
-              </Suspense>
-            </section>
-          </section>
-
-          {/* Métricas secundárias em cartões claros */}
-          <div style={gridStyle}>
-            <Metric
-              title={`Consistência (${days} dias)`}
-              value={`±${Math.round(summary.consistencyMinutes ?? 0)} min`}
-              hint="variação do horário de dormir; quanto menor, melhor"
-            />
-            <Metric
-              title="Dívida de sono (7 noites)"
-              value={formatMinutes(summary.sleepDebtMinutes ?? 0)}
-              hint={`falta para a meta de ${goalHours}h por noite`}
-            />
+      {status === 'erro' && (
+        <Card>
+          <div style={erroStyle} role="alert">
+            <p style={{ margin: 0 }}>Não foi possível carregar as estatísticas: {errorMessage}</p>
+            <Button variant="secondary" onClick={() => load()}>
+              Tentar novamente
+            </Button>
           </div>
+        </Card>
+      )}
+
+      {status === 'pronto' && (!summary?.daily || summary.daily.length === 0) && (
+        <Card>
+          <div style={vazioStyle}>
+            <p style={{ margin: 0, fontSize: '17px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Sem dados nos últimos {days} dias.
+            </p>
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+              Registre uma noite de sono para ver sua média, consistência e dívida de sono.
+            </p>
+            <Link to="/registrar" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>
+              Registrar uma noite →
+            </Link>
+          </div>
+        </Card>
+      )}
+
+      {status === 'pronto' && summary?.daily && summary.daily.length > 0 && (
+        <>
+          <Card style={{ padding: '1.25rem' }}>
+            <p className="overline" style={overlineStyle}>
+              Média de {days} dias
+            </p>
+            <p style={mediaNumeroStyle}>{formatHours(summary.averageHours ?? 0)}</p>
+            <p style={legendaStyle}>
+              Meta de {formatHours(metaHoras)} · {falta > 0 ? `faltam ${falta} min por noite` : 'meta atingida'}
+            </p>
+
+            <div
+              style={barrasAreaStyle}
+              role="img"
+              aria-label={`Gráfico de barras: horas dormidas por dia nos últimos ${days} dias, meta de ${formatHours(metaHoras)}`}
+            >
+              {/* Linha da meta na altura certa (dentro da área, rótulo fora). */}
+              <div style={{ ...linhaMetaStyle, top: `${100 - posicaoMeta}%` }} />
+              <div style={barrasLinhaStyle}>
+                {serie.map((dia) => {
+                  const abaixoDaMeta = dia.hours > 0 && dia.hours < metaHoras;
+                  return (
+                    <span
+                      key={dia.date}
+                      style={{
+                        ...barraStyle,
+                        // Lavanda se ≥ meta, Âmbar se < meta (gradientes por tema).
+                        background: abaixoDaMeta ? 'var(--bar-below-gradient)' : 'var(--bar-within-gradient)',
+                        height: dia.hasData ? `${Math.max(4, (dia.hours / teto) * 100)}%` : 0,
+                        visibility: dia.hasData ? 'visible' : 'hidden',
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+            {/* Letras só no período de 7 dias; em 30 dias, as pontas. */}
+            {days === 7 ? (
+              <div style={letrasStyle}>
+                {serie.map((dia) => (
+                  <span key={dia.date} style={letraStyle}>
+                    {etiquetaDia(dia.date, fuso)}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div style={{ ...letrasStyle, justifyContent: 'space-between' }}>
+                <span style={letraStyle}>início</span>
+                <span style={letraStyle}>hoje</span>
+              </div>
+            )}
+            {/* Rótulo da meta FORA da área das barras (não sobrepõe nada). */}
+            <p style={metaLegendaStyle}>- - meta de {formatHours(metaHoras)}</p>
+          </Card>
+
+          {/* Consistência e dívida (duas colunas a partir de ~340px, como o mockup) */}
+          <div style={{ ...metricasGridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+            <Card style={{ padding: '1.25rem' }}>
+              <p className="overline" style={overlineStyle}>
+                Consistência
+              </p>
+              <p style={metricaValorStyle}>±{consistencia} min</p>
+              <div style={{ marginTop: '0.75rem' }}>
+                <ProgressBar value={barraConsistencia(consistencia)} label="Consistência do horário de dormir" />
+              </div>
+              <p style={{ ...legendaStyle, fontSize: '13px' }}>horário de dormir</p>
+            </Card>
+
+            <Card style={{ padding: '1.25rem' }}>
+              <p className="overline" style={overlineStyle}>
+                Dívida de sono
+              </p>
+              <p
+                style={{
+                  ...metricaValorStyle,
+                  // Âmbar (do tema) quando há dívida; o rótulo sempre em texto.
+                  color: divida > 0 ? 'var(--below-meta-graphic)' : 'var(--text-primary)',
+                }}
+              >
+                {formatMinutes(divida)}
+              </p>
+              <div style={{ marginTop: '0.75rem' }}>
+                <ProgressBar
+                  value={Math.min(100, (divida / (7 * meta.minutos)) * 100)}
+                  label="Dívida de sono em relação à meta da semana"
+                  tone={divida > 0 ? 'below' : 'within'}
+                />
+              </div>
+              <p style={{ ...legendaStyle, fontSize: '13px' }}>nos últimos 7 dias</p>
+            </Card>
+          </div>
+
+          {/* Dica determinística */}
+          <Card style={{ padding: '1.25rem' }}>
+            <p className="overline" style={{ ...overlineStyle, color: 'var(--below-meta-graphic)' }}>
+              Dica
+            </p>
+            <p style={{ ...metricaDicaStyle, color: 'var(--text-primary)' }}>{dicaDashboard(divida)}</p>
+          </Card>
         </>
       )}
     </div>
