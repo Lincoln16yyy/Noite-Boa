@@ -75,6 +75,42 @@ describe('Dashboard', () => {
     expect(screen.getByRole('button', { name: '30 dias' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('cartão de média mostra meta, quanto falta por noite e a linha da meta', async () => {
+    openScreen();
+    // média 7h30 com meta 8h → faltam 30 min
+    expect(await screen.findByText('Meta de 8h · faltam 30 min por noite')).toBeInTheDocument();
+    // rótulo da meta FORA da área das barras
+    expect(screen.getByText('- - meta de 8h')).toBeInTheDocument();
+  });
+
+  it('mostra "meta atingida" quando a média alcança a meta', async () => {
+    currentSummary = { ...summary7, averageHours: 8.5 };
+    openScreen();
+    expect(await screen.findByText('Meta de 8h · meta atingida')).toBeInTheDocument();
+  });
+
+  it('dica: dívida de 210 min → 30 min mais cedo por noite (ceil(210/7))', async () => {
+    openScreen();
+    expect(
+      await screen.findByText('Dormir 30 minutos mais cedo nas próximas 7 noites zera sua dívida de 3h30.'),
+    ).toBeInTheDocument();
+  });
+
+  it('dívida 0 mostra a dica de "dentro da meta" e a barra em tom positivo', async () => {
+    currentSummary = { ...summary7, sleepDebtMinutes: 0 };
+    openScreen();
+    expect(await screen.findByText('Você está dentro da meta. Mantenha o ritmo!')).toBeInTheDocument();
+  });
+
+  it('em 30 dias as letras dos dias dão lugar às pontas início/hoje', async () => {
+    openScreen();
+    await screen.findByText('7h30');
+    fireEvent.click(screen.getByRole('button', { name: '30 dias' }));
+    expect(await screen.findByText('6h15')).toBeInTheDocument();
+    expect(screen.getByText('início')).toBeInTheDocument();
+    expect(screen.getByText('hoje')).toBeInTheDocument();
+  });
+
   it('mostra erro com opção de tentar novamente', async () => {
     fetchMock.mockImplementation(async (url: any) => {
       if (String(url).includes('/goal')) return jsonResponse({ targetMinutes: 480 });

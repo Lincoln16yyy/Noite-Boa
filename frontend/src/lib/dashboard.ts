@@ -59,3 +59,35 @@ export function formatMinutes(minutes: number): string {
   const rest = total % 60;
   return rest ? `${hours}h${pad(rest)}` : `${hours}h`;
 }
+
+/**
+ * Quanto falta por noite para bater a meta (subtitle do cartão de média).
+ * Diferença entre a meta e a média, nunca negativa: quando a média já alcança
+ * a meta, devolve 0 (a tela mostra "meta atingida").
+ */
+export function minutosQueFaltam(averageHours: number, metaMinutos: number): number {
+  const falta = Math.round(metaMinutos - (Number(averageHours) || 0) * 60);
+  return Math.max(0, falta);
+}
+
+/**
+ * Barra de progresso da consistência: variação do horário de dormir em
+ * minutos; 60 min ou mais enchem a barra (100%). Quanto menor, melhor — a
+ * barra é neutra (tom accent), sem cor de "abaixo da meta".
+ */
+export function barraConsistencia(consistencyMinutes: number): number {
+  return Math.min(100, Math.max(0, Math.round((Number(consistencyMinutes) || 0) * (100 / 60))));
+}
+
+/**
+ * Dica do Dashboard (regra determinística — seção 5 do guia):
+ * com dívida, "Dormir X minutos mais cedo nas próximas 7 noites zera sua
+ * dívida de Yh Zmin", com X = ceil(dívida / 7); sem dívida, incentivo para
+ * manter o ritmo. Nada de dica médica.
+ */
+export function dicaDashboard(sleepDebtMinutes: number): string {
+  const divida = Math.max(0, Math.round(Number(sleepDebtMinutes) || 0));
+  if (divida === 0) return 'Você está dentro da meta. Mantenha o ritmo!';
+  const minutosPorNoite = Math.ceil(divida / 7);
+  return `Dormir ${minutosPorNoite} minutos mais cedo nas próximas 7 noites zera sua dívida de ${formatMinutes(divida)}.`;
+}
