@@ -172,7 +172,9 @@ try {
 
   await verificar.check('visitante vê Entrar', async () => {
     await irPara('/');
-    if (!/Entrar/i.test(await texto())) throw new Error('não achei "Entrar" na home deslogada');
+    // A landing só monta depois do /me responder: espera o texto existir
+    // antes de julgar (cold-start do CI já falhou por leitura adiantada).
+    await pagina.waitForFunction(() => /Entrar/i.test(document.body.innerText), { timeout: 10000 });
   });
 
   // Critério de aceite: falha se o login deixar o usuário em /login.
@@ -199,6 +201,8 @@ try {
 
   await verificar.check('registrar uma noite', async () => {
     await irPara('/registrar');
+    // O formulário monta após o /me: espera o radio existir antes de clicar.
+    await pagina.waitForFunction(() => document.querySelector('input[name=quality][value="4"]'), { timeout: 10000 });
     // A qualidade começa em 0 (obrigatória): marca "Boa" antes de salvar.
     await pagina.evaluate(() => document.querySelector('input[name=quality][value="4"]').click());
     await Promise.all([
@@ -249,6 +253,8 @@ try {
   await verificar.check('modo escuro mantém o texto legível', async () => {
     await pagina.evaluateOnNewDocument(() => localStorage.setItem('noiteboa.theme', 'dark'));
     await irPara('/login');
+    // Espera a tela montar antes de medir o contraste do h1.
+    await pagina.waitForFunction(() => document.querySelector('h1'), { timeout: 10000 });
     const contraste = await pagina.evaluate(() => {
       const el = document.querySelector('h1') || document.body;
       const cor = getComputedStyle(el).color;
