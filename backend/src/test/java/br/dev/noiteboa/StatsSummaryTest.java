@@ -56,8 +56,13 @@ class StatsSummaryTest {
     @Test
     void summaryIsOkAndReturnsDailySeries() throws Exception {
         String token = token("stats@example.com");
-        create(token, "2026-10-06T22:00:00Z", "2026-10-07T06:00:00Z", 4);
-        create(token, "2026-10-07T22:00:00Z", "2026-10-08T06:00:00Z", 5);
+        // Duas noites de 8h DENTRO da janela de 7 dias. Datas relativas: com
+        // data fixa o teste quebrava quando a janela passava dela (era
+        // 2026-10-06/07; em 14/10 a média caiu para 0 e a CI ficou vermelha).
+        var anteontem = java.time.LocalDate.now(FUSO_PERFIL).minusDays(2);
+        var ontem = java.time.LocalDate.now(FUSO_PERFIL).minusDays(1);
+        create(token, anteontem.atTime(16, 0).toString() + "Z", anteontem.plusDays(1).atTime(0, 0).toString() + "Z", 4);
+        create(token, ontem.atTime(16, 0).toString() + "Z", ontem.plusDays(1).atTime(0, 0).toString() + "Z", 5);
 
         mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
