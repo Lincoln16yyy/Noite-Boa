@@ -205,6 +205,13 @@
   background: var(--accent);
   border-radius: inherit;
   transition: width 0.4s ease;
+  /* Cresce do zero ao valor final na montagem (issue #216). O keyframe só
+     declara o `from`: o `to` é a largura de verdade, que continua no DOM. */
+  animation: ui-progress-fill 0.4s ease;
+}
+
+@keyframes ui-progress-fill {
+  from { width: 0; }
 }
 
 .ui-progress__fill--within {
@@ -238,6 +245,14 @@
   stroke: var(--accent);
   fill: none;
   transition: stroke-dashoffset 0.6s ease;
+  /* Preenche do vazio ao valor final na montagem (issue #216). O keyframe
+     só declara o `from`: o `to` é o stroke-dashoffset de verdade, que
+     continua no atributo — acessibilidade e testes não mudam. */
+  animation: ui-ring-fill 0.6s ease;
+}
+
+@keyframes ui-ring-fill {
+  from { stroke-dashoffset: var(--ui-ring-cheio, 0); }
 }
 
 .ui-ring__value--within {
@@ -273,6 +288,34 @@
 .ui-field__erro {
   font-size: var(--fs-sm);
   color: var(--color-erro-texto);
+}
+
+/* ===== Transição entre telas (issue #216) =====
+   Entra com um deslize curto para cima e um leve aparecer. Só opacidade e
+   deslocamento: nada que mude layout, e o elemento assenta em `none` depois
+   (sem `forwards`) para não criar contexto de containing block depois da
+   animação. */
+.ui-screen-enter {
+  animation: ui-screen-enter 0.25s ease;
+}
+
+@keyframes ui-screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ===== Barras dos gráficos (Hoje e Dashboard — issue #216) =====
+   Crescem de baixo para cima na montagem. O keyframe só declara o `from`:
+   o `to` é a altura de verdade, que continua inline no elemento (mesmo
+   truque do anel e da barra de progresso). */
+.ui-bar-grow {
+  animation: ui-bar-grow 0.4s ease;
+}
+
+@keyframes ui-bar-grow {
+  from { height: 0; }
 }
 
 /* ===== Skeleton (carregamento — issue #214, seção 6 do guia) =====
@@ -421,6 +464,17 @@
   }
 
   .ui-skeleton {
+    animation: none;
+  }
+
+  /* Animações de entrada (issue #216): anel, barra de progresso, barras do
+     gráfico e a troca de tela já nascem no estado final, sem varredura.
+     Nada de salto de layout, porque o valor no DOM nunca muda — só a
+     apresentação. */
+  .ui-ring__value,
+  .ui-progress__fill,
+  .ui-bar-grow,
+  .ui-screen-enter {
     animation: none;
   }
 }

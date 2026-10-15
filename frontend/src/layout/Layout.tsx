@@ -4,6 +4,9 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import NightBackground from '../components/NightBackground';
 import BottomBar from './BottomBar';
 import { primeiroNome, saudacao } from '../lib/saudacao';
+// CSS dos componentes base: o Layout usa a classe .ui-screen-enter (issue #216)
+// e não importa nenhum componente que o puxe sozinho.
+import '../components/ui/ui.css';
 
 /** Item do menu de navegação (desktop). */
 interface MenuItem {
@@ -222,7 +225,11 @@ export default function Layout() {
       {isMobile && user && <BottomBar onLogout={handleLogout} />}
 
       <main style={{ flex: 1, padding: '1rem', paddingBottom: isMobile ? '100px' : '1rem' }}>
-        <Outlet />
+        {/* key = roda a animação de entrada a cada troca de tela (issue #216).
+            Com prefers-reduced-motion a classe não anima (ui.css). */}
+        <div key={location.pathname} className="ui-screen-enter">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

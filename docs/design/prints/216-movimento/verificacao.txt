@@ -1,0 +1,23 @@
+Evidência da issue #216 — movimento (executado em 2026-10-15 20:40)
+Navegador real (puppeteer), contra o build de produção servido por 'vite preview'.
+Reproduzir: cd frontend && npm run build && npx vite preview --port 4173 &
+           cd tools/visual && node movimento.mjs
+
+
+=== /hoje ===
+ok   anel           normal: pico=1 nome=ui-ring-fill · reduced-motion: pico=0 nome=none
+ok   tela           normal: pico=1 nome=ui-screen-enter · reduced-motion: pico=0 nome=none
+
+=== /dashboard ===
+ok   barraProgresso normal: pico=2 nome=ui-progress-fill · reduced-motion: pico=0 nome=none
+ok   barrasGrafico  normal: pico=7 nome=ui-bar-grow · reduced-motion: pico=0 nome=none
+ok   tela           normal: pico=1 nome=ui-screen-enter · reduced-motion: pico=0 nome=none
+
+=== /hoje · contagem do número ===
+    movimento normal  valores distintos: 26 · 0h → 4h29 → 4h34 → … → 7h30
+                       final: 7h30 · aria-label do anel: Última noite: 7h30, 94% da meta
+    reduced-motion    valores distintos: 1 · 7h30
+                       final: 7h30 · aria-label do anel: Última noite: 7h30, 94% da meta
+ok   contagem       conta no movimento normal, nasce no valor final com reduced-motion
+
+Todas as animações ligam no movimento normal e desligam com prefers-reduced-motion.

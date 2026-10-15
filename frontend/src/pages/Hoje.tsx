@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import type { Goal, SleepLogPage } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import { Button, Card, EmptyState, ErrorState, Ring, Skeleton } from '../components/ui';
+import { useCountUp } from '../hooks/useCountUp';
 import { formatHours } from '../lib/dashboard';
 import {
   barrasDaSemana,
@@ -165,6 +166,16 @@ export default function Hoje() {
     carregar();
   }, [carregar]);
 
+  // Derivações puras movidas para antes dos returns: os hooks (a contagem do
+  // número) precisam rodar em toda renderização, inclusive no carregamento e
+  // no erro (issue #216).
+  const meta = normalizarMeta(dados?.meta);
+  const logs = dados?.ultimoLog ?? [];
+  const noite = ultimaNoite(logs, meta.minutos, fuso);
+  // Contagem curta do número de destaque: só apresentação, o valor real é
+  // `noite.minutos` (que continua no aria-label do anel).
+  const horasContadas = useCountUp(noite ? noite.minutos / 60 : 0);
+
   if (estado === 'carregando') {
     return (
       <div style={telaStyle}>
@@ -201,9 +212,6 @@ export default function Hoje() {
     );
   }
 
-  const meta = normalizarMeta(dados?.meta);
-  const logs = dados?.ultimoLog ?? [];
-  const noite = ultimaNoite(logs, meta.minutos, fuso);
   const resumo = dados?.resumo ?? null;
   const temDadosNaSemana = (resumo?.daily ?? []).length > 0;
   const barras = barrasDaSemana(resumo, meta.minutos / 60, new Date(), fuso);
@@ -237,7 +245,7 @@ export default function Hoje() {
             >
               <span style={centroRingStyle}>
                 <span className="display-number" style={{ ...duracaoStyle, fontSize: '42px' }}>
-                  {formatHours(noite.minutos / 60)}
+                  {formatHours(horasContadas)}
                 </span>
                 <span style={porcentagemStyle}>
                   {noite.porcentagem}% da meta de {Math.round(meta.minutos / 60)}h
@@ -300,6 +308,7 @@ export default function Hoje() {
             {barras.map((barra) => (
               <div key={barra.date} style={colunaStyle}>
                 <span
+                  className="ui-bar-grow"
                   style={{
                     ...barraStyle(barra.cor),
                     height: `${barra.altura}%`,

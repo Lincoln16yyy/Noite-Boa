@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import './ui.css';
 
 export type RingTone = 'accent' | 'within' | 'below';
@@ -43,7 +43,18 @@ export default function Ring({
     .join(' ');
 
   return (
-    <div className="ui-ring" style={{ width: size, height: size }}>
+    <div
+      className="ui-ring"
+      style={
+        {
+          width: size,
+          height: size,
+          // Circunferência "vazia" para o keyframe da animação de preenchimento
+          // (issue #216) saber de onde começar, sem tocar no atributo do arco.
+          '--ui-ring-cheio': circumference,
+        } as CSSProperties
+      }
+    >
       <svg
         className="ui-ring__svg"
         viewBox={`0 0 ${size} ${size}`}
