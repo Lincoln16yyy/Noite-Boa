@@ -68,6 +68,12 @@ const blocosGridStyle: CSSProperties = {
   gap: '0.75rem',
 };
 
+const formStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+};
+
 const blocoStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
@@ -168,7 +174,6 @@ export default function Registrar() {
     if (saving) return; // guarda extra contra duplo envio (#99)
     setError('');
     setSuccess('');
-
     const form = { sleepStart, sleepEnd, quality, notes };
     const problem = validateSleepForm(form);
     if (problem) {
@@ -217,52 +222,61 @@ export default function Registrar() {
         </p>
       </Card>
 
-      {/* Blocos grandes de horário: <label> envolvendo datetime-local real */}
-      <div style={blocosGridStyle}>
-        {(
-          [
-            { etiqueta: 'Dormiu às', valor: sleepStart, set: setSleepStart },
-            { etiqueta: 'Acordou às', valor: sleepEnd, set: setSleepEnd },
-          ] as const
-        ).map(({ etiqueta, valor, set }) => (
-          <label key={etiqueta} className="bloco-horario" style={blocoStyle}>
-            <span className="overline">{etiqueta}</span>
-            <span style={blocoHoraStyle}>{horaVisivel(valor)}</span>
-            <span style={blocoLegendaStyle}>{valor ? rotuloDiaRelativo(dataVisivel(valor), hojeIso) : '—'}</span>
-            <input
-              type="datetime-local"
-              aria-label={etiqueta}
-              className="bloco-horario__input"
-              value={valor}
-              onChange={(e) => {
-                digitouRef.current = true;
-                set(e.target.value);
-              }}
-              required
-            />
-          </label>
-        ))}
-      </div>
+      {/* Formulário: Enter nos campos também salva; o botão é type=submit */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void handleSalvar();
+        }}
+        style={formStyle}
+      >
+        {/* Blocos grandes de horário: <label> envolvendo datetime-local real */}
+        <div style={blocosGridStyle}>
+          {(
+            [
+              { etiqueta: 'Dormiu às', valor: sleepStart, set: setSleepStart },
+              { etiqueta: 'Acordou às', valor: sleepEnd, set: setSleepEnd },
+            ] as const
+          ).map(({ etiqueta, valor, set }) => (
+            <label key={etiqueta} className="bloco-horario" style={blocoStyle}>
+              <span className="overline">{etiqueta}</span>
+              <span style={blocoHoraStyle}>{horaVisivel(valor)}</span>
+              <span style={blocoLegendaStyle}>{valor ? rotuloDiaRelativo(dataVisivel(valor), hojeIso) : '—'}</span>
+              <input
+                type="datetime-local"
+                aria-label={etiqueta}
+                className="bloco-horario__input"
+                value={valor}
+                onChange={(e) => {
+                  digitouRef.current = true;
+                  set(e.target.value);
+                }}
+                required
+              />
+            </label>
+          ))}
+        </div>
 
-      {/* Qualidade: radiogroup de cinco opções (selecionada em Âmbar) */}
-      <QualitySelector value={quality} onChange={setQuality} legend="Qualidade do sono" errorId={error ? 'quality-error' : undefined} />
+        {/* Qualidade: radiogroup de cinco opções (selecionada em Âmbar) */}
+        <QualitySelector value={quality} onChange={setQuality} legend="Qualidade do sono" errorId={error ? 'quality-error' : undefined} />
 
-      <label style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-        Observação (opcional)
-        <textarea
-          rows={3}
-          maxLength={2000}
-          placeholder="Ex.: acordei só uma vez"
-          className="field"
-          style={{ minHeight: '80px', resize: 'vertical' }}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-      </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+          Observação (opcional)
+          <textarea
+            rows={3}
+            maxLength={2000}
+            placeholder="Ex.: acordei só uma vez"
+            className="field"
+            style={{ minHeight: '80px', resize: 'vertical' }}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+        </label>
 
-      <Button variant="primary" size="md" disabled={saving} style={{ width: '100%' }} onClick={handleSalvar}>
-        {saving ? 'Salvando…' : 'Salvar registro'}
-      </Button>
+        <Button type="submit" variant="primary" size="md" disabled={saving} style={{ width: '100%' }}>
+          {saving ? 'Salvando…' : 'Salvar registro'}
+        </Button>
+      </form>
 
       {error && (
         <Card style={erroStyle}>
