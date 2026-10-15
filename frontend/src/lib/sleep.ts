@@ -7,7 +7,7 @@
 // os horários de parede digitados são interpretados e exibidos NELE — igual ao
 // agrupamento do back-end. Sem fuso, vale o do aparelho (comportamento antigo).
 
-import { formatarNoFuso, isoDateNoFuso, localInputNoFuso, menosDiasIso, parseNoFuso, partesNoFuso } from './fuso';
+import { formatarNoFuso, fusoDoAparelho, isoDateNoFuso, localInputNoFuso, menosDiasIso, parseNoFuso, partesNoFuso } from './fuso';
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 
@@ -135,6 +135,28 @@ export function formatarDuracaoLonga(minutos: number): string {
   const rest = total % 60;
   if (hours === 0) return `${rest}min`;
   return rest ? `${hours}h ${rest}min` : `${hours}h`;
+}
+
+/** 450 → "7h30"; 480 → "8h"; 45 → "45min" (formato compacto do histórico). */
+export function formatarDuracaoCurta(minutos: number): string {
+  const total = Math.max(0, Math.round(minutos));
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
+  if (hours === 0) return `${rest}min`;
+  return rest ? `${hours}h${pad(rest)}` : `${hours}h`;
+}
+
+/** ISO → 'HH:mm' de parede no fuso dado (intervalo do cartão do histórico). */
+export function formatarHora(iso: string, timeZone?: string): string {
+  if (!iso) return '--:--';
+  const { hora, minuto } = partesNoFuso(new Date(iso), timeZone ?? fusoDoAparelho());
+  return `${pad(hora)}:${pad(minuto)}`;
+}
+
+/** ISO → minutos entre dois instantes (0 se algum lado faltar). */
+export function minutosDoRegistro(inicioIso: string, fimIso: string): number {
+  if (!inicioIso || !fimIso) return 0;
+  return Math.max(0, Math.round((new Date(fimIso).getTime() - new Date(inicioIso).getTime()) / 60000));
 }
 
 /**

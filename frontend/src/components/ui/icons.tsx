@@ -121,5 +121,15 @@ export function TrashIcon(props: IconProps) {
   );
 }
 
+/** Lápis (editar). */
+export function PencilIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
 /** Tipo de um componente de ícone (para listas de navegação). */
 export type IconComponent = ComponentType<IconProps>;

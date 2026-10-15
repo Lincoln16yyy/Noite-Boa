@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatarDuracaoCurta,
   formatarDuracaoLonga,
   formatDuration,
   minutosEntre,
@@ -154,6 +155,13 @@ describe('duração ao vivo da tela Registrar (issue #212)', () => {
     expect(formatarDuracaoLonga(480)).toBe('8h');
     expect(formatarDuracaoLonga(45)).toBe('45min');
     expect(formatarDuracaoLonga(0)).toBe('0min');
+  });
+
+  it('formatarDuracaoCurta é o formato compacto do histórico', () => {
+    expect(formatarDuracaoCurta(450)).toBe('7h30');
+    expect(formatarDuracaoCurta(480)).toBe('8h');
+    expect(formatarDuracaoCurta(45)).toBe('45min');
+    expect(formatarDuracaoCurta(0)).toBe('0min');
   });
 
   it('porcentagemDaMeta corta em 100 e aceita meta zerada', () => {
