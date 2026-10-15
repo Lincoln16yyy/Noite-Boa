@@ -6,6 +6,7 @@ import {
   ListIcon,
   MoonIcon,
   MoreIcon,
+  PencilIcon,
   PlusIcon,
   StarIcon,
   TrashIcon,
@@ -22,6 +23,7 @@ const ICONE = [
   ['StarIcon', StarIcon],
   ['ClockIcon', ClockIcon],
   ['TrashIcon', TrashIcon],
+  ['PencilIcon', PencilIcon],
 ] as const;
 
 describe('Ícones SVG de traço (issue #209)', () => {

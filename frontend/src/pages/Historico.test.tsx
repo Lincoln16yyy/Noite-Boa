@@ -1,8 +1,13 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Historico from './Historico';
 import { renderWithAuth } from '../test/test-utils';
 import { localInputNoFuso } from '../lib/fuso';
+
+/** Data local (do aparelho) em 'YYYY-MM-DD' — para montar as noites do teste. */
+function isoLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function jsonResponse(body: any, status = 200) {
   return new Response(JSON.stringify(body), { status }) as any;
@@ -56,11 +61,29 @@ describe('tela de Histórico', () => {
     });
   });
 
-  it('lista as noites registradas com duração, nota e observação', async () => {
+  it('lista as noites registradas com duração, qualidade e observação', async () => {
     openScreen();
-    expect(await screen.findByText(/8h · nota 4/)).toBeInTheDocument();
+    expect(await screen.findByText('8h')).toBeInTheDocument();
+    expect(screen.getByText('Boa')).toBeInTheDocument();
     expect(screen.getByText('dormi bem')).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Paginação' })).toBeInTheDocument();
+  });
+
+  it('agrupa as noites por semana ("Esta semana" e "Semana passada") (#213)', async () => {
+    const hoje = new Date();
+    const destaSemana = new Date(hoje.getTime()); // hoje (sempre na semana atual)
+    const semanaPassada = new Date(hoje.getTime() - 8 * 86400000); // 8 dias atrás cai na semana anterior
+    state.logs = [
+      { id: 'agora', sleepStart: `${isoLocal(destaSemana)}T12:00:00.000Z`, sleepEnd: `${isoLocal(destaSemana)}T20:00:00.000Z`, quality: 5, notes: null },
+      { id: 'antiga', sleepStart: `${isoLocal(semanaPassada)}T12:00:00.000Z`, sleepEnd: `${isoLocal(semanaPassada)}T18:30:00.000Z`, quality: 2, notes: null },
+    ];
+    openScreen();
+
+    expect(await screen.findByText('Esta semana')).toBeInTheDocument();
+    expect(screen.getByText('Semana passada')).toBeInTheDocument();
+    // A noite de hoje aparece no grupo desta semana; a antiga, no outro.
+    expect(within(screen.getByLabelText('Esta semana')).getByText('Ótima')).toBeInTheDocument();
+    expect(within(screen.getByLabelText('Semana passada')).getByText('Ruim')).toBeInTheDocument();
   });
 
   it('exclui um registro depois da confirmação', async () => {
@@ -95,7 +118,13 @@ describe('tela de Histórico', () => {
       expect(body.quality).toBe(2);
       expect(body.sleepEnd).toBe(new Date('2026-10-08T08:00:00.000Z').toISOString());
     });
-    expect(await screen.findByText(/9h · nota 2/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole('progressbar', {
+        name: /Duração de 9h, 100% da meta de 8h/,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('9h')).toBeInTheDocument();
+    expect(screen.getByText('Ruim')).toBeInTheDocument();
   });
 
   it('desabilita o botão e mostra "Salvando…" durante o envio da edição (#99)', async () => {
@@ -149,7 +178,8 @@ describe('tela de Histórico', () => {
     });
 
     openScreen();
-    expect(await screen.findByText(/8h · nota 4/)).toBeInTheDocument();
+    expect(await screen.findByText('8h')).toBeInTheDocument();
+    expect(screen.getByText('Boa')).toBeInTheDocument();
     expect(screen.getByText(/Página 1 de 3/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Próxima' }));
@@ -165,11 +195,13 @@ describe('tela de Histórico', () => {
     // 2026-10-07T23:00Z: São Paulo = 07/10 20h00 · Tóquio = 08/10 08h00
     state.timezone = 'America/Sao_Paulo';
     openScreen();
-    expect(await screen.findByText('07/10 20h00 → 08/10 04h00')).toBeInTheDocument();
+    expect(await screen.findByText(/20:00 → 04:00/)).toBeInTheDocument();
+    expect(screen.getByText('Quarta, 07/10')).toBeInTheDocument();
 
     state.timezone = 'Asia/Tokyo';
     openScreen();
-    expect(await screen.findByText('08/10 08h00 → 08/10 16h00')).toBeInTheDocument();
+    expect(await screen.findByText(/08:00 → 16:00/)).toBeInTheDocument();
+    expect(screen.getByText('Quinta, 08/10')).toBeInTheDocument();
   });
 
   it('abre a edição e envia no fuso do perfil (issue #102)', async () => {
