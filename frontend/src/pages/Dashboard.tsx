@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import type { Goal, StatsSummary } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import { Card, Chip, EmptyState, ErrorState, ProgressBar, Skeleton } from '../components/ui';
+import { useCountUp } from '../hooks/useCountUp';
 import {
   barraConsistencia,
   buildDailySeries,
@@ -161,6 +162,10 @@ export default function Dashboard() {
   const divida = Math.max(0, Math.round(summary?.sleepDebtMinutes ?? 0));
   const consistencia = Math.round(summary?.consistencyMinutes ?? 0);
 
+  // Contagem curta do número de destaque (issue #216): só apresentação, o
+  // valor real continua em `summary.averageHours`.
+  const mediaContada = useCountUp(summary?.averageHours ?? 0);
+
   // Série das barras: dias do fuso do perfil (mesma série do back-end).
   const serie = buildDailySeries(summary, days, new Date(), fuso);
   const maiorNoite = serie.reduce((max, dia) => Math.max(max, dia.hours), 0);
@@ -229,7 +234,7 @@ export default function Dashboard() {
             <p className="overline" style={overlineStyle}>
               Média de {days} dias
             </p>
-            <p style={mediaNumeroStyle}>{formatHours(summary.averageHours ?? 0)}</p>
+            <p style={mediaNumeroStyle}>{formatHours(mediaContada)}</p>
             <p style={legendaStyle}>
               Meta de {formatHours(metaHoras)} · {falta > 0 ? `faltam ${falta} min por noite` : 'meta atingida'}
             </p>
@@ -247,6 +252,7 @@ export default function Dashboard() {
                   return (
                     <span
                       key={dia.date}
+                      className="ui-bar-grow"
                       style={{
                         ...barraStyle,
                         // Lavanda se ≥ meta, Âmbar se < meta (gradientes por tema).

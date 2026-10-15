@@ -70,11 +70,14 @@ describe('tela Hoje (issue #210)', () => {
     abrirHoje();
 
     expect(await screen.findByText('Última noite')).toBeInTheDocument();
-    // 7h36 = 456 min; meta 480 → 95%
-    expect(screen.getByText('7h36')).toBeInTheDocument();
+    // 7h36 = 456 min; meta 480 → 95%. O número de destaque conta do zero até
+    // o final (issue #216), então o valor final chega depois da montagem.
+    expect(await screen.findByText('7h36')).toBeInTheDocument();
     expect(screen.getByText('95% da meta de 8h')).toBeInTheDocument();
     // 22:00Z = 19:00 em São Paulo; 05:36Z = 02:36
     expect(screen.getByText('Dormiu 19:00 · Acordou 02:36')).toBeInTheDocument();
+    // O nome acessível do anel usa o valor real desde o primeiro render — só a
+    // apresentação anima, o leitor de tela nunca ouve a contagem.
     expect(screen.getByRole('img', { name: /Última noite: 7h36, 95% da meta/ })).toBeInTheDocument();
   });
 
