@@ -53,7 +53,7 @@ export default function QualitySelector({
 
   return (
     <fieldset style={fieldsetStyle} role="radiogroup" aria-labelledby={`${groupId}-legend`} aria-describedby={errorId}>
-      <legend id={`${groupId}-legend`} style={legendStyle}>
+      <legend id={`${groupId}-legend`} className="overline" style={legendStyle}>
         {legend}
       </legend>
       <div style={groupStyle} role="radiogroup" aria-labelledby={`${groupId}-legend`}>
@@ -70,7 +70,7 @@ export default function QualitySelector({
               aria-label={`${option.label} (${option.value})`}
             />
             <span style={buttonStyle(option.value === value)}>
-              <span style={{ fontSize: '18px', fontWeight: 800, lineHeight: 1, display: 'block' }}>
+              <span style={{ fontSize: '22px', fontWeight: 800, lineHeight: 1, display: 'block' }}>
                 {option.shortLabel}
               </span>
               <span style={{ fontSize: '11px', fontWeight: 400, opacity: 0.7, marginTop: '2px', textAlign: 'center', overflowWrap: 'anywhere', lineHeight: 1.1 }}>
@@ -91,10 +91,9 @@ const fieldsetStyle: CSSProperties = {
 };
 
 const legendStyle: CSSProperties = {
-  fontSize: '15px',
-  fontWeight: 700,
-  marginBottom: '0.5rem',
-  color: 'var(--color-noite)',
+  // Rótulo (overline) do sistema v2: cor de texto do tema — no modo escuro o
+  // antigo `--color-noite` ficava invisível sobre o fundo (issue #212).
+  margin: '0 0 0.5rem',
 };
 
 const groupStyle: CSSProperties = {
@@ -132,12 +131,12 @@ const buttonStyle = (selected: boolean): CSSProperties => ({
   fontSize: '13px',
   fontWeight: selected ? 700 : 400,
   borderRadius: '12px',
-  // Tokens de TEMA (não a cor fixa da marca): no modo escuro a pílula inativa
-  // acompanha o fundo em vez de continuar branca (#158).
-  border: selected ? '2px solid var(--color-indigo)' : '1px solid var(--input-border)',
-  background: selected ? 'var(--color-luar)' : 'var(--input-bg)',
-  color: selected ? 'var(--color-noite)' : 'var(--text-primary)',
+  // Selecionada em Âmbar (regra da seção 5): --accent é Âmbar nos dois
+  // temas e --accent-text é o texto escuro sobre ele.
+  border: selected ? '2px solid var(--accent)' : '1px solid var(--input-border)',
+  background: selected ? 'var(--accent)' : 'var(--input-bg)',
+  color: selected ? 'var(--accent-text)' : 'var(--text-primary)',
   cursor: 'pointer',
   transition: 'all 0.15s ease',
-  boxShadow: selected ? '0 2px 8px rgba(63, 60, 187, 0.25)' : 'none',
+  boxShadow: selected ? '0 2px 8px rgba(21, 20, 46, 0.35)' : 'none',
 });

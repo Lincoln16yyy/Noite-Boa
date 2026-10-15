@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Registrar from './Registrar';
 import { renderWithAuth } from '../test/test-utils';
@@ -82,7 +83,51 @@ describe('tela de Registrar sono', () => {
       notes: 'dormi bem',
     });
     expect(await screen.findByText(/dormi bem/)).toBeInTheDocument();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4)); // /me + lista inicial + POST + lista atualizada
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5)); // /me + /goal + lista inicial + POST + lista atualizada
+  });
+
+  it('mostra a duração ao vivo e a % da meta conforme os horários mudam (#212)', async () => {
+    openScreen();
+    // Padrões inteligentes trazem uma duração válida qualquer que seja o horário.
+    await screen.findByLabelText('Dormiu às');
+    fireEvent.change(screen.getByLabelText('Dormiu às'), { target: { value: '2026-10-07T23:10' } });
+    fireEvent.change(screen.getByLabelText('Acordou às'), { target: { value: '2026-10-08T06:40' } });
+
+    // 23:10 → 06:40 = 7h30 = 450 min; meta padrão do mock (/goal ausente) = 480 → 94%
+    expect(screen.getByText('7h 30min')).toBeInTheDocument();
+    expect(screen.getByText('Meta de 8h · 94%')).toBeInTheDocument();
+    // O rótulo do dia acompanha a data digitada (07/10 é uma data antiga).
+    expect(screen.getByText('07/10')).toBeInTheDocument();
+  });
+
+  it('mostra "—" enquanto os horários não formam uma duração válida', async () => {
+    openScreen();
+    fireEvent.change(await screen.findByLabelText('Dormiu às'), { target: { value: '2026-10-08T08:00' } });
+    fireEvent.change(screen.getByLabelText('Acordou às'), { target: { value: '2026-10-08T07:00' } });
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByText('Preencha os horários para ver a duração')).toBeInTheDocument();
+  });
+
+  it('navega a qualidade pelo teclado (setas) — radiogroup nativo (#212)', async () => {
+    const usuario = userEvent.setup();
+    openScreen();
+
+    // Foco na primeira opção; as setas percorrem o grupo (comportamento
+    // nativo do radiogroup — jsdom não implementa setas, daí o user-event).
+    const pessima = await screen.findByRole('radio', { name: 'Péssima (1)' });
+    pessima.focus();
+    expect(pessima).toHaveFocus();
+
+    await usuario.keyboard('{ArrowRight}');
+    expect(await screen.findByRole('radio', { name: 'Ruim (2)' })).toBeChecked();
+
+    // Seta para a esquerda volta uma casa.
+    await usuario.keyboard('{ArrowLeft}');
+    expect(await screen.findByRole('radio', { name: 'Péssima (1)' })).toBeChecked();
+
+    // Quatro setas para a direita chegam à 5 (o grupo é circular).
+    await usuario.keyboard('{ArrowRight>4/}');
+    expect(await screen.findByRole('radio', { name: 'Ótima (5)' })).toBeChecked();
   });
 
   it('bloqueia acordar antes de dormir', async () => {
