@@ -2,13 +2,19 @@
 // Uso: node screenshots.mjs   (veja .claude/skills/verificar-visual/SKILL.md)
 import fs from 'node:fs';
 import puppeteer from 'puppeteer-core';
-import { mocks, telas } from './mocks.mjs';
+import { mocks, mocksVazio, telas } from './mocks.mjs';
 
 const BASE = process.env.BASE_URL || 'http://localhost:4173';
 const API_PORT = process.env.API_PORT || '8080'; // porta que o front chama (VITE_API_URL)
 const ONLY = (process.env.ONLY || '').split(',').map((s) => s.trim()).filter(Boolean);
 const TEMA = process.env.THEME || ''; // '' (padrão), 'dark' ou 'light'
+const ESTADO = process.env.ESTADO || 'ok'; // 'ok' (padrão), 'vazio', 'carregando' ou 'erro'
 const OUT = new URL('./out/', import.meta.url).pathname;
+
+if (!['ok', 'vazio', 'carregando', 'erro'].includes(ESTADO)) {
+  console.error(`ESTADO inválido: ${ESTADO}. Use ok, vazio, carregando ou erro.`);
+  process.exit(1);
+}
 
 async function lancarNavegador() {
   if (process.env.CHROME_PATH) {
@@ -45,9 +51,24 @@ for (const [vpNome, vp] of viewports) {
         if (!req.headers().authorization) {
           return req.respond({ status: 401, contentType: 'application/json', headers: cors, body: '{"detail":"não autenticado"}' });
         }
-        const corpo = mocks[u.pathname.replace(/^\/api/, '')];
+        const caminho = u.pathname.replace(/^\/api/, '');
+        // O /me é a sessão: se ele falhar ou travar, o AuthContext derruba a
+        // sessão e o app redireciona para o login — aí a foto não mostra o
+        // estado que queremos. Ele sempre responde na hora, com o mock normal.
+        const ehSessao = caminho === '/me';
+        if (!ehSessao && ESTADO === 'erro') {
+          return req.respond({ status: 500, contentType: 'application/json', headers: cors, body: '{"detail":"algo quebrou no servidor"}' });
+        }
+        const fonte = ESTADO === 'vazio' ? mocksVazio : mocks;
+        const corpo = fonte[caminho];
         if (corpo !== undefined) {
-          return req.respond({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corpo) });
+          // No modo 'carregando' segura a resposta dos dados para o esqueleto
+          // da tela aparecer (o /me já respondeu e a sessão está de pé).
+          const segurar = !ehSessao && ESTADO === 'carregando';
+          const espera = segurar ? new Promise((r) => setTimeout(r, 30000)) : Promise.resolve();
+          return espera.then(() =>
+            req.respond({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corpo) }),
+          );
         }
         return req.respond({ status: 404, contentType: 'application/json', headers: cors, body: '{"detail":"mock não definido"}' });
       }
@@ -56,10 +77,14 @@ for (const [vpNome, vp] of viewports) {
     if (precisaLogin) await page.evaluateOnNewDocument(() => localStorage.setItem('token', 'fake.jwt.token'));
     if (TEMA) await page.evaluateOnNewDocument((tema) => localStorage.setItem('noiteboa.theme', tema), TEMA);
     try {
-      await page.goto(BASE + caminho, { waitUntil: 'networkidle0', timeout: 20000 });
+      // No modo 'carregando' as respostas ficam seguras, então o networkidle0
+      // nunca assenta: esperamos só o documento e fotografamos o esqueleto.
+      const esperaRede = ESTADO === 'carregando' ? 'domcontentloaded' : 'networkidle0';
+      await page.goto(BASE + caminho, { waitUntil: esperaRede, timeout: 20000 });
       await new Promise((r) => setTimeout(r, 600));
-      await page.screenshot({ path: `${OUT}${vpNome}-${nome}${TEMA ? `-${TEMA}` : ''}.png`, fullPage: true });
-      console.log('ok  ', vpNome, nome, TEMA);
+      const sufixo = [ESTADO !== 'ok' ? ESTADO : '', TEMA].filter(Boolean).join('-');
+      await page.screenshot({ path: `${OUT}${vpNome}-${nome}${sufixo ? `-${sufixo}` : ''}.png`, fullPage: true });
+      console.log('ok  ', vpNome, nome, sufixo || 'ok');
     } catch (e) {
       falhas += 1;
       console.log('FALHA', vpNome, nome, e.message);

@@ -275,6 +275,129 @@
   color: var(--color-erro-texto);
 }
 
+/* ===== Skeleton (carregamento — issue #214, seção 6 do guia) =====
+   Brilho suave varrendo o bloco; o fundo usa os tokens de superfície,
+   então funciona nos dois temas. */
+.ui-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface) 0%,
+    var(--progress-track) 50%,
+    var(--surface) 100%
+  );
+  background-size: 200% 100%;
+  animation: ui-skeleton-brilho 1.4s ease-in-out infinite;
+}
+
+@keyframes ui-skeleton-brilho {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ===== EmptyState (vazio — issue #214, seção 6 do guia) ===== */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+}
+
+/* Vazio de lista: sem ilustração, alinhado à esquerda (a lista é à esquerda)
+   e mais enxuto. */
+.ui-empty--sm {
+  align-items: flex-start;
+  text-align: left;
+  padding: var(--space-3) var(--space-2);
+}
+
+.ui-empty--sm .ui-empty__illustration {
+  display: none;
+}
+
+/* A lua se inverte por tema: Lavanda sobre Noite (escuro) e Índigo sobre
+   Névoa (claro) — Lavanda no claro quase não aparece. Mesmo fallback do
+   tokens.css para quem não escolheu tema explicitamente. */
+.ui-empty__moon {
+  fill: var(--color-indigo);
+}
+
+[data-theme='dark'] .ui-empty__moon {
+  fill: var(--color-lavanda);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .ui-empty__moon {
+    fill: var(--color-lavanda);
+  }
+}
+
+/* Olhos: cor do fundo da lua (sem contraste com ela mesma não lê). */
+.ui-empty__face {
+  stroke: var(--color-nevoa);
+}
+
+[data-theme='dark'] .ui-empty__face {
+  stroke: var(--color-noite);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .ui-empty__face {
+    stroke: var(--color-noite);
+  }
+}
+
+/* "z z z": fica sobre o fundo da página, então segue o texto secundário. */
+.ui-empty__z {
+  stroke: var(--text-secondary);
+}
+
+.ui-empty__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ui-empty__description {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.ui-empty__action {
+  margin-top: var(--space-2);
+}
+
+/* ===== ErrorState (erro — issue #214, seção 6 do guia) ===== */
+.ui-state-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--alert-error-border);
+  border-radius: var(--surface-radius);
+  background: var(--alert-error-bg);
+}
+
+.ui-state-error__message {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--alert-error-text);
+}
+
+.ui-state-error__detail {
+  margin: 0;
+  font-size: 14px;
+  color: var(--alert-error-text);
+  opacity: 0.85;
+}
+
 /* Movimento: respeita prefers-reduced-motion (seção 6 do guia) */
 @media (prefers-reduced-motion: reduce) {
   .ui-btn,
@@ -295,5 +418,9 @@
     animation: none;
     border-top-color: currentColor;
     opacity: 0.5;
+  }
+
+  .ui-skeleton {
+    animation: none;
   }
 }

@@ -61,3 +61,19 @@ export const telas = [
   ['home-conta-excluida', '/?deleted=true', false],
   ['privacidade', '/privacidade', false],
 ];
+
+// ===== Simulação de estados (issue #214) =====
+// 'ok' (padrão) devolve os dados fictícios acima. Os outros modos servem para
+// tirar prints dos estados de vazio, carregando e erro sem tocar na API.
+export const ESTADOS = ['ok', 'vazio', 'carregando', 'erro'];
+
+/** Dados no formato de uma resposta vazia (nenhuma noite, nenhum amigo). */
+export const mocksVazio = {
+  '/me': me,
+  '/goal': { targetMinutes: 480, bedtime: '23:00:00', wakeTime: '07:00:00' },
+  '/stats/summary': { days: 7, averageHours: 0, consistencyMinutes: 0, sleepDebtMinutes: 0, daily: [] },
+  '/sleep-logs': { content: [], totalPages: 0, totalElements: 0, number: 0, size: 20 },
+  '/friends': [],
+  '/friends/requests': { sent: [], received: [] },
+  '/friends/ranking': { days: 7, ranking: [] },
+};

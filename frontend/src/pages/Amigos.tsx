@@ -3,7 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react';
 import { api } from '../api/client';
 import type { Friend, FriendRequests, RankingEntry, SendResult, User } from '../api/types';
 import LoadingWarning from '../components/LoadingWarning';
-import { Button, Chip, Field } from '../components/ui';
+import { Button, Chip, EmptyState, ErrorState, Field, Skeleton } from '../components/ui';
 
 const cardStyle = {
   background: 'var(--card-bg)',
@@ -105,7 +105,16 @@ export default function Amigos() {
 
   if (loading) return (
     <>
-      <p>Carregando…</p>
+      <Skeleton height={20} width="35%" />
+      <Skeleton height={56} style={{ marginTop: '1rem' }} />
+      <Skeleton height={56} style={{ marginTop: '0.5rem' }} />
+      <Skeleton height={56} style={{ marginTop: '0.5rem' }} />
+      <p
+        style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' }}
+        role="status"
+      >
+        Carregando…
+      </p>
       <LoadingWarning isLoading={true} />
     </>
   );
@@ -162,14 +171,7 @@ export default function Amigos() {
         </p>
       </section>
 
-      {error && (
-        <div role="alert" style={{ ...cardStyle, borderColor: 'var(--color-erro)', marginBottom: '0.75rem' }}>
-          <p style={{ marginTop: 0, color: 'var(--color-erro-texto)' }}>{error}</p>
-          <Button variant="secondary" onClick={() => carregar(dias)}>
-            Tentar novamente
-          </Button>
-        </div>
-      )}
+      {error && <ErrorState message="Não foi possível completar a ação." detail={error} onRetry={() => carregar(dias)} />}
       {success && (
         <p role="status" style={{ color: 'var(--color-sucesso-texto)' }}>
           {success}
@@ -178,7 +180,9 @@ export default function Amigos() {
 
       <section aria-label="Convites recebidos" style={{ marginBottom: '1.5rem' }}>
         <h2 style={{ fontSize: '18px' }}>Convites recebidos</h2>
-        {(convites.received ?? []).length === 0 && <p style={mutedTextStyle}>Nenhum convite recebido.</p>}
+        {(convites.received ?? []).length === 0 && (
+          <EmptyState size="sm" title="Nenhum convite recebido." />
+        )}
         {(convites.received ?? []).map((convite) => (
           <div key={convite.id} style={cardStyle}>
             <div style={rowStyle}>
@@ -212,7 +216,9 @@ export default function Amigos() {
 
       <section aria-label="Convites enviados" style={{ marginBottom: '1.5rem' }}>
         <h2 style={{ fontSize: '18px' }}>Convites enviados</h2>
-        {(convites.sent ?? []).length === 0 && <p style={mutedTextStyle}>Nenhum convite enviado.</p>}
+        {(convites.sent ?? []).length === 0 && (
+          <EmptyState size="sm" title="Nenhum convite enviado." />
+        )}
         {(convites.sent ?? []).map((convite) => (
           <div key={convite.id} style={cardStyle}>
             <div style={rowStyle}>
@@ -236,7 +242,9 @@ export default function Amigos() {
 
       <section aria-label="Meus amigos" style={{ marginBottom: '1.5rem' }}>
         <h2 style={{ fontSize: '18px' }}>Meus amigos</h2>
-        {amigos.length === 0 && <p style={mutedTextStyle}>Você ainda não tem amigos aceitos.</p>}
+        {amigos.length === 0 && (
+          <EmptyState size="sm" title="Você ainda não tem amigos aceitos." />
+        )}
         {amigos.map((amigo) => (
           <div key={amigo.id} style={cardStyle}>
             <div style={rowStyle}>
@@ -280,6 +288,13 @@ export default function Amigos() {
           Só entram quem é amigo aceito e compartilhou suas noites registradas. O ranking mostra apenas quantas noites
           você registrou e em que porcentagem dos dias — nunca horários ou durações.
         </p>
+        {ranking.length === 0 && (
+          <EmptyState
+            size="sm"
+            title="Ninguém no ranking ainda."
+            description="Convide alguém e peça para ativar o compartilhamento: o ranking aparece assim que a primeira pessoa aceitar."
+          />
+        )}
         {ranking.map((linha, index) => (
           <div key={linha.userId} style={cardStyle}>
             <div style={rowStyle}>
