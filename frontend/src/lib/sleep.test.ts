@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { formatDuration, smartDefaults, toApiPayload, validateSleepForm } from './sleep';
+import {
+  formatarDuracaoLonga,
+  formatDuration,
+  minutosEntre,
+  porcentagemDaMeta,
+  rotuloDiaRelativo,
+  smartDefaults,
+  toApiPayload,
+  validateSleepForm,
+} from './sleep';
 
 describe('smartDefaults', () => {
   it('usa ontem 23:00 e hoje 07:00 durante o dia', () => {
@@ -120,5 +129,42 @@ describe('fuso do perfil (issue #102)', () => {
     const payload = toApiPayload({ sleepStart: '2026-01-09T23:00', sleepEnd: '2026-01-10T07:00', quality: 4, notes: null });
     expect(payload.sleepStart).toBe(new Date('2026-01-09T23:00').toISOString());
     expect(payload.sleepEnd).toBe(new Date('2026-01-10T07:00').toISOString());
+  });
+});
+
+describe('duração ao vivo da tela Registrar (issue #212)', () => {
+  it('minutosEntre calcula no fuso do perfil, não no do aparelho', () => {
+    // 09/01 23:00 → 10/01 07:00 em Tóquio = 8h
+    expect(minutosEntre('2026-01-09T23:00', '2026-01-10T07:00', 'Asia/Tokyo')).toBe(480);
+    // os mesmos valores em São Paulo também são 8h (a duração não muda),
+    // mas o instante sim — o que importa é não depender do fuso do aparelho
+    expect(minutosEntre('2026-01-09T23:00', '2026-01-10T07:00', 'America/Sao_Paulo')).toBe(480);
+  });
+
+  it('minutosEntre devolve null com lado faltando, inválido ou invertido', () => {
+    expect(minutosEntre('', '2026-01-10T07:00', 'UTC')).toBeNull();
+    expect(minutosEntre('2026-01-09T23:00', '', 'UTC')).toBeNull();
+    expect(minutosEntre('lixo', '2026-01-10T07:00', 'UTC')).toBeNull();
+    // acordar antes de dormir não tem duração
+    expect(minutosEntre('2026-01-10T07:00', '2026-01-09T23:00', 'UTC')).toBeNull();
+  });
+
+  it('formatarDuracaoLonga usa o formato do mockup', () => {
+    expect(formatarDuracaoLonga(450)).toBe('7h 30min'); // 7h30 do mockup
+    expect(formatarDuracaoLonga(480)).toBe('8h');
+    expect(formatarDuracaoLonga(45)).toBe('45min');
+    expect(formatarDuracaoLonga(0)).toBe('0min');
+  });
+
+  it('porcentagemDaMeta corta em 100 e aceita meta zerada', () => {
+    expect(porcentagemDaMeta(450, 480)).toBe(94);
+    expect(porcentagemDaMeta(600, 480)).toBe(100);
+    expect(porcentagemDaMeta(100, 0)).toBe(0);
+  });
+
+  it('rotuloDiaRelativo marca hoje/ontem e usa dd/MM no resto', () => {
+    expect(rotuloDiaRelativo('2026-01-10', '2026-01-10')).toBe('hoje');
+    expect(rotuloDiaRelativo('2026-01-09', '2026-01-10')).toBe('ontem');
+    expect(rotuloDiaRelativo('2026-01-08', '2026-01-10')).toBe('08/01');
   });
 });

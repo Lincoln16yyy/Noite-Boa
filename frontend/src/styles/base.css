@@ -374,3 +374,28 @@ header nav a {
 .display-lg { font-size: var(--fs-display-lg); }
 .display-md { font-size: var(--fs-display-md); }
 .display-sm { font-size: var(--fs-display-sm); }
+
+/* ===== Bloco de horário (tela Registrar, issue #212) =====
+   O <label> mostra o horário grande; o input datetime-local real fica por
+   cima, invisível, para o seletor nativo e o teclado continuarem
+   funcionando. O anel de foco aparece no bloco (o input é transparente). */
+.bloco-horario {
+  position: relative;
+  cursor: pointer;
+}
+
+.bloco-horario__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.bloco-horario:has(.bloco-horario__input:focus-visible) {
+  outline: 2px solid var(--color-ambar);
+  outline-offset: 2px;
+}

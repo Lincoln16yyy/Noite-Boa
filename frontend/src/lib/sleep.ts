@@ -107,6 +107,56 @@ export function formatDuration(startIso: string, endIso: string): string {
   return rest ? `${signal}${hours}h${pad(rest)}m` : `${signal}${hours}h`;
 }
 
+/** Formato de `datetime-local` (`YYYY-MM-DDTHH:mm`) — o que o formulário entrega. */
+const FORMATO_DATETIME_LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u;
+
+/**
+ * Minutos entre dois valores `datetime-local` do formulário (issue #212).
+ * Com `timeZone`, os horários de parede são interpretados no fuso do perfil
+ * (mesma regra do payload). Devolve `null` quando algum lado falta, é
+ * inválido, não está no formato do input ou quando o fim não é depois do
+ * início (acordar antes de dormir não tem duração) — a tela mostra "—" em
+ * vez de uma duração falsa.
+ */
+export function minutosEntre(inicio: string, fim: string, timeZone?: string): number | null {
+  if (!inicio || !fim) return null;
+  if (!FORMATO_DATETIME_LOCAL.test(inicio) || !FORMATO_DATETIME_LOCAL.test(fim)) return null;
+  const start = timeZone ? parseNoFuso(inicio, timeZone) : new Date(inicio);
+  const end = timeZone ? parseNoFuso(fim, timeZone) : new Date(fim);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  const minutos = (end.getTime() - start.getTime()) / 60000;
+  return minutos > 0 ? minutos : null;
+}
+
+/** 456 → "7h 36min"; 45 → "45min"; 120 → "2h" (formato do mockup). */
+export function formatarDuracaoLonga(minutos: number): string {
+  const total = Math.max(0, Math.round(minutos));
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
+  if (hours === 0) return `${rest}min`;
+  return rest ? `${hours}h ${rest}min` : `${hours}h`;
+}
+
+/**
+ * Porcentagem da meta, cortada em 100 (mesma regra do anel da tela Hoje).
+ * Meta inválida/zerada → 0.
+ */
+export function porcentagemDaMeta(minutos: number, metaMinutos: number): number {
+  if (!metaMinutos || metaMinutos <= 0) return 0;
+  return Math.min(100, Math.round((minutos / metaMinutos) * 100));
+}
+
+/**
+ * Rótulo relativo do dia de um registro ('hoje', 'ontem' ou 'dd/MM'),
+ * pela data ISO (`YYYY-MM-DD`) no fuso do perfil — issue #212.
+ */
+export function rotuloDiaRelativo(isoDate: string, hojeIso: string): string {
+  if (isoDate === hojeIso) return 'hoje';
+  if (isoDate === menosDiasIso(hojeIso, 1)) return 'ontem';
+  const [, mes, dia] = isoDate.split('-');
+  return `${dia}/${mes}`;
+}
+
 const twoDigits = (n: number): string => String(n).padStart(2, '0');
 
 export function formatLocal(iso: string, timeZone?: string): string {
