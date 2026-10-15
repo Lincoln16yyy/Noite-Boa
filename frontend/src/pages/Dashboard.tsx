@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Goal, StatsSummary } from '../api/types';
 import { useAuth } from '../context/AuthContext';
-import { Button, Card, Chip, ProgressBar } from '../components/ui';
+import { Card, Chip, EmptyState, ErrorState, ProgressBar, Skeleton } from '../components/ui';
 import {
   barraConsistencia,
   buildDailySeries,
@@ -125,20 +125,6 @@ const metricaDicaStyle: CSSProperties = {
   lineHeight: 1.45,
 };
 
-const erroStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.75rem',
-  alignItems: 'flex-start',
-};
-
-const vazioStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.5rem',
-  alignItems: 'flex-start',
-};
-
 export default function Dashboard() {
   const { user } = useAuth();
   const fuso = user?.timezone ?? 'America/Sao_Paulo';
@@ -203,37 +189,38 @@ export default function Dashboard() {
       </div>
 
       {status === 'carregando' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-          <p>Carregando…</p>
+        <>
+          <Card>
+            <Skeleton height={12} width="35%" />
+            <Skeleton height={56} width="45%" style={{ marginTop: '0.5rem' }} />
+            <Skeleton height={14} width="60%" style={{ marginTop: '0.5rem' }} />
+            <Skeleton height={140} style={{ marginTop: '1.25rem' }} />
+          </Card>
+          <p style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' }} role="status">
+            Carregando…
+          </p>
           <LoadingWarning isLoading={true} />
-        </div>
+        </>
       )}
 
       {status === 'erro' && (
-        <Card>
-          <div style={erroStyle} role="alert">
-            <p style={{ margin: 0 }}>Não foi possível carregar as estatísticas: {errorMessage}</p>
-            <Button variant="secondary" onClick={() => load()}>
-              Tentar novamente
-            </Button>
-          </div>
-        </Card>
+        <ErrorState
+          message="Não foi possível carregar as estatísticas."
+          detail={errorMessage}
+          onRetry={() => load()}
+        />
       )}
 
       {status === 'pronto' && (!summary?.daily || summary.daily.length === 0) && (
-        <Card>
-          <div style={vazioStyle}>
-            <p style={{ margin: 0, fontSize: '17px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Sem dados nos últimos {days} dias.
-            </p>
-            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-              Registre uma noite de sono para ver sua média, consistência e dívida de sono.
-            </p>
+        <EmptyState
+          title={`Sem dados nos últimos ${days} dias.`}
+          description="Registre uma noite de sono para ver sua média, consistência e dívida de sono."
+          action={
             <Link to="/registrar" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>
               Registrar uma noite →
             </Link>
-          </div>
-        </Card>
+          }
+        />
       )}
 
       {status === 'pronto' && summary?.daily && summary.daily.length > 0 && (

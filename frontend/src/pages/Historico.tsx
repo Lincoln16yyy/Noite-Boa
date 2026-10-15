@@ -17,8 +17,8 @@ import { agruparPorSemana, rotuloNoite } from '../lib/historico';
 import { normalizarMeta } from '../lib/hoje';
 import LoadingWarning from '../components/LoadingWarning';
 import QualitySelector from '../components/QualitySelector';
-import { Button, Card, Field, IconButton, ProgressBar } from '../components/ui';
-import { MoonIcon, PencilIcon, TrashIcon } from '../components/ui/icons';
+import { Button, Card, EmptyState, ErrorState, Field, IconButton, ProgressBar, Skeleton } from '../components/ui';
+import { PencilIcon, TrashIcon } from '../components/ui/icons';
 
 /**
  * Histórico v2 (issue #213) — fiel a docs/design/mockups/historico.png.
@@ -137,8 +137,6 @@ const notasStyle: CSSProperties = {
   fontSize: '13px',
   color: 'var(--text-muted)',
 };
-
-const erroStyle: CSSProperties = { borderColor: 'var(--color-erro)' };
 
 const grupoStyle: CSSProperties = { margin: '0.5rem 0 0' };
 
@@ -271,40 +269,30 @@ export default function Historico() {
         </h1>
       </header>
 
-      {error && (
-        <Card style={erroStyle}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-start' }} role="alert">
-            <p style={{ margin: 0, color: 'var(--color-erro-texto)' }}>{error}</p>
-            <Button variant="secondary" onClick={() => load(page)}>
-              Tentar novamente
-            </Button>
-          </div>
-        </Card>
-      )}
+      {error && <ErrorState message="Não foi possível carregar seu histórico." detail={error} onRetry={() => load(page)} />}
 
       {loading && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} aria-hidden="true">
-          <div className="esqueleto" style={{ height: '128px', borderRadius: 'var(--surface-radius)' }} />
-          <div className="esqueleto" style={{ height: '128px', borderRadius: 'var(--surface-radius)' }} />
-          <div className="esqueleto" style={{ height: '128px', borderRadius: 'var(--surface-radius)' }} />
-          <p style={{ color: 'var(--text-secondary)' }}>Carregando…</p>
+        <>
+          <Skeleton height={128} radius="var(--surface-radius)" />
+          <Skeleton height={128} radius="var(--surface-radius)" />
+          <Skeleton height={128} radius="var(--surface-radius)" />
+          <p style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' }} role="status">
+            Carregando…
+          </p>
           <LoadingWarning isLoading={true} />
-        </div>
+        </>
       )}
 
       {!loading && totalElements === 0 && (
-        <Card style={{ ...cardStyle, alignItems: 'flex-start' }}>
-          <MoonIcon size={40} />
-          <p style={{ margin: 0, fontSize: '17px', fontWeight: 600, color: 'var(--text-primary)' }}>
-            Você ainda não registrou nenhuma noite de sono.
-          </p>
-          <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-            Cada noite registrada aparece aqui, agrupada por semana, com a duração e a qualidade.
-          </p>
-          <Link to="/registrar" style={{ color: 'var(--accent)', fontWeight: 700 }}>
-            Registrar a primeira noite →
-          </Link>
-        </Card>
+        <EmptyState
+          title="Você ainda não registrou nenhuma noite de sono."
+          description="Cada noite registrada aparece aqui, agrupada por semana, com a duração e a qualidade."
+          action={
+            <Link to="/registrar" style={{ color: 'var(--accent)', fontWeight: 700 }}>
+              Registrar a primeira noite →
+            </Link>
+          }
+        />
       )}
 
       {!loading &&

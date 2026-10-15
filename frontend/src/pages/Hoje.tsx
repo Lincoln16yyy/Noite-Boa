@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Goal, SleepLogPage } from '../api/types';
 import { useAuth } from '../context/AuthContext';
-import { Button, Card, Ring } from '../components/ui';
+import { Button, Card, EmptyState, ErrorState, Ring, Skeleton } from '../components/ui';
 import { formatHours } from '../lib/dashboard';
 import {
   barrasDaSemana,
@@ -122,8 +122,6 @@ const letraStyle: CSSProperties = {
 
 const botaoLarguraStyle: CSSProperties = { width: '100%' };
 
-const erroStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-start' };
-
 /** "Somente leitores de tela": título da página sem aparecer no mockup. */
 const srOnly: CSSProperties = {
   position: 'absolute',
@@ -170,7 +168,19 @@ export default function Hoje() {
   if (estado === 'carregando') {
     return (
       <div style={telaStyle}>
-        <p style={{ color: 'var(--text-secondary)' }} role="status">
+        <h1 style={srOnly}>Hoje</h1>
+        <Card style={secaoStyle}>
+          <p className="overline" style={{ margin: '0 0 0.75rem' }}>
+            Última noite
+          </p>
+          <Skeleton height={210} width={210} radius="var(--radius-pill)" style={{ margin: '0 auto' }} />
+          <Skeleton height={16} width="60%" style={{ margin: '0.75rem auto 0' }} />
+        </Card>
+        <Card style={secaoStyle}>
+          <Skeleton height={12} width="35%" />
+          <Skeleton height={30} width="45%" style={{ marginTop: '0.5rem' }} />
+        </Card>
+        <p style={srOnly} role="status">
           Carregando…
         </p>
         <LoadingWarning isLoading={true} />
@@ -182,14 +192,11 @@ export default function Hoje() {
     return (
       <div style={telaStyle}>
         <h1 style={srOnly}>Hoje</h1>
-        <Card style={secaoStyle}>
-          <div style={erroStyle} role="alert">
-            <p style={{ margin: 0 }}>Não foi possível carregar sua noite: {erro}</p>
-            <Button variant="secondary" onClick={() => carregar()}>
-              Tentar novamente
-            </Button>
-          </div>
-        </Card>
+        <ErrorState
+          message="Não foi possível carregar sua noite."
+          detail={erro}
+          onRetry={() => carregar()}
+        />
       </div>
     );
   }
@@ -242,15 +249,11 @@ export default function Hoje() {
             </p>
           </div>
         ) : (
-          // Sem registros: estado vazio convidando a registrar (seção 5).
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
-            <p style={{ margin: 0, fontSize: '17px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Nenhuma noite registrada ainda.
-            </p>
-            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-              Registre a última noite para ver quanto você dormiu e como está em relação à meta.
-            </p>
-          </div>
+          // Sem registros: estado vazio convidando a registrar (seção 6 do guia).
+          <EmptyState
+            title="Nenhuma noite registrada ainda."
+            description="Registre a última noite para ver quanto você dormiu e como está em relação à meta."
+          />
         )}
       </Card>
 
