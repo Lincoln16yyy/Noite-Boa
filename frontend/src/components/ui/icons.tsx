@@ -109,6 +109,17 @@ export function ClockIcon(props: IconProps) {
   );
 }
 
+/** Engrenagem (Configurações). Aro com dentes e miolo, mesmo traço dos demais. */
+export function GearIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <circle cx="12" cy="12" r="6.5" />
+      <circle cx="12" cy="12" r="2.75" />
+      <path d="M12 5.5v-3M12 18.5v3M18.5 12h3M5.5 12h-3M16.6 7.4l2.12-2.12M7.4 16.6l-2.12 2.12M16.6 16.6l2.12 2.12M7.4 7.4 5.28 5.28" />
+    </svg>
+  );
+}
+
 /** Lixeira. */
 export function TrashIcon(props: IconProps) {
   return (

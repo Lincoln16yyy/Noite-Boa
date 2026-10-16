@@ -4,16 +4,12 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import NightBackground from '../components/NightBackground';
 import BottomBar from './BottomBar';
 import { primeiroNome, saudacao } from '../lib/saudacao';
+import { NAV_PRINCIPAL, NAV_SECUNDARIA } from './nav-items';
 // CSS dos componentes base: o Layout usa a classe .ui-screen-enter (issue #216)
 // e não importa nenhum componente que o puxe sozinho.
 import '../components/ui/ui.css';
-
-/** Item do menu de navegação (desktop). */
-interface MenuItem {
-  path: string;
-  label: string;
-  exact: boolean;
-}
+// Container e grade de duas colunas (issue #217).
+import './layout.css';
 
 /** Breakpoint único da navegação (issue #157): até 767px é celular. */
 const CONSULTA_CELULAR = '(max-width: 767px)';
@@ -24,16 +20,9 @@ const PROTECTED_ROUTES: string[] = ['/registrar', '/historico', '/dashboard', '/
 /** Rotas de autenticação: só acessíveis SEM usuário logado */
 const AUTH_ROUTES: string[] = ['/login', '/cadastro'];
 
-/** Ordem dos itens no menu desktop (issue #209: Hoje é a primeira aba) */
-const MENU_ITEMS_LOGGED_IN: MenuItem[] = [
-  { path: '/hoje', label: 'Hoje', exact: false },
-  { path: '/registrar', label: 'Registrar', exact: false },
-  { path: '/historico', label: 'Histórico', exact: false },
-  { path: '/dashboard', label: 'Dashboard', exact: false },
-  { path: '/amigos', label: 'Amigos', exact: false },
-  { path: '/sons', label: 'Sons', exact: false },
-  { path: '/configuracoes', label: 'Configurações', exact: false },
-];
+/** Ordem do menu desktop (issue #209: Hoje é a primeira aba). Os mesmos
+    itens e ícones da barra inferior, vindos da fonte única (issue #217). */
+const MENU_DESKTOP = [...NAV_PRINCIPAL, ...NAV_SECUNDARIA];
 
 export default function Layout() {
   const { user, loading, logout } = useAuth();
@@ -81,150 +70,169 @@ export default function Layout() {
   return (
     <div style={{ fontFamily: 'var(--font-sans)', background: 'var(--bg-primary)', minHeight: '100vh', display: 'flex', flexDirection: 'column', color: 'var(--text-primary)' }}>
       <NightBackground />
-      {/* Header desktop */}
+      {/* Header desktop. O conteúdo fica no mesmo container de 1100 px das
+          telas (issue #217), para o cabeçalho se alinhar com o corpo. */}
       <header
         style={{
-          padding: '0.75rem 1rem',
           background: 'var(--color-noite)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1rem',
           position: 'sticky',
           top: 0,
           zIndex: 50,
         }}
         role="banner"
       >
-        {isMobile && user ? (
-          /* Cabeçalho do celular logado (issue #209): saudação + nome e a
-             lua da marca. Sem links de navegação — eles ficam só na barra
-             inferior (nada duplicado). */
-          <>
-            <div>
-              <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--color-lavanda)' }}>
-                {saudacao(user.timezone ?? 'America/Sao_Paulo')},
-              </p>
-              <p style={{ margin: 0, fontSize: '26px', lineHeight: 1.15, fontWeight: 800, color: 'var(--color-luar)' }}>
-                {primeiroNome(user.displayName ?? '')}
-              </p>
-            </div>
-            <span
-              aria-hidden="true"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '44px',
-                height: '44px',
-                borderRadius: '50%',
-                background: 'var(--surface)',
-              }}
-            >
-              <img src="/mark-light.svg" alt="" width={34} height={34} style={{ display: 'block' }} />
-            </span>
-          </>
-        ) : (
-          <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem' }} aria-label="Noite Boa - Início">
-            <img src="/logo-horizontal-dark.svg" alt="" style={{ height: '36px', width: 'auto' }} />
-          </Link>
-        )}
-
-        {/* No celular logado o cabeçalho fica só com a saudação: a navegação vai
-            para a barra inferior, sem duplicar. Visitante segue com
-            Entrar/Cadastrar (não há barra inferior para ele). */}
-        {(!isMobile || !user) && (
-        <nav aria-label="Navegação principal" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {user ? (
+        <div
+          className="app-container"
+          style={{
+            paddingTop: '0.75rem',
+            paddingBottom: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '1rem',
+          }}
+        >
+          {isMobile && user ? (
+            /* Cabeçalho do celular logado (issue #209): saudação + nome e a
+               lua da marca. Sem links de navegação — eles ficam só na barra
+               inferior (nada duplicado). */
             <>
-              {MENU_ITEMS_LOGGED_IN.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  aria-current={isActive(item.path) ? 'page' : undefined}
-                  style={{
-                    color: isActive(item.path) ? 'var(--color-luar)' : 'var(--color-lavanda)',
-                    textDecoration: 'none',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '8px',
-                    fontWeight: isActive(item.path) ? 700 : 400,
-                    minHeight: '44px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    transition: 'color 0.15s, background 0.15s',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,233,181,0.1)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                >
-                  {item.label}
-                </Link>
-              ))}
-              <button
-                type="button"
-                onClick={handleLogout}
-                aria-label="Sair da conta"
+              <div>
+                <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--color-lavanda)' }}>
+                  {saudacao(user.timezone ?? 'America/Sao_Paulo')},
+                </p>
+                <p style={{ margin: 0, fontSize: '26px', lineHeight: 1.15, fontWeight: 800, color: 'var(--color-luar)' }}>
+                  {primeiroNome(user.displayName ?? '')}
+                </p>
+              </div>
+              <span
+                aria-hidden="true"
                 style={{
-                  color: 'var(--color-ambar)',
-                  background: 'none',
-                  border: '1px solid var(--color-ambar)',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '8px',
-                  fontWeight: 700,
-                  minHeight: '44px',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  fontSize: '15px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '50%',
+                  background: 'var(--surface)',
                 }}
               >
-                Sair
-              </button>
+                <img src="/mark-light.svg" alt="" width={34} height={34} style={{ display: 'block' }} />
+              </span>
             </>
           ) : (
-            <>
-              <Link
-                to="/login"
-                aria-current={isActive('/login') ? 'page' : undefined}
-                style={{
-                  color: isActive('/login') ? 'var(--color-luar)' : 'var(--color-lavanda)',
-                  textDecoration: 'none',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '8px',
-                  fontWeight: isActive('/login') ? 700 : 400,
-                  minHeight: '44px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                }}
-              >
-                Entrar
-              </Link>
-              <Link
-                to="/cadastro"
-                aria-current={isActive('/cadastro') ? 'page' : undefined}
-                style={{
-                  color: 'var(--color-noite)',
-                  background: 'var(--color-ambar)',
-                  textDecoration: 'none',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '8px',
-                  fontWeight: 700,
-                  minHeight: '44px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                }}
-              >
-                Cadastrar
-              </Link>
-            </>
+            <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem' }} aria-label="Noite Boa - Início">
+              <img src="/logo-horizontal-dark.svg" alt="" style={{ height: '36px', width: 'auto' }} />
+            </Link>
           )}
-        </nav>
-        )}
+
+          {/* No celular logado o cabeçalho fica só com a saudação: a navegação vai
+              para a barra inferior, sem duplicar. Visitante segue com
+              Entrar/Cadastrar (não há barra inferior para ele). */}
+          {(!isMobile || !user) && (
+            <nav aria-label="Navegação principal" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {user ? (
+                <>
+                  {MENU_DESKTOP.map((item) => {
+                    const Icone = item.Icone;
+                    return (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        aria-current={isActive(item.path) ? 'page' : undefined}
+                        style={{
+                          color: isActive(item.path) ? 'var(--color-luar)' : 'var(--color-lavanda)',
+                          textDecoration: 'none',
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: '8px',
+                          fontWeight: isActive(item.path) ? 700 : 400,
+                          minHeight: '44px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          transition: 'color 0.15s, background 0.15s',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,233,181,0.1)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        {/* Mesmo ícone de traço da barra inferior (issue #217); é
+                            decorativo (aria-hidden), o rótulo continua sendo o nome
+                            acessível do link. */}
+                        <Icone size={18} />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    aria-label="Sair da conta"
+                    style={{
+                      color: 'var(--color-ambar)',
+                      background: 'none',
+                      border: '1px solid var(--color-ambar)',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      minHeight: '44px',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      fontSize: '15px',
+                    }}
+                  >
+                    Sair
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    aria-current={isActive('/login') ? 'page' : undefined}
+                    style={{
+                      color: isActive('/login') ? 'var(--color-luar)' : 'var(--color-lavanda)',
+                      textDecoration: 'none',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '8px',
+                      fontWeight: isActive('/login') ? 700 : 400,
+                      minHeight: '44px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    Entrar
+                  </Link>
+                  <Link
+                    to="/cadastro"
+                    aria-current={isActive('/cadastro') ? 'page' : undefined}
+                    style={{
+                      color: 'var(--color-noite)',
+                      background: 'var(--color-ambar)',
+                      textDecoration: 'none',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      minHeight: '44px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    Cadastrar
+                  </Link>
+                </>
+              )}
+            </nav>
+          )}
+        </div>
       </header>
 
       {/* Bottom bar mobile (só para usuário logado) — issue #209 */}
       {isMobile && user && <BottomBar onLogout={handleLogout} />}
 
-      <main style={{ flex: 1, padding: '1rem', paddingBottom: isMobile ? '100px' : '1rem' }}>
+      <main
+        className="app-container"
+        style={{ flex: 1, paddingTop: '1rem', paddingBottom: isMobile ? '100px' : '1rem' }}
+      >
         {/* key = roda a animação de entrada a cada troca de tela (issue #216).
             Com prefers-reduced-motion a classe não anima (ui.css). */}
         <div key={location.pathname} className="ui-screen-enter">

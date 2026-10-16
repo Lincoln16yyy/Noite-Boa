@@ -3,6 +3,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { Route, Routes } from 'react-router-dom';
 import { mockMe, renderWithAuth } from '../test/test-utils';
 import Layout from './Layout';
+import BottomBar from './BottomBar';
 import type { User } from '../api/types';
 
 const usuario: User = {
@@ -184,5 +185,71 @@ describe('Layout — navegação responsiva (issue #157)', () => {
     // Estreita de novo (rotação): volta a barra inferior.
     act(() => media.ativarCelular(true));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Mais opções' })).toBeInTheDocument());
+  });
+});
+
+/** Abas e rótulos do menu logado, na ordem em que aparecem no desktop. */
+const ROTULOS_DESKTOP = [
+  'Hoje',
+  'Registrar',
+  'Histórico',
+  'Dashboard',
+  'Amigos',
+  'Sons',
+  'Configurações',
+];
+
+/** As abas que também são ícones da barra inferior (celular). */
+const ROTULOS_BARRA = ['Hoje', 'Registrar', 'Histórico', 'Dashboard', 'Amigos'];
+
+/**
+ * O desenho do ícone (traços e círculos), ignorando o tamanho em px: a barra
+ * inferior usa 24 px e o cabeçalho 18 px, mas o glifo tem de ser o mesmo.
+ */
+function desenhoDoIcone(link: HTMLElement) {
+  const figuras = [...link.querySelectorAll('svg > path, svg > circle')];
+  return figuras.map((figura) => figura.outerHTML).join('');
+}
+
+describe('Layout — desktop v2 (issue #217)', () => {
+  it('cabeçalho e conteúdo ficam dentro do mesmo container centralizado', async () => {
+    await renderLayout({ celular: false, user: usuario, route: '/hoje' });
+
+    expect(screen.getByRole('banner').querySelector('.app-container')).not.toBeNull();
+    expect(screen.getByRole('main')).toHaveClass('app-container');
+  });
+
+  it('todo link do menu desktop traz um único ícone decorativo', async () => {
+    await renderLayout({ celular: false, user: usuario, route: '/hoje' });
+    const menu = within(screen.getByRole('banner')).getByRole('navigation');
+
+    for (const rotulo of ROTULOS_DESKTOP) {
+      const link = within(menu).getByRole('link', { name: rotulo });
+      const icones = link.querySelectorAll('svg');
+      // Um só, e decorativo: o nome acessível continua sendo o rótulo.
+      expect(icones).toHaveLength(1);
+      expect(icones[0]).toHaveAttribute('aria-hidden', 'true');
+    }
+  });
+
+  it('o menu desktop usa os mesmos ícones da barra inferior', async () => {
+    await renderLayout({ celular: false, user: usuario, route: '/hoje' });
+    const menu = within(screen.getByRole('banner')).getByRole('navigation');
+    const { container: barra } = renderWithAuth(<BottomBar />, { user: usuario, route: '/hoje' });
+
+    for (const rotulo of ROTULOS_BARRA) {
+      expect(desenhoDoIcone(within(menu).getByRole('link', { name: rotulo }))).toBe(
+        desenhoDoIcone(within(barra).getByRole('link', { name: rotulo })),
+      );
+    }
+  });
+
+  it('Sons e Configurações viram links diretos no desktop (sem menu "Mais")', async () => {
+    await renderLayout({ celular: false, user: usuario, route: '/hoje' });
+    const menu = within(screen.getByRole('banner')).getByRole('navigation');
+
+    expect(within(menu).getByRole('link', { name: 'Sons' })).toBeInTheDocument();
+    expect(within(menu).getByRole('link', { name: 'Configurações' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mais opções' })).not.toBeInTheDocument();
   });
 });

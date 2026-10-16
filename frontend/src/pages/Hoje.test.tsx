@@ -101,6 +101,25 @@ describe('tela Hoje (issue #210)', () => {
     expect(screen.getAllByText(/^[DSTQ]$/)).toHaveLength(7);
   });
 
+  it('divide em duas colunas: resumo de um lado, gráfico da semana do outro (issue #217)', async () => {
+    abrirHoje();
+    await screen.findByText('Esta semana');
+
+    const colunas = document.querySelectorAll('.app-grade .app-coluna');
+    expect(colunas).toHaveLength(2);
+    expect(colunas[0]).toHaveTextContent('Última noite');
+    expect(colunas[0]).toHaveTextContent('Hora de dormir');
+    expect(colunas[1]).toHaveTextContent('Esta semana');
+  });
+
+  it('fica com uma coluna só quando não há semana para mostrar', async () => {
+    abrirHoje({ resumo: { days: 7, averageHours: 0, daily: [] } });
+    await screen.findByRole('img', { name: /Última noite/ });
+
+    // Uma coluna só não pode deixar metade da tela vazia (layout.css).
+    expect(document.querySelectorAll('.app-grade .app-coluna')).toHaveLength(1);
+  });
+
   it('mostra a comparação com a semana anterior quando a API manda o dado', async () => {
     abrirHoje({ resumo: { ...resumo, previousAverageHours: 7.1 } });
     expect(await screen.findByText('+15 min vs. semana passada')).toBeInTheDocument();

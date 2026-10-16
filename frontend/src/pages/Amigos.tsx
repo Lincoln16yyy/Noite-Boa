@@ -120,7 +120,7 @@ export default function Amigos() {
   );
 
   return (
-    <div style={{ maxWidth: '560px' }}>
+    <div style={{ maxWidth: '560px', width: '100%', marginInline: 'auto' }}>
       <h1>Amigos</h1>
 
       <section aria-label="Compartilhar minhas noites registradas" style={{ marginBottom: '1.5rem' }}>

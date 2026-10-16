@@ -8,6 +8,12 @@ const BASE = process.env.BASE_URL || 'http://localhost:4173';
 const API_PORT = process.env.API_PORT || '8080'; // porta que o front chama (VITE_API_URL)
 const ONLY = (process.env.ONLY || '').split(',').map((s) => s.trim()).filter(Boolean);
 const TEMA = process.env.THEME || ''; // '' (padrão), 'dark' ou 'light'
+// Larguras sobrescrevem o par padrão celular/desktop, para conferir o layout
+// em qualquer medida (issue #217): ex. WIDTHS=768,1280,1440
+const LARGURAS = (process.env.WIDTHS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 const ESTADO = process.env.ESTADO || 'ok'; // 'ok' (padrão), 'vazio', 'carregando' ou 'erro'
 const OUT = new URL('./out/', import.meta.url).pathname;
 
@@ -24,10 +30,12 @@ async function lancarNavegador() {
   return puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: 'shell' });
 }
 
-const viewports = [
-  ['mobile', { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true }],
-  ['desktop', { width: 1280, height: 800, deviceScaleFactor: 1 }],
-];
+const viewports = LARGURAS.length
+  ? LARGURAS.map((largura) => [`w${largura}`, { width: Number(largura), height: 900, deviceScaleFactor: 1 }])
+  : [
+      ['mobile', { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true }],
+      ['desktop', { width: 1280, height: 800, deviceScaleFactor: 1 }],
+    ];
 
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
 

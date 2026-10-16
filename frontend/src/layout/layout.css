@@ -1,0 +1,67 @@
+/* ===== Layout do app (issue #217) =====
+   Container único e centralizado para todas as telas. No celular a coluna é a
+   da tela; no desktop ela para em 1100 px e fica centrada, para as telas se
+   alinharem nas mesmas margens (antes cada tela limitava a largura sozinha,
+   com medidas diferentes, e nada aproveitava a tela). */
+
+.app-container {
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+/* Tela que usa a largura toda do container quando há espaço. No celular e no
+   tablet estreito mantém a coluna legível de antes (560 px). */
+.app-tela-larga {
+  width: 100%;
+  max-width: 560px;
+  margin-inline: auto;
+}
+
+/* O Dashboard sempre teve coluna um pouco mais larga (720 px). */
+.app-tela-larga--720 {
+  max-width: 720px;
+}
+
+/* Grade de duas colunas: resumo e gráfico lado a lado quando cabe (issue
+   #217). Abaixo do limite vira coluna única, e a ordem do código continua
+   sendo a ordem de leitura — nada empilhado ao contrário. */
+.app-grade {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Sem a segunda coluna (ex.: semana sem dado) a grade não pode deixar a
+   metade direita vazia: a única coluna ocupa a largura toda. `:only-child`
+   resolve sozinho em qualquer tela, sem classe condicional no JSX — e como
+   só mexe em `grid-column`, não briga com a media query abaixo. */
+.app-grade > .app-coluna:only-child {
+  grid-column: 1 / -1;
+}
+
+/* Coluna da grade: os cartões empilham com o mesmo espaçamento de 1 rem da
+   tela (o `gap` do flex container parou de alcançá-los virando netos). */
+.app-coluna {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+@media (min-width: 960px) {
+  .app-tela-larga,
+  .app-tela-larga--720 {
+    /* Usa o container inteiro: a grade de duas colunas precisa dessa largura.
+       Abaixo de 960 px a coluna estreita continua valendo. */
+    max-width: none;
+  }
+
+  .app-grade {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    /* Cada coluna tem a altura do seu conteúdo: o cartão curto não estica
+       para igualar o vizinho. */
+    align-items: start;
+  }
+}

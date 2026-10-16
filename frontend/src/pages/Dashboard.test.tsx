@@ -62,6 +62,18 @@ describe('Dashboard', () => {
     ).toBe(true);
   });
 
+  it('divide em duas colunas: gráfico de um lado, resumo do outro (issue #217)', async () => {
+    openScreen();
+
+    await screen.findByRole('img', { name: /Gráfico de barras/ });
+    const colunas = document.querySelectorAll('.app-grade .app-coluna');
+    expect(colunas).toHaveLength(2);
+    // O gráfico (cartão da média) numa coluna; métricas e dica na outra.
+    expect(colunas[0].querySelector('[role="img"]')).not.toBeNull();
+    expect(colunas[1]).toHaveTextContent('Dívida de sono');
+    expect(colunas[1]).toHaveTextContent('Dica');
+  });
+
   it('alterna para 30 dias e recarrega', async () => {
     openScreen();
     await screen.findByText('7h30');
