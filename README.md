@@ -180,7 +180,7 @@ Os Dockerfiles são multi-stage: dependências/build em uma etapa e imagem final
 # back-end: Maven (JDK 21) -> JRE 21
 docker build -t noiteboa-backend ./backend
 
-# front-end: Node 24 -> Nginx (serve o SPA)
+# front-end: Node 24 -> Nginx não-root (serve o SPA na 8080)
 docker build -t noiteboa-frontend ./frontend
 
 # a URL da API é embutida no build do front-end:
@@ -203,8 +203,10 @@ docker run --rm -p 8080:8080 \
 Rodar o front-end:
 
 ```bash
-docker run --rm -p 8081:80 noiteboa-frontend   # http://localhost:8081
+docker run --rm -p 8081:8080 noiteboa-frontend   # http://localhost:8081
 ```
+
+A imagem roda o Nginx como usuário `nginx` (não-root); por isso o container serve internamente na **8080** e qualquer porta externa deve ser mapeada para ela (portas abaixo de 1024 exigiriam root).
 
 ## Estrutura
 

@@ -34,6 +34,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - uses: anthropics/claude-code-action@v1
+      # Fixada no SHA do commit para a tag não virar código mutável; o
+      # Dependabot (github-actions) avisa quando sai versão nova.
+      - uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9 # v1.0.251
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
