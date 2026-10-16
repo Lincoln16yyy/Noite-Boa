@@ -44,11 +44,17 @@ public class StatsService {
                         org.springframework.http.HttpStatus.UNAUTHORIZED));
         ZoneId zone = ZoneId.of(user.getTimezone() != null ? user.getTimezone() : "America/Sao_Paulo");
 
+        // Limite entre a janela atual e a anterior (agora - days). Um único
+        // `now()` para as duas: a atual é `> limiteJanela`, a anterior é
+        // `(limite - days, limite]` (#206), então elas particionam o histórico
+        // sem vão e sem noite contada duas vezes.
+        OffsetDateTime limiteJanela = OffsetDateTime.now().minusDays(days);
+
         // A janela (agora - days) cobre também a dívida de sono (hoje-6 a
         // ontem), pois days é sempre 7 ou 30 (#98): o limite é aplicado na
         // consulta, sem carregar o histórico inteiro.
         List<SleepLog> logs = sleepLogRepository.findByUserIdAndSleepStartGreaterThanOrderBySleepStartDesc(
-                user.getId(), OffsetDateTime.now().minusDays(days));
+                user.getId(), limiteJanela);
         
         // agrupar minutos dormidos e horário de dormir por dia local (do início do sono)
         Map<LocalDate, Long> minutesSleptByDate = new TreeMap<>();
@@ -87,6 +93,19 @@ public class StatsService {
         int targetMinutesForDebt = sleepGoalRepository.findById(user.getId())
                 .map(br.dev.noiteboa.goal.SleepGoal::getTargetMinutes)
                 .orElse(TARGET_MINUTES);
+
+        // Comparação com o período anterior (#206): a mesma média da janela
+        // atual, só que deslocada um período para trás. Anulável — sem noite
+        // no período anterior vem null, nunca 0h artificial.
+        //
+        // Feito em uma consulta por período, não carregando o histórico: a
+        // janela (limite - days, limite] termina exatamente onde a atual
+        // começa, então os dois números são de recortes do mesmo tamanho, seja
+        // qual for o fuso do usuário ou a hora do dia em que a consulta roda.
+        Double previousAverage = sleepLogRepository
+                .mediaHorasNaJanela(user.getId(), limiteJanela.minusDays(days), limiteJanela)
+                .map(java.math.BigDecimal::doubleValue)
+                .orElse(null);
         
         // Calcular dívida de sono:
         // - A janela de cálculo começa no PRIMEIRO registro do usuário no
@@ -126,10 +145,22 @@ public class StatsService {
         }
         daily.sort(Comparator.comparing(DayStats::getDate));
 
-        return new Summary(days, Math.round(avgHours * 100.0) / 100.0, Math.round(consistency * 100.0) / 100.0, debtMinutes, daily);
+        return new Summary(days, Math.round(avgHours * 100.0) / 100.0,
+                previousAverage,
+                Math.round(consistency * 100.0) / 100.0, debtMinutes, daily);
     }
 
-    public record Summary(int days, double averageHours, double consistencyMinutes, long sleepDebtMinutes, List<DayStats> daily) {}
+    /**
+     * Métricas da janela de {@code days} dias.
+     */
+    public record Summary(int days, double averageHours,
+            @io.swagger.v3.oas.annotations.media.Schema(
+                    nullable = true,
+                    description = "Média da duração das noites no período imediatamente anterior de mesmo tamanho "
+                                + "(issue #206). null quando não há nenhuma noite nele, para o cliente "
+                                + "distinguir 'sem comparação' de 'dormiu menos'.")
+            Double previousAverageHours,
+            double consistencyMinutes, long sleepDebtMinutes, List<DayStats> daily) {}
     public static class DayStats {
         private final String date;
         private final double hoursSlept;

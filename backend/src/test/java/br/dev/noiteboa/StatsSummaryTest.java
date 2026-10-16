@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -53,6 +55,27 @@ class StatsSummaryTest {
             .andExpect(status().isCreated());
     }
 
+    /**
+     * Noite de `horas` que começa às 16hZ de `diasAtras` dias atrás.
+     *
+     * Por que 16hZ e não 23hZ: a validação da #99 rejeita `sleepEnd` no
+     * futuro (limite de 5 min). Começando às 16hZ e durando até 8h o fim cai
+     * até 00hZ do dia seguinte, que é sempre passado — com 23hZ o fim iria até
+     * 07h/08hZ e o teste quebraria sozinho entre 03h e 08h UTC (a CI roda
+     * perto da virada do dia UTC; o teste `sleepDebtWithSingleNightYesterdayIsZero`
+     * já caiu nisso).
+     *
+     * `diasAtras` deve ficar longe da fronteira da janela, que é
+     * `agora - days` (um instante, muda com a hora do dia). Para days=7,
+     * 1 a 5 caem sempre na janela atual e 8 a 12 sempre na anterior, seja
+     * qual for a hora em que o teste rode; 6 e 7 são ambíguos. Para days=30,
+     * o equivalente é 1 a 28 (atual) e 31 a 58 (anterior).
+     */
+    private void createNightAt(String token, int diasAtras, int horas) throws Exception {
+        var start = java.time.LocalDate.now(FUSO_PERFIL).minusDays(diasAtras).atTime(16, 0);
+        create(token, start.toString() + "Z", start.plusHours(horas).toString() + "Z", 4);
+    }
+
     @Test
     void summaryIsOkAndReturnsDailySeries() throws Exception {
         String token = token("stats@example.com");
@@ -69,6 +92,86 @@ class StatsSummaryTest {
             .andExpect(jsonPath("$.days").value(7))
             .andExpect(jsonPath("$.averageHours").value(8.0))
             .andExpect(jsonPath("$.daily").isArray());
+    }
+
+    @Test
+    void previousAverageIsNullWhenThereIsNoNightInThePreviousPeriod() throws Exception {
+        String token = token("stats-prev-vazio@example.com");
+        // Só a janela atual tem noite: a anterior fica sem nada e o campo vem
+        // nulo — "sem comparação", não "piorou".
+        createNightAt(token, 1, 8);
+
+        mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.averageHours").value(8.0))
+            // `previousAverageHours` é anulável (#206): no fio do JSON ele
+            // aparece como null explícito, não omitido. JsonPath sozinho não
+            // distingue os dois (doesNotExist passa para os dois), por isso
+            // a checagem no corpo cru.
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("\"previousAverageHours\":null")));
+    }
+
+    @Test
+    void previousAverageComparesWithTheImmediatelyPreviousPeriod() throws Exception {
+        String token = token("stats-prev-dois@example.com");
+        // 5 noites de 6h na janela anterior (hoje-12 a hoje-8) e 3 de 8h na
+        // atual (hoje-3 a hoje-1): a comparação tem de devolver 8.0 e 6.0 —
+        // nem 0 (seria "sem dado" mascarado) nem a média dos dois juntos.
+        for (int diasAtras = 8; diasAtras <= 12; diasAtras++) createNightAt(token, diasAtras, 6);
+        for (int diasAtras = 1; diasAtras <= 3; diasAtras++) createNightAt(token, diasAtras, 8);
+
+        mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.averageHours").value(8.0))
+            .andExpect(jsonPath("$.previousAverageHours").value(6.0));
+    }
+
+    @Test
+    void previousAverageComparesThirtyDayWindows() throws Exception {
+        String token = token("stats-prev-30@example.com");
+        // Mesma ideia em janelas de 30 dias: 6h no período anterior, 8h no atual.
+        for (int diasAtras = 32; diasAtras <= 37; diasAtras++) createNightAt(token, diasAtras, 6);
+        for (int diasAtras = 1; diasAtras <= 4; diasAtras++) createNightAt(token, diasAtras, 8);
+
+        mockMvc.perform(get("/api/stats/summary?days=30").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.averageHours").value(8.0))
+            .andExpect(jsonPath("$.previousAverageHours").value(6.0));
+    }
+
+    @Test
+    void previousAverageDoesNotChangeWithTheProfileTimezone() throws Exception {
+        // A comparação é por instante, não por dia local (#206): o mesmo
+        // histórico tem de dar o mesmo resultado em UTC+14 (Pacific/Kiritimati,
+        // a maior distância do UTC) e no fuso padrão. Se alguém trocar a
+        // janela por contagem de dias no fuso do perfil, a borda anda até 24h
+        // e as duas médias divergem.
+        String emKiritimati = token("stats-prev-kiritimati@example.com");
+        mockMvc.perform(put("/api/me").header("Authorization", "Bearer " + emKiritimati)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"timezone\":\"Pacific/Kiritimati\"}"))
+            .andExpect(status().isOk());
+        String noPadrao = token("stats-prev-padrao@example.com");
+
+        for (String tk : java.util.List.of(emKiritimati, noPadrao)) {
+            createNightAt(tk, 8, 8); // janela anterior: uma noite de 8h
+            createNightAt(tk, 2, 6); // janela atual: uma noite de 6h
+
+            mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + tk))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.averageHours").value(6.0))
+                .andExpect(jsonPath("$.previousAverageHours").value(8.0));
+        }
+    }
+
+    @Test
+    void previousAverageIsNullForAUserWhoNeverRegistered() throws Exception {
+        String token = token("stats-prev-sem-nada@example.com");
+        // Nunca registrou nada: nem a média atual existe (0.0), nem há o que
+        // comparar.
+        mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.averageHours").value(0.0))
+            .andExpect(jsonPath("$.previousAverageHours").doesNotExist());
     }
 
     @Test

@@ -70,6 +70,7 @@ Horários sempre em UTC no banco; conversão pelo `timezone` do usuário na hora
 
 **Definições das métricas (para ninguém inventar diferente):**
 - *Média de horas*: média da duração das noites no período (7 ou 30 dias).
+- *Média do período anterior* (`previousAverageHours`): mesma média, mas do período imediatamente anterior de mesmo tamanho (`days`), para o front mostrar comparação ("+22 min vs. semana passada"). Anulável: `null` quando não há nenhuma noite no período anterior, assim o front distingue "sem comparação" de "dormiu menos". Comparação por instante, não por dia no fuso do usuário.
 - *Consistência*: desvio padrão do horário de dormir no período (menor = melhor).
 - *Dívida de sono*: soma de (meta diária − dormido) nos últimos 7 dias, mínimo 0. Só conta a partir do primeiro registro do usuário no **histórico** (não da janela consultada): quem nunca registrou não tem dívida; dias sem registro dentro da janela contam como dívida cheia.
 
