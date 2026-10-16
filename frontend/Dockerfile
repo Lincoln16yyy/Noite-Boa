@@ -24,8 +24,16 @@ FROM nginxinc/nginx-unprivileged:1.29-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# A config fica com dono root de proposito: nginx (uid 101) nao pode reescrever
-# a propria configuracao numa pos-comprometimento (CWE-732). Em contrapartida
-# o entrypoint da base loga um "info: can not modify ... default.conf" na
-# subida — inofensivo e esperado para config que nao e a de fabrica.
+# A base unprivileged deixa /etc/nginx gravavel pelo uid 101 (para o
+# entrypoint funcionar como usuario comum) — daria para o nginx reescrever a
+# propria configuracao num pos-comprometimento (CWE-732): o arquivo root-owned
+# seria desvinculado pelo diretorio pai gravavel. Trava tudo em root:root sem
+# escrita para o servico; em troca o entrypoint loga um unico "info: can not
+# modify ... default.conf" por subida (inofensivo e esperado para config que
+# nao e a de fabrica). /var/cache/nginx (fora de /etc/nginx) continua gravavel
+# de proposito: e onde o Nginx grava os arquivos temporarios.
+USER root
+RUN chown -R root:root /etc/nginx && chmod -R go-w /etc/nginx
+USER nginx
+
 EXPOSE 8080
