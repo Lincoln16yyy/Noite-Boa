@@ -8,8 +8,26 @@ Reproduzir: cd frontend && npm run build && npx vite preview --port 4173 &
            cd ../tools/visual && ONLY=onboarding-1,onboarding-2,onboarding-3 THEME=dark node screenshots.mjs
            ONLY=onboarding-1,onboarding-2,onboarding-3 THEME=light node screenshots.mjs
 
-Revisão visual (skill verificar-visual), contra docs/design/direcao-visual.md:
+E2E contra a API de verdade (tools/visual/primeiro-uso-e2e.mjs, 2 execuções seguidas):
+ok  cadastro criou a conta e foi para /login
+ok  login de conta nova caiu em /onboarding
+ok  passo 1 salvou { targetMinutes: 420 }
+ok  passo 2 salvou { targetMinutes: 420, bedtime: "23:30", wakeTime: "06:45" }
+ok  passo 3 terminou em /hoje com o indicador marcado
+ok  reload mantém /hoje (não volta ao onboarding)
+ok  sem indicador mas COM meta salva → fica na Hoje (é o que hasGoal resolve)
+ok  noite registrada pela API real (status 201)
+ok  sem indicador e COM noite registrada → fica na Hoje
+PUT /goal observados: [{"targetMinutes":420},{"targetMinutes":420,"bedtime":"23:30","wakeTime":"06:45"}]
 
+Foi este E2E que pegou o único defeito real encontrado no caminho: a sonda do
+primeiro uso rodava em QUALQUER rota, inclusive /login antes de existir sessão.
+O 401 virava "não é primeiro uso" e o resultado era memoizado, então depois do
+cadastro o fluxo nunca aparecia — o app caía direto na Hoje vazia, o problema
+exato que a issue quer resolver. A unidade não pegava porque sempre começava
+logado. Correção: a sonda só roda com sessão ativa e falha não memoiza.
+
+Revisão visual (skill verificar-visual), contra docs/design/direcao-visual.md:
 celular 390 px
 ok  nada cortado ou rolando para o lado   os 3 passos
 ok  alvos de toque ≥ 44 px                Avançar/Pular/Agora não = 48 px (md)

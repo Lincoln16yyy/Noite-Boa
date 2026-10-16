@@ -12,19 +12,26 @@ export interface PrimeiroUsoEstado {
 /**
  * Decide se o fluxo de primeiro uso deve aparecer (issue #215).
  *
+ * `sessaoAtiva` é o que autoriza a consulta: o primeiro uso é uma propriedade
+ * da CONTA (sem noite e sem meta), então fora de uma sessão logada não há o
+ * que perguntar.
+ *
  * O efeito depende do caminho da rota de propósito: quem conclui ou pula o
  * fluxo é levado para /hoje, o efeito roda de novo, encontra o indicador no
  * aparelho e desliga — sem isso haveria um redirecionamento de ida e volta
  * entre /hoje e /onboarding.
  */
-export function usePrimeiroUso(): PrimeiroUsoEstado {
+export function usePrimeiroUso(sessaoAtiva: boolean): PrimeiroUsoEstado {
   const location = useLocation();
   const [estado, setEstado] = useState<PrimeiroUsoEstado>(() =>
     onboardingConcluido() ? { verificando: false, precisa: false } : { verificando: true, precisa: false },
   );
 
   useEffect(() => {
-    if (onboardingConcluido()) {
+    // Sem sessão não há quem perguntar: em /login e /cadastro a sonda levaria
+    // 401, e memoizar esse "não é primeiro uso" esconderia o fluxo de quem
+    // acabou de criar a conta (pegado no teste ponta a ponta com a API real).
+    if (!sessaoAtiva || onboardingConcluido()) {
       setEstado({ verificando: false, precisa: false });
       return;
     }
@@ -35,7 +42,7 @@ export function usePrimeiroUso(): PrimeiroUsoEstado {
     return () => {
       ativo = false;
     };
-  }, [location.pathname]);
+  }, [location.pathname, sessaoAtiva]);
 
   return estado;
 }

@@ -35,22 +35,27 @@ export function onboardingConcluido(): boolean {
  */
 let sondagem: Promise<boolean> | null = null;
 
+async function sondar(): Promise<boolean> {
+  const [logs, goal] = await Promise.all([
+    api.get<SleepLogPage>('/sleep-logs?page=0&size=1'),
+    api.get<Goal>('/goal'),
+  ]);
+  const semNoite = (logs.content?.length ?? 0) === 0;
+  const semMeta = goal.hasGoal === false;
+  return semNoite && semMeta;
+}
+
 export function precisaDePrimeiroUso(): Promise<boolean> {
   if (onboardingConcluido()) return Promise.resolve(false);
   if (!sondagem) {
-    sondagem = (async () => {
-      try {
-        const [logs, goal] = await Promise.all([
-          api.get<SleepLogPage>('/sleep-logs?page=0&size=1'),
-          api.get<Goal>('/goal'),
-        ]);
-        const semNoite = (logs.content?.length ?? 0) === 0;
-        const semMeta = goal.hasGoal === false;
-        return semNoite && semMeta;
-      } catch {
-        return false;
-      }
-    })();
+    sondagem = sondar().catch(() => {
+      // Falha NÃO memoiza: sem resposta não dá para saber se é primeiro uso, e
+      // prender esse "false" até o fim da sessão esconderia o fluxo de quem
+      // acabou de criar a conta — foi o que o teste ponta a ponta com a API
+      // real pegou (a sonda rodava em /login, sem sessão, e levava 401).
+      sondagem = null;
+      return false;
+    });
   }
   return sondagem;
 }

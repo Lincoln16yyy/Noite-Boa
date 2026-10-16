@@ -88,6 +88,18 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     await expect(precisaDePrimeiroUso()).resolves.toBe(false);
   });
 
+  it('a falha não memoiza: com a rede de volta a sonda tenta de novo', async () => {
+    const { precisaDePrimeiroUso } = await carregar();
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('rede fora'));
+    await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+
+    // Sempre memoizar o "false" da falha esconderia o fluxo de quem acabou de
+    // criar a conta (o 401 da sonda em /login, sem sessão, fazia exatamente
+    // isso — pegado no E2E com a API real).
+    instalarFetch({ comNoite: false, comMeta: false });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true);
+  });
+
   it('back-end antigo (sem hasGoal) também não empurra', async () => {
     const { precisaDePrimeiroUso } = await carregar();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {

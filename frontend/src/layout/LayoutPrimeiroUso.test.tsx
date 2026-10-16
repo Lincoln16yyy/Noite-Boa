@@ -83,4 +83,23 @@ describe('Layout — primeiro uso (issue #215)', () => {
     });
     expect(sondadas).toHaveLength(0);
   });
+
+  it('sem sessão não sonda nada: em /login e /cadastro não há o que perguntar', async () => {
+    // A sonda é uma propriedade da conta. Rodá-la em rota pública levaria 401
+    // e, se o "false" fosse memoizado, o fluxo nunca apareceria depois do
+    // cadastro — comportamento que o E2E com a API real pegou.
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({}, 401));
+
+    renderWithAuth(<Layout />, { user: null, route: '/hoje' });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await new Promise((r) => {
+      setTimeout(r, 300);
+    });
+
+    const sondadas = fetchMock.mock.calls.filter(([url]) => {
+      const caminho = String(url);
+      return caminho.includes('/sleep-logs') || caminho.includes('/goal');
+    });
+    expect(sondadas).toHaveLength(0);
+  });
 });
