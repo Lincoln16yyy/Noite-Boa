@@ -1,0 +1,47 @@
+Evidência da issue #215 — primeiro uso em 3 passos (executado em 2026-10-15 23:30)
+Navegador real (puppeteer), contra o build de produção servido por 'vite preview'.
+São 12 prints: 3 passos × 2 larguras (celular 390 px @2x e desktop 1280 px) ×
+2 temas (escuro e claro). O passo 1 é a rota /onboarding; os passos 2 e 3 são
+alcançados com cliques reais no botão "Avançar" (hook `preparar` em mocks.mjs).
+
+Reproduzir: cd frontend && npm run build && npx vite preview --port 4173 &
+           cd ../tools/visual && ONLY=onboarding-1,onboarding-2,onboarding-3 THEME=dark node screenshots.mjs
+           ONLY=onboarding-1,onboarding-2,onboarding-3 THEME=light node screenshots.mjs
+
+Revisão visual (skill verificar-visual), contra docs/design/direcao-visual.md:
+
+celular 390 px
+ok  nada cortado ou rolando para o lado   os 3 passos
+ok  alvos de toque ≥ 44 px                Avançar/Pular/Agora não = 48 px (md)
+ok  campos de horário empilham legíveis   2 colunas de ~160 px
+ok  barra inferior visível                as abas continuam acessíveis
+
+desktop 1280 px
+ok  coluna de 480 px centrada             mesma medida do Registrar (§9)
+ok  cabeçalho com navegação completa      Hoje…Configurações + Sair
+
+marca e contraste
+ok  só cores da paleta                    Âmbar no primário, Índigo em links e
+                                         secundários no claro, Lavanda no escuro
+ok  texto sobre fundo legível             Noite sobre Névoa, Lavanda sobre Noite
+ok  sem Âmbar nem Lavanda como texto em fundo claro (§3)
+ok  paridade de temas                     os dois têm a mesma estrutura
+
+consistência
+ok  a tela parece do mesmo app            mesmos tokens, Cartão, Button e Field
+ok  anel de foco visível                  anel Âmbar (escuro) / Índigo (claro) no
+                                         título do passo; some em cliques de
+                                         mouse e aparece no teclado (:focus-visible)
+ok  copy honesta                          "não é um alarme", "só enquanto o app
+                                         estiver aberto" (PLANO.md §3)
+
+Não foi verificado aqui:
+- Fontes do Google não carregam offline: o texto cai numa fonte genérica, então a
+  tipografia dos prints não é a definitiva.
+- Dados são fictícios (mocks.mjs); os horários do passo 2 aparecem vazios de
+  propósito, para fotografar o estado inicial.
+- Não há mockup de onboarding em docs/design/mockups/: não existe imagem de
+  comparação (mockup | app) para esta tela, apenas os prints acima.
+- Navegadores diferentes do Chromium embutido do puppeteer e leitores de tela
+  reais não foram testados; a acessibilidade foi conferida por árvore de acessibilidade
+  nos testes (role/name/foco), não por escuta.

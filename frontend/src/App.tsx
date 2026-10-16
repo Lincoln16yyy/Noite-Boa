@@ -13,6 +13,7 @@ import Sons from './pages/Sons';
 import ProtectedRoute from './auth/ProtectedRoute';
 import Vitrine from './pages/Vitrine';
 import Hoje from './pages/Hoje';
+import Onboarding from './pages/Onboarding';
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             {/* A tela real da Hoje é a issue #210; por ora, placeholder navegável. */}
             <Route path="/hoje" element={<Hoje />} />
+            <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/registrar" element={<Registrar />} />
             <Route path="/historico" element={<Historico />} />
             <Route path="/dashboard" element={<Dashboard />} />

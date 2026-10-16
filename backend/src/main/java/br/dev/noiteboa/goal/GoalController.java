@@ -22,14 +22,17 @@ public class GoalController {
     @GetMapping("/api/goal")
     public ResponseEntity<GoalResponse> get(Authentication authentication) {
         String email = (String) authentication.getPrincipal();
-        SleepGoal g = goalService.getOrDefault(email);
-        return ResponseEntity.ok(new GoalResponse(g.getTargetMinutes(), g.getBedtime(), g.getWakeTime()));
+        var encontrado = goalService.findOrDefault(email);
+        SleepGoal g = encontrado.goal();
+        return ResponseEntity.ok(new GoalResponse(
+                g.getTargetMinutes(), g.getBedtime(), g.getWakeTime(), encontrado.saved()));
     }
 
     @PutMapping("/api/goal")
     public ResponseEntity<GoalResponse> put(Authentication authentication, @Valid @RequestBody GoalRequest request) {
         String email = (String) authentication.getPrincipal();
         SleepGoal g = goalService.upsert(email, request);
-        return ResponseEntity.ok(new GoalResponse(g.getTargetMinutes(), g.getBedtime(), g.getWakeTime()));
+        // um PUT grava a meta, então a partir daqui ela existe de verdade
+        return ResponseEntity.ok(new GoalResponse(g.getTargetMinutes(), g.getBedtime(), g.getWakeTime(), true));
     }
 }

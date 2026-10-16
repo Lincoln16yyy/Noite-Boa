@@ -1,0 +1,61 @@
+import { api } from '../api/client';
+import type { Goal, SleepLogPage } from '../api/types';
+
+/**
+ * Primeiro uso (issue #215).
+ *
+ * O indicador fica NO APARELHO (localStorage), não na conta. Quem conclui ou
+ * pula o fluxo não vê de novo ao trocar de aba, deslogar e logar neste mesmo
+ * dispositivo; em outro aparelho o fluxo aparece porque lá não há indicador.
+ * A preferência não é apagada no logout de propósito: é preferência do
+ * aparelho, não da sessão.
+ */
+export const CHAVE_ONBOARDING = 'noiteboa.onboarding-concluido';
+
+export function onboardingConcluido(): boolean {
+  return localStorage.getItem(CHAVE_ONBOARDING) === '1';
+}
+
+/**
+ * Sonda do primeiro uso: só com quem NÃO tem noite registrada E NÃO tem meta
+ * salva. Um dos dois já basta para sair do fluxo — quem já usa o app não deve
+ * ser apresentado a ele de novo.
+ *
+ * `GET /api/goal` responde 200 com um default de 8h quando nunca houve meta,
+ * por isso a API ganhou `hasGoal` (issue #215): sem esse campo não haveria
+ * como separar "nunca configurou" de "escolheu 8h de propósito". Se o campo
+ * não vier (back-end antigo), assumimos que há meta — na dúvida, não se
+ * empurra ninguém para o fluxo.
+ *
+ * Erro de rede também não empurra: sem resposta não dá para saber, e travar
+ * o app na primeira tela por causa de um timeout seria pior que a Hoje vazia.
+ *
+ * O resultado é memoizado por sessão, para as rotas não refazerem as duas
+ * chamadas a cada navegação.
+ */
+let sondagem: Promise<boolean> | null = null;
+
+export function precisaDePrimeiroUso(): Promise<boolean> {
+  if (onboardingConcluido()) return Promise.resolve(false);
+  if (!sondagem) {
+    sondagem = (async () => {
+      try {
+        const [logs, goal] = await Promise.all([
+          api.get<SleepLogPage>('/sleep-logs?page=0&size=1'),
+          api.get<Goal>('/goal'),
+        ]);
+        const semNoite = (logs.content?.length ?? 0) === 0;
+        const semMeta = goal.hasGoal === false;
+        return semNoite && semMeta;
+      } catch {
+        return false;
+      }
+    })();
+  }
+  return sondagem;
+}
+
+export function marcarOnboardingConcluido(): void {
+  localStorage.setItem(CHAVE_ONBOARDING, '1');
+  sondagem = null; // quem estava observando reavalia na próxima rota
+}

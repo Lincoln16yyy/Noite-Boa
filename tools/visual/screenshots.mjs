@@ -44,7 +44,7 @@ const browser = await lancarNavegador();
 let falhas = 0;
 
 for (const [vpNome, vp] of viewports) {
-  for (const [nome, caminho, precisaLogin] of telas) {
+  for (const [nome, caminho, precisaLogin, preparar] of telas) {
     if (ONLY.length && !ONLY.includes(nome)) continue;
     const page = await browser.newPage();
     await page.setViewport(vp);
@@ -90,6 +90,8 @@ for (const [vpNome, vp] of viewports) {
       const esperaRede = ESTADO === 'carregando' ? 'domcontentloaded' : 'networkidle0';
       await page.goto(BASE + caminho, { waitUntil: esperaRede, timeout: 20000 });
       await new Promise((r) => setTimeout(r, 600));
+      // Passos de UI antes da foto (ex.: avançar no primeiro uso).
+      if (preparar) await preparar(page);
       const sufixo = [ESTADO !== 'ok' ? ESTADO : '', TEMA].filter(Boolean).join('-');
       await page.screenshot({ path: `${OUT}${vpNome}-${nome}${sufixo ? `-${sufixo}` : ''}.png`, fullPage: true });
       console.log('ok  ', vpNome, nome, sufixo || 'ok');
