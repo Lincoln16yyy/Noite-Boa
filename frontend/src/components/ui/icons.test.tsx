@@ -3,6 +3,7 @@ import { render } from '@testing-library/react';
 import {
   BarChartIcon,
   ClockIcon,
+  GearIcon,
   ListIcon,
   MoonIcon,
   MoreIcon,
@@ -22,6 +23,7 @@ const ICONE = [
   ['MoonIcon', MoonIcon],
   ['StarIcon', StarIcon],
   ['ClockIcon', ClockIcon],
+  ['GearIcon', GearIcon],
   ['TrashIcon', TrashIcon],
   ['PencilIcon', PencilIcon],
 ] as const;

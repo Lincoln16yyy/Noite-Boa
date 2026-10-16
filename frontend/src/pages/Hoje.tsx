@@ -16,6 +16,8 @@ import {
 } from '../lib/hoje';
 import type { ResumoComAnterior } from '../lib/hoje';
 import LoadingWarning from '../components/LoadingWarning';
+// Coluna da tela e grade de duas colunas (issue #217).
+import '../layout/layout.css';
 
 /**
  * Tela Hoje (issue #210) — "como foi minha última noite e o que faço agora?".
@@ -33,9 +35,11 @@ interface Carregados {
   meta: Goal | null;
 }
 
+/**
+ * Coluna da tela: o `maxWidth` vem de `.app-tela-larga` (issue #217), que
+ * estreita no celular e larga no desktop dentro do container de 1100 px.
+ */
 const telaStyle: CSSProperties = {
-  maxWidth: '560px',
-  margin: '0 auto',
   display: 'flex',
   flexDirection: 'column',
   gap: '1rem',
@@ -178,19 +182,26 @@ export default function Hoje() {
 
   if (estado === 'carregando') {
     return (
-      <div style={telaStyle}>
+      <div style={telaStyle} className="app-tela-larga">
         <h1 style={srOnly}>Hoje</h1>
-        <Card style={secaoStyle}>
-          <p className="overline" style={{ margin: '0 0 0.75rem' }}>
-            Última noite
-          </p>
-          <Skeleton height={210} width={210} radius="var(--radius-pill)" style={{ margin: '0 auto' }} />
-          <Skeleton height={16} width="60%" style={{ margin: '0.75rem auto 0' }} />
-        </Card>
-        <Card style={secaoStyle}>
-          <Skeleton height={12} width="35%" />
-          <Skeleton height={30} width="45%" style={{ marginTop: '0.5rem' }} />
-        </Card>
+        {/* Mesma forma e mesma ordem de nós do conteúdo carregado (issue #217):
+            o esqueleto reserva o lugar dos cartões em vez de a tela trocar de
+            forma quando a resposta chega. */}
+        <div className="app-grade">
+          <div className="app-coluna">
+            <Card style={secaoStyle}>
+              <p className="overline" style={{ margin: '0 0 0.75rem' }}>
+                Última noite
+              </p>
+              <Skeleton height={210} width={210} radius="var(--radius-pill)" style={{ margin: '0 auto' }} />
+              <Skeleton height={16} width="60%" style={{ margin: '0.75rem auto 0' }} />
+            </Card>
+            <Card style={secaoStyle}>
+              <Skeleton height={12} width="35%" />
+              <Skeleton height={30} width="45%" style={{ marginTop: '0.5rem' }} />
+            </Card>
+          </div>
+        </div>
         <p style={srOnly} role="status">
           Carregando…
         </p>
@@ -201,7 +212,7 @@ export default function Hoje() {
 
   if (estado === 'erro') {
     return (
-      <div style={telaStyle}>
+      <div style={telaStyle} className="app-tela-larga">
         <h1 style={srOnly}>Hoje</h1>
         <ErrorState
           message="Não foi possível carregar sua noite."
@@ -225,103 +236,112 @@ export default function Hoje() {
   );
 
   return (
-    <div style={telaStyle}>
+    <div style={telaStyle} className="app-tela-larga">
       <h1 style={srOnly}>Hoje</h1>
 
-      {/* Última noite: anel com a duração e a porcentagem da meta */}
-      <Card style={secaoStyle}>
-        <p className="overline" style={{ margin: '0 0 0.75rem' }}>
-          Última noite
-        </p>
-        {noite ? (
-          <div style={ringWrapStyle}>
-            <Ring
-              label={`Última noite: ${formatHours(noite.minutos / 60)}, ${noite.porcentagem}% da meta`}
-              value={noite.porcentagem}
-              size={210}
-              strokeWidth={20}
-              // Âmbar quando abaixo da meta, Lavanda quando dentro (regra do Dashboard).
-              tone={noite.porcentagem < 100 ? 'below' : 'within'}
-            >
-              <span style={centroRingStyle}>
-                <span className="display-number" style={{ ...duracaoStyle, fontSize: '42px' }}>
-                  {formatHours(horasContadas)}
-                </span>
-                <span style={porcentagemStyle}>
-                  {noite.porcentagem}% da meta de {Math.round(meta.minutos / 60)}h
-                </span>
-              </span>
-            </Ring>
-            <p style={{ ...horariosStyle, margin: 0 }}>
-              Dormiu {noite.dormiu} · Acordou {noite.acordou}
+      {/* Duas colunas quando há largura (issue #217): resumo de um lado,
+          gráfico da semana do outro. Sem dado na semana a coluna deixa de
+          existir e a única restante ocupa a largura toda (layout.css). */}
+      <div className="app-grade">
+        <div className="app-coluna">
+          {/* Última noite: anel com a duração e a porcentagem da meta */}
+          <Card style={secaoStyle}>
+            <p className="overline" style={{ margin: '0 0 0.75rem' }}>
+              Última noite
             </p>
-          </div>
-        ) : (
-          // Sem registros: estado vazio convidando a registrar (seção 6 do guia).
-          <EmptyState
-            title="Nenhuma noite registrada ainda."
-            description="Registre a última noite para ver quanto você dormiu e como está em relação à meta."
-          />
-        )}
-      </Card>
-
-      {/* Hora de dormir (some quando a meta não tem horário-alvo) */}
-      {contagem && (
-        <Card style={{ ...secaoStyle, ...dormirCardStyle }}>
-          <div>
-            <p className="overline" style={{ margin: '0 0 0.5rem' }}>
-              Hora de dormir
-            </p>
-            <p style={{ ...contagemStyle, margin: 0 }}>{contagem}</p>
-          </div>
-          <p style={{ ...metaDormirStyle, margin: 0 }}>
-            <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)' }}>Meta</span>
-            <span style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>{meta.dormir}</span>
-          </p>
-        </Card>
-      )}
-
-      {registrarNoite}
-
-      {/* Esta semana: barras dos últimos 7 dias + comparação (se houver dado) */}
-      {temDadosNaSemana && (
-        <Card style={secaoStyle}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem' }}>
-            <p className="overline" style={{ margin: 0 }}>
-              Esta semana
-            </p>
-            {comparacao && (
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  // Âmbar se pior, Lavanda se melhor (mesma semântica das barras).
-                  color: comparacao.cor === 'below' ? 'var(--below-meta-graphic)' : 'var(--within-meta-graphic)',
-                }}
-              >
-                {comparacao.texto}
-              </p>
-            )}
-          </div>
-          <div style={barrasWrapStyle}>
-            {barras.map((barra) => (
-              <div key={barra.date} style={colunaStyle}>
-                <span
-                  className="ui-bar-grow"
-                  style={{
-                    ...barraStyle(barra.cor),
-                    height: `${barra.altura}%`,
-                    // Dia sem registro: só a letra, sem barra (sem dado falso).
-                    visibility: barra.hasData ? 'visible' : 'hidden',
-                  }}
-                />
-                <span style={letraStyle}>{barra.label}</span>
+            {noite ? (
+              <div style={ringWrapStyle}>
+                <Ring
+                  label={`Última noite: ${formatHours(noite.minutos / 60)}, ${noite.porcentagem}% da meta`}
+                  value={noite.porcentagem}
+                  size={210}
+                  strokeWidth={20}
+                  // Âmbar quando abaixo da meta, Lavanda quando dentro (regra do Dashboard).
+                  tone={noite.porcentagem < 100 ? 'below' : 'within'}
+                >
+                  <span style={centroRingStyle}>
+                    <span className="display-number" style={{ ...duracaoStyle, fontSize: '42px' }}>
+                      {formatHours(horasContadas)}
+                    </span>
+                    <span style={porcentagemStyle}>
+                      {noite.porcentagem}% da meta de {Math.round(meta.minutos / 60)}h
+                    </span>
+                  </span>
+                </Ring>
+                <p style={{ ...horariosStyle, margin: 0 }}>
+                  Dormiu {noite.dormiu} · Acordou {noite.acordou}
+                </p>
               </div>
-            ))}
+            ) : (
+              // Sem registros: estado vazio convidando a registrar (seção 6 do guia).
+              <EmptyState
+                title="Nenhuma noite registrada ainda."
+                description="Registre a última noite para ver quanto você dormiu e como está em relação à meta."
+              />
+            )}
+          </Card>
+
+          {/* Hora de dormir (some quando a meta não tem horário-alvo) */}
+          {contagem && (
+            <Card style={{ ...secaoStyle, ...dormirCardStyle }}>
+              <div>
+                <p className="overline" style={{ margin: '0 0 0.5rem' }}>
+                  Hora de dormir
+                </p>
+                <p style={{ ...contagemStyle, margin: 0 }}>{contagem}</p>
+              </div>
+              <p style={{ ...metaDormirStyle, margin: 0 }}>
+                <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)' }}>Meta</span>
+                <span style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>{meta.dormir}</span>
+              </p>
+            </Card>
+          )}
+
+          {registrarNoite}
+        </div>
+
+        {/* Esta semana: barras dos últimos 7 dias + comparação (se houver dado) */}
+        {temDadosNaSemana && (
+          <div className="app-coluna">
+            <Card style={secaoStyle}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem' }}>
+                <p className="overline" style={{ margin: 0 }}>
+                  Esta semana
+                </p>
+                {comparacao && (
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      // Âmbar se pior, Lavanda se melhor (mesma semântica das barras).
+                      color: comparacao.cor === 'below' ? 'var(--below-meta-graphic)' : 'var(--within-meta-graphic)',
+                    }}
+                  >
+                    {comparacao.texto}
+                  </p>
+                )}
+              </div>
+              <div style={barrasWrapStyle}>
+                {barras.map((barra) => (
+                  <div key={barra.date} style={colunaStyle}>
+                    <span
+                      className="ui-bar-grow"
+                      style={{
+                        ...barraStyle(barra.cor),
+                        height: `${barra.altura}%`,
+                        // Dia sem registro: só a letra, sem barra (sem dado falso).
+                        visibility: barra.hasData ? 'visible' : 'hidden',
+                      }}
+                    />
+                    <span style={letraStyle}>{barra.label}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
-        </Card>
-      )}
+        )}
+      </div>
     </div>
   );
 }

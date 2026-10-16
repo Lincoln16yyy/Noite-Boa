@@ -1,16 +1,9 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChartIcon, ListIcon, MoonIcon, MoreIcon, PlusIcon, UsersIcon } from '../components/ui/icons';
-import type { IconProps } from '../components/ui/icons';
-import type { ComponentType } from 'react';
-
-/** Aba da barra inferior (mobile). */
-interface BottomTab {
-  path: string;
-  label: string;
-  Icone: ComponentType<IconProps>;
-}
+import { MoreIcon } from '../components/ui/icons';
+import { NAV_PRINCIPAL, NAV_SECUNDARIA } from './nav-items';
+import type { NavItem } from './nav-items';
 
 /** Item do menu "Mais" (mobile); `action` marca itens de ação (ex.: Sair). */
 interface MoreItem {
@@ -21,19 +14,13 @@ interface MoreItem {
 
 /**
  * 5 abas principais + "Mais" (issue #209): a aba Hoje é a primeira do app
- * logado. Ícones SVG de traço (24 px) no lugar dos emojis.
+ * logado. Vem da fonte única de navegação (issue #217), então o desktop usa
+ * exatamente os mesmos ícones de traço (24 px).
  */
-const BOTTOM_TABS: BottomTab[] = [
-  { path: '/hoje', label: 'Hoje', Icone: MoonIcon },
-  { path: '/registrar', label: 'Registrar', Icone: PlusIcon },
-  { path: '/historico', label: 'Histórico', Icone: ListIcon },
-  { path: '/dashboard', label: 'Dashboard', Icone: BarChartIcon },
-  { path: '/amigos', label: 'Amigos', Icone: UsersIcon },
-];
+const BOTTOM_TABS: NavItem[] = NAV_PRINCIPAL;
 
 const MORE_ITEMS: MoreItem[] = [
-  { path: '/sons', label: 'Sons' },
-  { path: '/configuracoes', label: 'Configurações' },
+  ...NAV_SECUNDARIA.map(({ path, label }) => ({ path, label })),
   { path: '/logout', label: 'Sair', action: true },
 ];
 

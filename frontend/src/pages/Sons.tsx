@@ -11,6 +11,10 @@ import {
 
 const conteudo: CSSProperties = {
   maxWidth: '480px',
+  // Centrada no container (issue #217): sem isso a coluna fica encostada na
+  // esquerda assim que a tela tem mais que 480 px.
+  width: '100%',
+  marginInline: 'auto',
   display: 'flex',
   flexDirection: 'column',
   gap: '1rem',

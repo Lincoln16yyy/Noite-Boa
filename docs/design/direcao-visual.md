@@ -83,3 +83,20 @@ Mínimos: **4,5:1 em texto** e **3:1 em elementos gráficos**. Pares conferidos 
 | Âmbar escuro `#B8690A` / branco `#FFFFFF` | 4,15:1 | **só elementos gráficos** no claro (nunca texto) |
 
 > O Âmbar escuro `#B8690A` fica abaixo de 4,5:1 para texto, por isso a regra da seção 3: em fundo claro, "abaixo da meta" usa-o **apenas em barras e ícones** (3:1 gráfico), nunca em texto.
+
+## 9. Largura e layout (issue #217)
+O alvo dos mockups é o celular (390 px). O desktop não tem mockup próprio: estas são as regras que governam a largura lá.
+
+| Regra | Valor |
+|---|---|
+| Container de todas as telas | `max-width: 1100px`, centrado, `padding-inline: 1rem` |
+| Coluna legível (formulários e listas) | 560 px; o Dashboard, 720 px — centrados no container |
+| Grade de duas colunas (Hoje e Dashboard) | a partir de **960 px**; abaixo disso, coluna única |
+| Navegação | no celular (até 767 px), barra inferior fixa; no desktop, links no cabeçalho |
+| Ícones | os **mesmos** da barra inferior (fonte única `src/layout/nav-items.ts`) |
+
+- **Uma coluna só ocupa a largura toda** (`.app-grade > .app-coluna:only-child`), para não sobrar metade da tela vazia quando não há gráfico.
+- **`align-items: start`:** o cartão curto não estica para igualar o vizinho.
+- **O esqueleto de carregamento tem a mesma forma do conteúdo carregado** (mesma ordem de nós), para a tela não trocar de forma quando a resposta chega.
+- O container é só `max-width`/`margin`/`padding`: **nunca** `transform` ou `filter`, que quebrariam o `position: fixed` da barra e do cabeçalho.
+- Prints de conferência em 768, 1280 e 1440 px nos dois temas: `docs/design/prints/217-layout-desktop/`.

@@ -2,6 +2,9 @@ import type { CSSProperties } from 'react';
 
 const conteudo: CSSProperties = {
   maxWidth: '720px',
+  // Centrada no container (issue #217).
+  width: '100%',
+  marginInline: 'auto',
   display: 'flex',
   flexDirection: 'column',
   gap: '1rem',

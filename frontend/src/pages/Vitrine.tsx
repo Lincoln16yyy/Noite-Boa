@@ -19,7 +19,7 @@ import {
  */
 export default function Vitrine() {
   return (
-    <div style={{ maxWidth: '720px' }}>
+    <div style={{ maxWidth: '720px', width: '100%', marginInline: 'auto' }}>
       <h1>Vitrine de componentes</h1>
       <p className="overline">Desenvolvimento · tema claro e escuro</p>
 

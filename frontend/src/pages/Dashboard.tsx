@@ -16,6 +16,8 @@ import {
 } from '../lib/dashboard';
 import { etiquetaDia, normalizarMeta } from '../lib/hoje';
 import LoadingWarning from '../components/LoadingWarning';
+// Coluna da tela e grade de duas colunas (issue #217).
+import '../layout/layout.css';
 
 /**
  * Dashboard v2 (issue #211) — fiel a docs/design/mockups/dashboard.png.
@@ -26,9 +28,11 @@ import LoadingWarning from '../components/LoadingWarning';
 
 type Estado = 'carregando' | 'pronto' | 'erro';
 
+/**
+ * Coluna da tela: o `maxWidth` (720 px) vem de `.app-tela-larga--720`
+ * (issue #217), que estreita no celular e larga no desktop no container.
+ */
 const telaStyle: CSSProperties = {
-  maxWidth: '720px',
-  margin: '0 auto',
   display: 'flex',
   flexDirection: 'column',
   gap: '1rem',
@@ -173,7 +177,7 @@ export default function Dashboard() {
   const posicaoMeta = (metaHoras / teto) * 100;
 
   return (
-    <div style={telaStyle}>
+    <div style={telaStyle} className="app-tela-larga app-tela-larga--720">
       {/* Título da tela: o cabeçalho compartilhado mostra a saudação (#209),
           então overline + título vêm aqui, como no mockup. */}
       <header>
@@ -229,7 +233,11 @@ export default function Dashboard() {
       )}
 
       {status === 'pronto' && summary?.daily && summary.daily.length > 0 && (
-        <>
+        /* Duas colunas quando há largura (issue #217): o gráfico de um lado,
+           o resumo (métricas + dica) do outro. Abaixo de 960 px é coluna
+           única e a ordem de leitura é a mesma de sempre. */
+        <div className="app-grade">
+          <div className="app-coluna">
           <Card style={{ padding: '1.25rem' }}>
             <p className="overline" style={overlineStyle}>
               Média de {days} dias
@@ -283,7 +291,9 @@ export default function Dashboard() {
             {/* Rótulo da meta FORA da área das barras (não sobrepõe nada). */}
             <p style={metaLegendaStyle}>- - meta de {formatHours(metaHoras)}</p>
           </Card>
+          </div>
 
+          <div className="app-coluna">
           {/* Consistência e dívida (duas colunas a partir de ~340px, como o mockup) */}
           <div style={{ ...metricasGridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
             <Card style={{ padding: '1.25rem' }}>
@@ -328,7 +338,8 @@ export default function Dashboard() {
             </p>
             <p style={{ ...metricaDicaStyle, color: 'var(--text-primary)' }}>{dicaDashboard(divida)}</p>
           </Card>
-        </>
+          </div>
+        </div>
       )}
     </div>
   );

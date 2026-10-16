@@ -1,0 +1,133 @@
+Evidência da issue #217 — layout desktop (executado em 2026-10-15 21:43)
+Navegador real (puppeteer), contra o build de produção servido por 'vite preview'.
+Cada linha mede a geometria de verdade (getBoundingClientRect / getComputedStyle),
+não a aparência: container, alinhamento cabeçalho↔conteúdo, trilhas da grade e
+qual navegação está no ar.
+
+Reproduzir: cd frontend && npm run build && npx vite preview --port 4173 &
+           cd tools/visual && node larguras.mjs
+
+Referências: container = 1100 px (max) · limite da grade = 960 px · celular = 390 px
+
+
+=== /hoje @ celular ===
+ok   container ≤ 1100 px                conteúdo=390px
+ok   cabeçalho e conteúdo alinhados     esquerda 0/0 · direita 390/390
+ok   coluna da tela ≤ 720 px            tela=358px
+ok   1 coluna(s) na grade               trilhas=1 (358px) · cartões=358 + 358px
+ok   menu no cabeçalho só no desktop    menu=false
+ok   barra inferior fixa só no celular  barra=true
+
+=== /dashboard @ celular ===
+ok   container ≤ 1100 px                conteúdo=390px
+ok   cabeçalho e conteúdo alinhados     esquerda 0/0 · direita 390/390
+ok   coluna da tela ≤ 720 px            tela=358px
+ok   1 coluna(s) na grade               trilhas=1 (358px) · cartões=358 + 358px
+ok   menu no cabeçalho só no desktop    menu=false
+ok   barra inferior fixa só no celular  barra=true
+
+=== /configuracoes @ celular ===
+ok   container ≤ 1100 px                conteúdo=390px
+ok   cabeçalho e conteúdo alinhados     esquerda 0/0 · direita 390/390
+ok   coluna da tela ≤ 720 px            tela=358px
+ok   menu no cabeçalho só no desktop    menu=false
+ok   barra inferior fixa só no celular  barra=true
+
+=== /sons @ celular ===
+ok   container ≤ 1100 px                conteúdo=390px
+ok   cabeçalho e conteúdo alinhados     esquerda 0/0 · direita 390/390
+ok   coluna da tela ≤ 720 px            tela=358px
+ok   menu no cabeçalho só no desktop    menu=false
+ok   barra inferior fixa só no celular  barra=true
+
+=== /hoje @ 768 ===
+ok   container ≤ 1100 px                conteúdo=768px
+ok   cabeçalho e conteúdo alinhados     esquerda 0/0 · direita 768/768
+ok   coluna da tela ≤ 720 px            tela=560px
+ok   1 coluna(s) na grade               trilhas=1 (560px) · cartões=560 + 560px
+ok   menu no cabeçalho só no desktop    menu=true
+ok   barra inferior fixa só no celular  barra=false
+
+=== /dashboard @ 768 ===
+ok   container ≤ 1100 px                conteúdo=768px
+ok   cabeçalho e conteúdo alinhados     esquerda 0/0 · direita 768/768
+ok   coluna da tela ≤ 720 px            tela=720px
+ok   1 coluna(s) na grade               trilhas=1 (720px) · cartões=720 + 720px
+ok   menu no cabeçalho só no desktop    menu=true
+ok   barra inferior fixa só no celular  barra=false
+
+=== /configuracoes @ 768 ===
+ok   container ≤ 1100 px                conteúdo=768px
+ok   cabeçalho e conteúdo alinhados     esquerda 0/0 · direita 768/768
+ok   coluna da tela ≤ 720 px            tela=720px
+ok   menu no cabeçalho só no desktop    menu=true
+ok   barra inferior fixa só no celular  barra=false
+
+=== /sons @ 768 ===
+ok   container ≤ 1100 px                conteúdo=768px
+ok   cabeçalho e conteúdo alinhados     esquerda 0/0 · direita 768/768
+ok   coluna da tela ≤ 720 px            tela=480px
+ok   menu no cabeçalho só no desktop    menu=true
+ok   barra inferior fixa só no celular  barra=false
+
+=== /hoje @ 1280 ===
+ok   container ≤ 1100 px                conteúdo=1100px
+ok   cabeçalho e conteúdo alinhados     esquerda 90/90 · direita 1190/1190
+ok   coluna da tela ≤ 1100 px           tela=1068px
+ok   2 coluna(s) na grade               trilhas=2 (526px + 526px) · cartões=526 + 526px
+ok   menu no cabeçalho só no desktop    menu=true
+ok   barra inferior fixa só no celular  barra=false
+
+=== /dashboard @ 1280 ===
+ok   container ≤ 1100 px                conteúdo=1100px
+ok   cabeçalho e conteúdo alinhados     esquerda 90/90 · direita 1190/1190
+ok   coluna da tela ≤ 1100 px           tela=1068px
+ok   2 coluna(s) na grade               trilhas=2 (526px + 526px) · cartões=526 + 526px
+ok   menu no cabeçalho só no desktop    menu=true
+ok   barra inferior fixa só no celular  barra=false
+
+=== /configuracoes @ 1280 ===
+ok   container ≤ 1100 px                conteúdo=1100px
+ok   cabeçalho e conteúdo alinhados     esquerda 90/90 · direita 1190/1190
+ok   coluna da tela ≤ 720 px            tela=720px
+ok   menu no cabeçalho só no desktop    menu=true
+ok   barra inferior fixa só no celular  barra=false
+
+=== /sons @ 1280 ===
+ok   container ≤ 1100 px                conteúdo=1100px
+ok   cabeçalho e conteúdo alinhados     esquerda 90/90 · direita 1190/1190
+ok   coluna da tela ≤ 720 px            tela=480px
+ok   menu no cabeçalho só no desktop    menu=true
+ok   barra inferior fixa só no celular  barra=false
+
+=== /hoje @ 1440 ===
+ok   container ≤ 1100 px                conteúdo=1100px
+ok   cabeçalho e conteúdo alinhados     esquerda 170/170 · direita 1270/1270
+ok   coluna da tela ≤ 1100 px           tela=1068px
+ok   2 coluna(s) na grade               trilhas=2 (526px + 526px) · cartões=526 + 526px
+ok   menu no cabeçalho só no desktop    menu=true
+ok   barra inferior fixa só no celular  barra=false
+
+=== /dashboard @ 1440 ===
+ok   container ≤ 1100 px                conteúdo=1100px
+ok   cabeçalho e conteúdo alinhados     esquerda 170/170 · direita 1270/1270
+ok   coluna da tela ≤ 1100 px           tela=1068px
+ok   2 coluna(s) na grade               trilhas=2 (526px + 526px) · cartões=526 + 526px
+ok   menu no cabeçalho só no desktop    menu=true
+ok   barra inferior fixa só no celular  barra=false
+
+=== /configuracoes @ 1440 ===
+ok   container ≤ 1100 px                conteúdo=1100px
+ok   cabeçalho e conteúdo alinhados     esquerda 170/170 · direita 1270/1270
+ok   coluna da tela ≤ 720 px            tela=720px
+ok   menu no cabeçalho só no desktop    menu=true
+ok   barra inferior fixa só no celular  barra=false
+
+=== /sons @ 1440 ===
+ok   container ≤ 1100 px                conteúdo=1100px
+ok   cabeçalho e conteúdo alinhados     esquerda 170/170 · direita 1270/1270
+ok   coluna da tela ≤ 720 px            tela=480px
+ok   menu no cabeçalho só no desktop    menu=true
+ok   barra inferior fixa só no celular  barra=false
+
+Container, colunas e navegação batem em todas as larguras conferidas.
