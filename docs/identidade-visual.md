@@ -2,6 +2,11 @@
 
 ![Quadro da marca](brand-board.png)
 
+> **Visual v2 (M9):** as telas do app seguem [`docs/design/direcao-visual.md`](design/direcao-visual.md).
+> Este documento é a base da **marca** — nome, logo, paleta, tipografia e contraste — e vale
+> por baixo daquilo: superfícies, tema claro, componentes, telas e largura estão descritos na
+> direção visual e apontados aqui só como resumo.
+
 ## Conceito
 **Noite Boa** descreve exatamente o resultado que o app busca entregar. O nome combina com a lua em formato de berço que abraça uma estrela: o sono como algo que se cuida. O visual é noturno, macio e calmo, sem parecer infantil.
 
@@ -57,6 +62,8 @@
 
 Regra prática: no fundo claro o texto é Noite ou Índigo. Âmbar em fundo claro só como preenchimento de botão (com texto Noite). Mensagens de erro/sucesso em texto usam as variantes `*-texto` acima (adicionadas na issue #35; `#E5484D` e `#2FBF9B` continuam para bordas, ícones e preenchimentos) — medições em [`docs/qualidade.md`](qualidade.md).
 
+**Derivados do visual v2** (não são cores novas da marca): gradiente de fundo `#3A3796` → `#1E1C52`, aba inativa `#8B88C9`, Âmbar escuro `#B8690A` (a versão do Âmbar com contraste em fundo claro) e as variantes de gradiente das barras (`#D9D6FF` → `#8B88C9` e `#FFD27A` → `#FFB347`). Valores e contraste em [`design/direcao-visual.md`](design/direcao-visual.md) §2, §3 e §8.
+
 ## Tipografia
 **Nunito** (Google Fonts, licença SIL OFL, gratuita, inclusive para uso comercial). A licença está em `docs/assets/brand/Nunito-OFL.txt`.
 
@@ -65,19 +72,43 @@ Regra prática: no fundo claro o texto é Noite ou Índigo. Âmbar em fundo clar
 | Títulos | 800 | 32 a 44 px |
 | Subtítulos e rótulos | 700 / 600 | 16 a 24 px |
 | Texto corrido | 400 | 16 px (mínimo 14 px) |
-| Números de destaque (ex.: 7h 42min) | 800 | 44 a 58 px, cor Luar em fundo escuro |
+| Números de destaque (ex.: 7h 42min) | 800 | 56 a 64 px em tela cheia, 30 px em cartão (v2), cor Luar em fundo escuro |
 
 Para usar no front-end, importe `docs/assets/brand/tokens.css` (ele já carrega a fonte e define as variáveis de cor, tipografia, espaçamento e raios).
 
+## Superfícies (v2)
+Duas superfícies, uma linguagem só — cartão arredondado para tudo:
+
+| Tema | Fundo | Cartão |
+|---|---|---|
+| Escuro (o rosto da marca) | gradiente `#3A3796 → #1E1C52 → #15142E` | `rgba(255,255,255,.06)`, borda `rgba(185,182,255,.22)`, raio 24 px, padding 18 px |
+| Claro | Névoa `#F5F3FF` | branco, borda `rgba(63,60,187,.18)`, sombra `0 8px 24px rgba(21,20,46,.08)` |
+
+Valores exatos, botão, barra inferior e régua de largura: [`design/direcao-visual.md`](design/direcao-visual.md) §2 e §9.
+
+## Tema claro (v2)
+O tema inicial é **`auto`** (segue o `prefers-color-scheme` do sistema) e o usuário escolhe
+claro/escuro/auto nas Configurações — não existe mais um "padrão ao anoitecer" fixo.
+
+O claro precisa ter **paridade** com o escuro: texto Noite, destaques em Índigo `#3F3CBB`
+(8,15:1 sobre branco) e botão principal continua Âmbar com texto Noite. "Abaixo da meta" usa
+**Âmbar escuro `#B8690A`** em barras e ícones (4,15:1 sobre branco, **nunca em texto**) e
+"dentro da meta" usa Índigo: o Âmbar claro `#FFB347` não tem contraste sobre fundo claro.
+Detalhe: [`design/direcao-visual.md`](design/direcao-visual.md) §3.
+
 ## Componentes (diretrizes rápidas)
-- **Botão principal:** fundo Âmbar, texto Noite, peso 800, formato pílula.
-- **Cartões:** fundo branco em telas claras ou Noite em telas escuras, raio 28 px, sombra suave.
-- **Gráficos:** barras Lavanda; barras abaixo da meta em Âmbar; linha da meta tracejada em Luar.
-- **Modo escuro:** é o "modo natural" do app (uso à noite). Considerar como padrão ao anoitecer.
-- **Acessibilidade:** não depender só de cor para passar informação (use também ícone ou texto) e manter alvos de toque de pelo menos 44 px.
+- **Botão principal:** pílula de 54 px, fundo Âmbar, texto Noite, peso 800, 17 px.
+- **Cartões:** superfície translúcida no escuro / branco com borda Índigo no claro, raio 24 px (ver "Superfícies").
+- **Gráficos:** gradiente Lavanda (`#D9D6FF → #8B88C9`) nas barras ≥ meta, gradiente Âmbar (`#FFD27A → #FFB347`) nas < meta, raio 10 px.
+- **Barra inferior (celular):** 78 px, ícone ativo em Luar, inativo em `#8B88C9`.
+- **Acessibilidade:** nunca só cor (sempre texto ou ícone junto), alvos de toque de pelo menos 44 px, foco visível com anel Âmbar de 2 px.
+
+A lista completa de componentes e os estados obrigatórios (hover, foco, pressionado, desabilitado,
+carregando) estão em [`design/direcao-visual.md`](design/direcao-visual.md) §4; as telas, em §5.
 
 ## Como foi gerado
-Os arquivos foram gerados por script a partir de formas geométricas e do traçado da fonte Nunito ExtraBold convertido em curvas (o logo não depende de a fonte estar instalada). Se quiser trocar o nome, é só regerar o logo horizontal com o novo nome.
+- **Logo:** as formas nasceram de um script (geometria + traçado da Nunito ExtraBold em curvas, sem depender da fonte instalada). O wordmark atual veio de `frontend/public/logo-horizontal-dark.svg` (o mesmo que o app usa) e a variante `light` foi derivada dele trocando a lua para indigo e o texto para Noite; os PNG são rasterização dos SVG a 3× (rsvg). Para trocar o nome, regere as duas variantes e os dois PNG.
+- **Quadro da marca (`brand-board.png`):** [`tools/visual/brand-board.mjs`](../tools/visual/brand-board.mjs) — monta a identidade (marca, paleta, tipografia) e as **telas reais** do app (Hoje, Dashboard, Registrar e Histórico, prints de 390 px no tema escuro). O comando está no [README](../README.md#prints-mockups-e-o-quadro-da-marca).
 
 ## Próximos passos
 - [ ] Validar a disponibilidade do nome (domínio, GitHub, lojas, INPI)
