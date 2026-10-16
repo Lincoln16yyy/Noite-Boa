@@ -28,12 +28,9 @@ export default function Home() {
           uma nova conta quando quiser.
         </p>
       )}
+      {/* Sem logo aqui: o cabeçalho do Layout já mostra a marca em toda rota
+          (issue #218) — repetir no hero deixava a marca duas vezes na tela. */}
       <section className={styles.hero} aria-labelledby="hero-title">
-        <div className={styles.brand}>
-          <img src="/mark-light.svg" alt="" className={styles.mark} />
-          <span className={styles.name}>Noite Boa</span>
-        </div>
-
         <h1 id="hero-title" className={styles.tagline}>
           Durma melhor, no seu ritmo.
         </h1>
