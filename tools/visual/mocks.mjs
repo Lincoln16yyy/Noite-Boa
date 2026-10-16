@@ -46,7 +46,17 @@ export const mocks = {
   },
 };
 
-// nome, caminho, precisa de login?
+// nome, caminho, precisa de login?, preparar? (passos de UI antes da foto)
+// O `preparar` existe para telas com passos internos — o primeiro uso tem 3,
+// e só a primeira é uma rota estática (issue #215).
+const avancar = async (page, vezes = 1) => {
+  for (let i = 0; i < vezes; i += 1) {
+    await page.waitForSelector('button ::-p-text(Avançar)', { timeout: 5000 });
+    await page.click('button ::-p-text(Avançar)');
+    await new Promise((r) => setTimeout(r, 400));
+  }
+};
+
 export const telas = [
   ['home', '/', false],
   ['login', '/login', false],
@@ -60,6 +70,9 @@ export const telas = [
   ['configuracoes', '/configuracoes', true],
   ['home-conta-excluida', '/?deleted=true', false],
   ['privacidade', '/privacidade', false],
+  ['onboarding-1', '/onboarding', true],
+  ['onboarding-2', '/onboarding', true, (page) => avancar(page, 1)],
+  ['onboarding-3', '/onboarding', true, (page) => avancar(page, 2)],
 ];
 
 // ===== Simulação de estados (issue #214) =====

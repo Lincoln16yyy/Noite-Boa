@@ -39,11 +39,15 @@ class GoalEndpointTest {
     }
 
     @Test
-    void defaultGoalIs8h() throws Exception {
+    void defaultGoalIs8hAndIsFlaggedAsNotSaved() throws Exception {
         String token = token("g1@example.com");
+        // GET /api/goal responde 200 com o default de 8h quando nunca houve
+        // meta; `hasGoal=false` é o que permite o cliente distinguir esse
+        // default de uma meta que o usuário escolheu (issue #215).
         mockMvc.perform(get("/api/goal").header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.targetMinutes").value(480));
+            .andExpect(jsonPath("$.targetMinutes").value(480))
+            .andExpect(jsonPath("$.hasGoal").value(false));
     }
 
     @Test
@@ -53,9 +57,11 @@ class GoalEndpointTest {
         mockMvc.perform(put("/api/goal").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.targetMinutes").value(540));
+            .andExpect(jsonPath("$.targetMinutes").value(540))
+            .andExpect(jsonPath("$.hasGoal").value(true));
         mockMvc.perform(get("/api/goal").header("Authorization", "Bearer " + token))
-            .andExpect(jsonPath("$.targetMinutes").value(540));
+            .andExpect(jsonPath("$.targetMinutes").value(540))
+            .andExpect(jsonPath("$.hasGoal").value(true));
     }
 
     @Test

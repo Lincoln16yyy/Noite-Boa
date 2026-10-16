@@ -275,6 +275,7 @@ export interface components {
             targetMinutes?: number;
             bedtime?: string;
             wakeTime?: string;
+            hasGoal?: boolean;
         };
         InviteRequest: {
             /** Format: email */

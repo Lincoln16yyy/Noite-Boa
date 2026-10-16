@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { usePrimeiroUso } from '../hooks/usePrimeiroUso';
 import NightBackground from '../components/NightBackground';
 import BottomBar from './BottomBar';
 import { primeiroNome, saudacao } from '../lib/saudacao';
@@ -15,7 +16,7 @@ import './layout.css';
 const CONSULTA_CELULAR = '(max-width: 767px)';
 
 /** Rotas protegidas: só acessíveis com usuário logado */
-const PROTECTED_ROUTES: string[] = ['/registrar', '/historico', '/dashboard', '/amigos', '/sons', '/configuracoes', '/hoje'];
+const PROTECTED_ROUTES: string[] = ['/registrar', '/historico', '/dashboard', '/amigos', '/sons', '/configuracoes', '/hoje', '/onboarding'];
 
 /** Rotas de autenticação: só acessíveis SEM usuário logado */
 const AUTH_ROUTES: string[] = ['/login', '/cadastro'];
@@ -30,6 +31,7 @@ export default function Layout() {
   // Reativo a redimensionamento/rotação (media query do navegador), não um
   // `window.innerWidth` lido uma única vez no primeiro render.
   const isMobile = useMediaQuery(CONSULTA_CELULAR);
+  const primeiroUso = usePrimeiroUso(!loading && Boolean(user));
 
   // Redireciona rotas protegidas se não logado
   if (!loading && !user && PROTECTED_ROUTES.some((r) => location.pathname.startsWith(r))) {
@@ -40,6 +42,14 @@ export default function Layout() {
   // /hoje é a tela inicial do app (issue #210).
   if (!loading && user && (AUTH_ROUTES.includes(location.pathname) || location.pathname === '/')) {
     return <Navigate to="/hoje" replace />;
+  }
+
+  // Primeiro uso (issue #215): quem ainda não registrou noite nem salvou meta
+  // vê o fluxo de 3 passos antes da Hoje, uma vez por aparelho. A sonda só
+  // roda quando não há indicador no dispositivo, então em quem já usou o app
+  // não há chamada extra nenhuma.
+  if (!loading && user && primeiroUso.precisa && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />;
   }
 
   // Mostra esqueleto enquanto carrega a sessão
