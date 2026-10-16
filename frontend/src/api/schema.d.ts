@@ -326,6 +326,11 @@ export interface components {
             days?: number;
             /** Format: double */
             averageHours?: number;
+            /**
+             * Format: double
+             * @description Média da duração das noites no período imediatamente anterior de mesmo tamanho (issue #206). null quando não há nenhuma noite nele, para o cliente distinguir 'sem comparação' de 'dormiu menos'.
+             */
+            previousAverageHours?: number;
             /** Format: double */
             consistencyMinutes?: number;
             /** Format: int64 */
