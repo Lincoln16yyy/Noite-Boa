@@ -24,11 +24,8 @@ FROM nginxinc/nginx-unprivileged:1.29-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# A base ja sobe como nginx (uid 101), entao o chown pede root so na hora:
-# conf.d (diretorio E arquivo) com dono nginx, porque o entrypoint da base
-# faz touch/sed no default.conf e loga "can not modify" toda subida sem isso.
-USER root
-RUN chown -R nginx:nginx /etc/nginx/conf.d
-USER nginx
-
+# A config fica com dono root de proposito: nginx (uid 101) nao pode reescrever
+# a propria configuracao numa pos-comprometimento (CWE-732). Em contrapartida
+# o entrypoint da base loga um "info: can not modify ... default.conf" na
+# subida — inofensivo e esperado para config que nao e a de fabrica.
 EXPOSE 8080
