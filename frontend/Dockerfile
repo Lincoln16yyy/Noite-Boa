@@ -19,4 +19,15 @@ FROM nginx:1.29-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
-EXPOSE 80
+# Sem privilegios de root: a imagem oficial ja traz o usuario "nginx"
+# (uid 101), dono dos diretorios de cache/tempo do Nginx; conf.d tambem fica
+# com ele para o entrypoint conseguir rodar, o "user" (no-op aqui) sai do
+# config e o pid vai para /tmp porque /run e do root. Portas < 1024 exigiriam
+# bind como root, por isso o container serve na 8080 (README: -p 8081:8080).
+RUN chown -R nginx:nginx /var/cache/nginx /etc/nginx/conf.d \
+ && sed -i -e '/^user[[:space:]]*nginx;/d' \
+           -e 's|^pid .*;|pid /tmp/nginx.pid;|' /etc/nginx/nginx.conf
+
+USER nginx
+
+EXPOSE 8080
