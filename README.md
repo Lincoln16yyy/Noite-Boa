@@ -180,7 +180,7 @@ Os Dockerfiles são multi-stage: dependências/build em uma etapa e imagem final
 # back-end: Maven (JDK 21) -> JRE 21
 docker build -t noiteboa-backend ./backend
 
-# front-end: Node 24 -> Nginx (serve o SPA)
+# front-end: Node 24 -> Nginx não-root (serve o SPA na 8080)
 docker build -t noiteboa-frontend ./frontend
 
 # a URL da API é embutida no build do front-end:
