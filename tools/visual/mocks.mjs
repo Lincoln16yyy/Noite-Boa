@@ -57,12 +57,49 @@ const avancar = async (page, vezes = 1) => {
   }
 };
 
+// Preenche o formulário como o alvo (docs/design/mockups/registrar.png):
+// 23:10 → 06:40 = 7h30 (94% da meta), qualidade 4 e observação. Sem isso a
+// foto depende do relógio: antes das 7 h o app assume que você acordou agora
+// e a duração inicial sai com minutos (issue #218).
+const preencherNoite = async (page) => {
+  await page.evaluate(() => {
+    const pad = (n) => String(n).padStart(2, '0');
+    const local = (d) =>
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    // Setter nativo + evento: o campo é controlado pelo React, atribuir
+    // `el.value` direto não atualiza o estado.
+    const definir = (el, valor) => {
+      const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
+      Object.getOwnPropertyDescriptor(proto.prototype, 'value').set.call(el, valor);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const dormiu = document.querySelector('input[aria-label="Dormiu às"]');
+    const acordou = document.querySelector('input[aria-label="Acordou às"]');
+    if (!dormiu || !acordou) throw new Error('campos "Dormiu às"/"Acordou às" não encontrados');
+    const inicio = new Date();
+    inicio.setDate(inicio.getDate() - 1);
+    inicio.setHours(23, 10, 0, 0);
+    const fim = new Date();
+    fim.setHours(6, 40, 0, 0);
+    definir(dormiu, local(inicio));
+    definir(acordou, local(fim));
+    const observacao = document.querySelector('textarea');
+    if (observacao) definir(observacao, 'acordei só uma vez');
+    const qualidade = document.querySelector('input[aria-label="Boa (4)"]');
+    if (!qualidade) throw new Error('opção de qualidade "Boa (4)" não encontrada');
+    qualidade.closest('label').click();
+  });
+  await new Promise((r) => setTimeout(r, 300));
+};
+
 export const telas = [
   ['home', '/', false],
   ['login', '/login', false],
   ['cadastro', '/cadastro', false],
   ['hoje', '/hoje', true],
   ['registrar', '/registrar', true],
+  ['registrar-preenchido', '/registrar', true, preencherNoite],
   ['historico', '/historico', true],
   ['dashboard', '/dashboard', true],
   ['amigos', '/amigos', true],

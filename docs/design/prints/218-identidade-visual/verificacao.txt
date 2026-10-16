@@ -1,0 +1,66 @@
+Verificação visual — issue #218 (16/10/2026)
+=============================================
+
+Como foi feito
+--------------
+  cd frontend && npm run build && npx vite preview --port 4173 &
+  cd ../tools/visual && npm ci
+  node screenshots.mjs                          # todas as telas, 390 e 1280 px
+  ONLY=home THEME=dark  node screenshots.mjs    # Home no tema escuro
+  ONLY=home THEME=light node screenshots.mjs    # Home no tema claro
+  node brand-board.mjs                          # regenera docs/brand-board.png
+
+Avaliação (olhando as imagens, não o código)
+--------------------------------------------
+1. Logo duplicado na Home (o alvo da issue): resolvido. O cabeçalho do Layout
+   já mostra a marca em toda rota; o hero agora começa direto no slogan
+   "Durma melhor, no seu ritmo." — prints: mobile-home-light e -dark,
+   desktop-home-light e -dark.
+
+2. Achei pelo caminho, na mesma tela: no tema escuro o H2 "Como funciona"
+   estava INVISÍVEL (cor fixa Noite sobre fundo Noite) e o lead "Três passos…"
+   ficava a ~2,4:1 (Índigo sobre Noite). Corrigido só com tokens de tema:
+     .sectionTitle  -> var(--text-primary)   (claro: Noite, igual a antes;
+                                               escuro: Luar, 15,00:1)
+     .sectionLead   -> var(--text-secondary) (claro: Índigo, igual a antes;
+                                               escuro: Lavanda, 9,56:1)
+   No tema claro nada mudou (mesmos valores numéricos de antes).
+
+3. Quadra da marca (docs/brand-board.png, 1600×2391): os wordmarks de
+   docs/assets/brand ainda diziam "Sleep Well". Regenerados a partir de
+   frontend/public/logo-horizontal-dark.svg (o que o app usa) e a variante
+   clara derivada da mesma forma (lua indigo + texto Noite); PNGs
+   re-rasterizados com rsvg (2025×360). Os aria-label dos demais SVGs da
+   marca também passaram a dizer "Noite Boa". Hoje "Sleep Well" só aparece
+   em docs/nome-do-produto.md (histórico da troca de nome).
+
+4. Telas do quadro: fotografadas com viewport esticado (MODO=tela) para a
+   barra inferior fixa sair no PÉ da imagem — na página inteira ela congela
+   no fim da primeira dobra e aparece no meio das telas longas. A tela
+   Registrar é fotografada com o formulário preenchido como o alvo
+   (23:10 → 06:40 = 7h30, 94%, qualidade 4 em Âmbar, observação): sem isso a
+   duração inicial depende do relógio e, gerada de madrugada, saía com 1h46.
+
+5. Marca/paleta/tipografia do quadro: mesmos valores de docs/identidade-visual.md
+   e docs/design/direcao-visual.md; fonte Nunito embutida em base64 na
+   primeira geração (cache em tools/visual/out/nunito-embed.css).
+
+Verificações de código (estado final da branch)
+-----------------------------------------------
+  backend   mvn -B verify ............ BUILD SUCCESS, 106 testes, 0 falhas
+  frontend  typecheck ................ exit 0
+  frontend  lint ..................... exit 0, 3030 avisos = 3030 da baseline
+                                       (mesmas contagens por arquivo)
+  frontend  npm test ................. 366 testes / 46 arquivos, todos passam
+  frontend  npm run build ............ ok
+
+O que não foi verificado
+------------------------
+- Leitores de tela de verdade (NVDA, VoiceOver, TalkBack).
+- Safari/iOS (seletor de hora nativo, suporte a prefers-color-scheme).
+- Navegadores fora do Chromium (prints com o Chromium embutido do puppeteer).
+- Exibição do quadro impresso ou em tela pequena (ele mede 1600 px de largura).
+- Dados reais: os números das telas vêm de tools/visual/mocks.mjs.
+- frontend/public/logo-horizontal-light.svg (não usado pelo app) continua com
+  o wordmark antigo; a pendência está registrada em docs/nome-do-produto.md e
+  ficou fora do escopo desta issue.

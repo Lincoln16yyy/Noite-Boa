@@ -61,11 +61,13 @@ describe('landing page', () => {
     expect(await screen.findByRole('heading', { name: 'Login' })).toBeInTheDocument();
   });
 
-  it('nome da marca aparece como texto e a marca é decorativa', async () => {
+  it('não repete a marca no conteúdo: quem mostra é o cabeçalho do Layout (issue #218)', async () => {
     const { container } = renderLanding();
-    expect(await screen.findByText('Noite Boa', { selector: 'span' })).toBeInTheDocument();
-    const img = container.querySelector('img[src="/mark-light.svg"]');
-    expect(img).not.toBeNull();
-    expect(img).toHaveAttribute('alt', '');
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Durma melhor, no seu ritmo.' }),
+    ).toBeInTheDocument();
+    // O hero não carrega o logo: o Layout já mostra a marca em toda rota.
+    expect(container.querySelector('img[src="/mark-light.svg"]')).toBeNull();
+    expect(screen.queryByText('Noite Boa', { selector: 'span' })).toBeNull();
   });
 });

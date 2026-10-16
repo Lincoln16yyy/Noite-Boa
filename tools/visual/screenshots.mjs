@@ -15,10 +15,21 @@ const LARGURAS = (process.env.WIDTHS || '')
   .map((s) => s.trim())
   .filter(Boolean);
 const ESTADO = process.env.ESTADO || 'ok'; // 'ok' (padrão), 'vazio', 'carregando' ou 'erro'
+// 'pagina' (padrão) fotografa a página inteira; 'tela' estica o viewport até o
+// fim do conteúdo antes de fotografar. A diferença é a barra inferior fixa:
+// na página inteira ela congela no fim da primeira dobra (fica no MEIO da
+// imagem das telas longas). Esticando, ela renderiza no pé, como o usuário
+// vê ao rolar até o final.
+const MODO = process.env.MODO || 'pagina';
 const OUT = new URL('./out/', import.meta.url).pathname;
 
 if (!['ok', 'vazio', 'carregando', 'erro'].includes(ESTADO)) {
   console.error(`ESTADO inválido: ${ESTADO}. Use ok, vazio, carregando ou erro.`);
+  process.exit(1);
+}
+
+if (!['pagina', 'tela'].includes(MODO)) {
+  console.error(`MODO inválido: ${MODO}. Use pagina ou tela.`);
   process.exit(1);
 }
 
@@ -92,8 +103,23 @@ for (const [vpNome, vp] of viewports) {
       await new Promise((r) => setTimeout(r, 600));
       // Passos de UI antes da foto (ex.: avançar no primeiro uso).
       if (preparar) await preparar(page);
+      // Modo 'tela': estica o viewport até o fim do conteúdo, para a barra
+      // inferior fixa renderizar no pé da imagem e não no meio. O 100vh do
+      // Layout muda junto com o viewport, então mede até estabilizar.
+      if (MODO === 'tela') {
+        for (let i = 0; i < 3; i += 1) {
+          const altura = await page.evaluate(() => Math.ceil(document.documentElement.scrollHeight));
+          const atual = (await page.viewport())?.height ?? 0;
+          if (altura === atual) break;
+          await page.setViewport({ ...vp, height: altura });
+          await new Promise((r) => setTimeout(r, 250));
+        }
+      }
       const sufixo = [ESTADO !== 'ok' ? ESTADO : '', TEMA].filter(Boolean).join('-');
-      await page.screenshot({ path: `${OUT}${vpNome}-${nome}${sufixo ? `-${sufixo}` : ''}.png`, fullPage: true });
+      await page.screenshot({
+        path: `${OUT}${vpNome}-${nome}${sufixo ? `-${sufixo}` : ''}.png`,
+        fullPage: MODO !== 'tela',
+      });
       console.log('ok  ', vpNome, nome, sufixo || 'ok');
     } catch (e) {
       falhas += 1;

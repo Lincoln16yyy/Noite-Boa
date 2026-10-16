@@ -15,25 +15,6 @@
   padding: clamp(48px, 9vw, 96px) var(--space-6);
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-}
-
-.mark {
-  width: 56px;
-  height: 56px;
-}
-
-.name {
-  font-size: var(--fs-xl);
-  font-weight: 800;
-  color: var(--color-luar);
-  letter-spacing: 0.5px;
-}
-
 .tagline {
   margin: var(--space-6) 0 0;
   font-size: clamp(2rem, 6vw, 2.75rem);
@@ -96,19 +77,22 @@
   padding: var(--space-12) var(--space-6);
 }
 
+/* Cor por token de tema: no claro continua Noite/Índigo (visual igual ao de
+   antes), no escuro vira Luar/Lavanda — com cor fixa o título ficava invisível
+   e o lead a 2,4:1 (issue #218). */
 .sectionTitle {
   margin: 0;
   text-align: center;
   font-size: var(--fs-2xl);
   font-weight: 800;
-  color: var(--color-noite);
+  color: var(--text-primary);
 }
 
 .sectionLead {
   margin: var(--space-3) auto 0;
   max-width: 40rem;
   text-align: center;
-  color: var(--color-indigo);
+  color: var(--text-secondary);
 }
 
 .grid {

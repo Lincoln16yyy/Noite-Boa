@@ -93,6 +93,24 @@ cd ../tools/e2e && npm ci && npm run smoke
 
 Detalhes em [`tools/e2e/README.md`](tools/e2e/README.md).
 
+### Prints, mockups e o quadro da marca
+
+Os mockups em [`docs/design/mockups/`](docs/design/mockups/) são o **alvo** visual; os prints são o app renderizado de verdade. Para fotografar as telas, comparar com o alvo e regenerar o quadro da marca:
+
+```bash
+cd frontend && npm ci && npm run build && npx vite preview --port 4173 &
+
+cd tools/visual && npm ci
+node screenshots.mjs                 # prints: celular 390 px e desktop 1280 px
+node compare.mjs hoje                # hoje.png (mockup) ao lado do print de hoje
+node brand-board.mjs                 # regenera docs/brand-board.png com telas reais
+```
+
+- A saída fica em `tools/visual/out/` (não versionada): `mobile-<tela>` / `desktop-<tela>` por tela e `compare-<tela>.png` com o mockup à esquerda e o app à direita.
+- Variáveis: `ONLY=hoje,dashboard` limita as telas, `THEME=dark|light` escolhe o tema, `ESTADO=vazio|carregando|erro` simula estados, `WIDTHS=768,1280` troca as larguras e `MODO=tela` fotografa com a barra inferior fixa no pé da imagem (padrão: `pagina`, a página inteira).
+- Os números dos mockups são fictícios; os prints usam a API simulada de [`tools/visual/mocks.mjs`](tools/visual/mocks.mjs).
+- O que cada tela deve mostrar está em [`docs/design/direcao-visual.md`](docs/design/direcao-visual.md); a marca, em [`docs/identidade-visual.md`](docs/identidade-visual.md). Para rodar tudo e conferir o visual, use a skill `.claude/skills/verificar-visual/SKILL.md`.
+
 ## API
 
 **Base:** `http://localhost:8080/api`
