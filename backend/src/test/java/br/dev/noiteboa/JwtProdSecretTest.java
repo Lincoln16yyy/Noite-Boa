@@ -36,7 +36,7 @@ class JwtProdSecretTest {
     @Test
     void comVariavelPresenteAProducaoSobeEAssinaToken() {
         assertTrue(context.isActive(), "contexto com perfil prod deveria subir");
-        String token = jwtService.generateToken("teste@example.com");
+        String token = jwtService.generateToken(java.util.UUID.randomUUID());
         assertFalse(token.isBlank(), "JWT_SECRET válida deveria assinar tokens");
     }
 

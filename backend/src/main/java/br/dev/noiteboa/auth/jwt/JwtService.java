@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 @Component
 public class JwtService {
@@ -34,10 +35,15 @@ public class JwtService {
         this.expirationSeconds = expirationSeconds;
     }
 
-    public String generateToken(String email) {
+    /**
+     * O `subject` é o **id da conta** (issue #276), não o e-mail: apagar a conta
+     * libera o e-mail para um cadastro novo, então um token preso ao e-mail
+     * voltaria a valer — agora para a conta de outra pessoa.
+     */
+    public String generateToken(UUID userId) {
         long now = System.currentTimeMillis();
         return Jwts.builder()
-            .subject(email)
+            .subject(userId.toString())
             .issuedAt(new Date(now))
             .expiration(new Date(now + expirationSeconds * 1000))
             .signWith(key)
@@ -48,12 +54,20 @@ public class JwtService {
         return expirationSeconds;
     }
 
-    public String parseEmail(String token) {
-        return Jwts.parser()
+    /**
+     * Id da conta que o token representa.
+     *
+     * Lança `IllegalArgumentException` quando o subject não é um UUID — é o caso
+     * dos tokens emitidos antes da #276 (subject = e-mail). Eles deixam de valer,
+     * de propósito: quem estava logado entra de novo.
+     */
+    public UUID parseUserId(String token) {
+        String subject = Jwts.parser()
             .verifyWith(key)
             .build()
             .parseSignedClaims(token)
             .getPayload()
             .getSubject();
+        return subject == null ? null : UUID.fromString(subject);
     }
 }
