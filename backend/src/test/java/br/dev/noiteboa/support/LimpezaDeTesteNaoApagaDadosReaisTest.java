@@ -32,12 +32,19 @@ class LimpezaDeTesteNaoApagaDadosReaisTest {
 
     @Test
     void limpezaApagaDadosDeTesteEPreservaDadosReais() {
-        User deTeste = usuario("limpeza-teste@example.com");
-        User real = usuario("dados-reais-do-dev@noiteboa.local");
-        SleepLog logDeTeste = noite(deTeste);
-        SleepLog logReal = noite(real);
+        // Criadas DENTRO do try: se o setup falhar, o finally ainda limpa as duas
+        // contas. E-mails únicos por execução para não colidir com sobras de uma
+        // rodada interrompida (review do PR #284).
+        User deTeste = null;
+        User real = null;
+        SleepLog logReal = null;
 
         try {
+            deTeste = usuario("limpeza-teste-" + UUID.randomUUID() + "@example.com");
+            real = usuario("dados-reais-" + UUID.randomUUID() + "@noiteboa.local");
+            SleepLog logDeTeste = noite(deTeste);
+            logReal = noite(real);
+
             LimpezaDeTeste.limpar(userRepository);
 
             assertThat(userRepository.findById(deTeste.getId())).isEmpty();
@@ -50,8 +57,20 @@ class LimpezaDeTesteNaoApagaDadosReaisTest {
                 .as("a noite do usuário real não pode ser apagada")
                 .isPresent();
         } finally {
-            sleepLogRepository.deleteById(logReal.getId());
-            userRepository.deleteById(real.getId());
+            // findById + ifPresent: o dado de teste já pode ter sido apagado pela
+            // própria limpeza, e apagar de novo não pode estourar.
+            if (logReal != null) {
+                UUID id = logReal.getId();
+                sleepLogRepository.findById(id).ifPresent(sleepLogRepository::delete);
+            }
+            if (real != null) {
+                UUID id = real.getId();
+                userRepository.findById(id).ifPresent(userRepository::delete);
+            }
+            if (deTeste != null) {
+                UUID id = deTeste.getId();
+                userRepository.findById(id).ifPresent(userRepository::delete);
+            }
         }
     }
 

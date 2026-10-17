@@ -16,29 +16,48 @@ import org.junit.jupiter.api.Test;
  */
 class FlywayMigrationTest {
 
-    private static final String ADMIN_URL =
-        "jdbc:postgresql://localhost:5432/sono?user=sono&password=sono_dev_only";
     private static final String SCHEMA = "flyway_test";
+
+    /**
+     * Mesmas variáveis do application.yml: assim a suíte não toca o banco de dev
+     * quando `POSTGRES_DB` está setado (#269; review do PR #284). Sem as variáveis
+     * o padrão continua `sono`, como no CI.
+     */
+    private static String url() {
+        return "jdbc:postgresql://" + env("DB_HOST", "localhost") + ":" + env("DB_PORT", "5432")
+            + "/" + env("POSTGRES_DB", "sono");
+    }
+
+    private static String usuario() {
+        return env("POSTGRES_USER", "sono");
+    }
+
+    private static String senha() {
+        return env("POSTGRES_PASSWORD", "sono_dev_only");
+    }
+
+    private static String env(String chave, String padrao) {
+        String valor = System.getenv(chave);
+        return valor == null || valor.isBlank() ? padrao : valor;
+    }
 
     @Test
     void migrationV1AppliesOnCleanDatabase() throws SQLException {
-        try (Connection c = DriverManager.getConnection(ADMIN_URL);
+        try (Connection c = DriverManager.getConnection(url(), usuario(), senha());
              Statement s = c.createStatement()) {
             s.execute("DROP SCHEMA IF EXISTS " + SCHEMA + " CASCADE");
             s.execute("CREATE SCHEMA " + SCHEMA);
         }
 
         Flyway flyway = Flyway.configure()
-            .dataSource("jdbc:postgresql://localhost:5432/sono?user=sono&password=sono_dev_only"
-                , "sono", "sono_dev_only")
+            .dataSource(url(), usuario(), senha())
             .schemas(SCHEMA)
             .load();
         flyway.migrate();
 
         assertEquals("5", flyway.info().current().getVersion().toString());
 
-        try (Connection c = DriverManager.getConnection(
-                "jdbc:postgresql://localhost:5432/sono?user=sono&password=sono_dev_only", "sono", "sono_dev_only");
+        try (Connection c = DriverManager.getConnection(url(), usuario(), senha());
              Statement s = c.createStatement()) {
             s.execute("SET search_path TO " + SCHEMA);
             s.execute("INSERT INTO users (email, password_hash, display_name) VALUES ('a@b.com','x','A')");
