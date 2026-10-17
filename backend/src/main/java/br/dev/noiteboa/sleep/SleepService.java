@@ -4,6 +4,7 @@ import br.dev.noiteboa.auth.User;
 import br.dev.noiteboa.auth.UserRepository;
 import br.dev.noiteboa.sleep.dto.CreateSleepLogRequest;
 import br.dev.noiteboa.sleep.dto.SleepLogResponse;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -25,6 +26,12 @@ public class SleepService {
      */
     static final Duration MAX_FUTURE_SKEW = Duration.ofMinutes(5);
     static final Duration MAX_AGE = Duration.ofDays(365);
+
+    /** Mensagem única de sobreposição: mesma resposta na checagem e na constraint. */
+    private static final String MSG_SOBREPOSICAO = "Este período se sobrepõe a um registro existente.";
+
+    /** Constraint EXCLUDE criada na V5 — é como reconhecemos a violação no banco. */
+    private static final String CONSTRAINT_SEM_SOBREPOSICAO = "ex_sleep_logs_sem_sobreposicao";
 
     public SleepService(SleepLogRepository sleepLogRepository, UserRepository userRepository) {
         this.sleepLogRepository = sleepLogRepository;
@@ -52,8 +59,24 @@ public class SleepService {
             .stream()
             .anyMatch(l -> ignorarId == null || !l.getId().equals(ignorarId));
         if (sobrepoe) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                "Este período se sobrepõe a um registro existente.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, MSG_SOBREPOSICAO);
+        }
+    }
+
+    /**
+     * Grava a noite garantindo o 409 mesmo na corrida (#265): se outra transação
+     * passou pela checagem no meio do caminho, quem barra é a constraint EXCLUDE
+     * da V5. Sem este tratamento a violação viraria 500 para o usuário.
+     */
+    private void salvar(SleepLog log) {
+        try {
+            sleepLogRepository.saveAndFlush(log);
+        } catch (DataIntegrityViolationException e) {
+            String causa = e.getMostSpecificCause().getMessage();
+            if (causa != null && causa.contains(CONSTRAINT_SEM_SOBREPOSICAO)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, MSG_SOBREPOSICAO);
+            }
+            throw e;
         }
     }
 
@@ -70,7 +93,7 @@ public class SleepService {
         validarDatas(request.getSleepStart(), request.getSleepEnd());
         assertSemSobreposicao(user.getId(), request.getSleepStart(), request.getSleepEnd(), null);
         SleepLog log = new SleepLog(UUID.randomUUID(), user, request.getSleepStart(), request.getSleepEnd(), request.getQuality(), request.getNotes());
-        sleepLogRepository.save(log);
+        salvar(log);
         return new SleepLogResponse(log.getId(), log.getSleepStart(), log.getSleepEnd(), log.getQuality(), log.getNotes());
     }
 
@@ -98,7 +121,7 @@ public class SleepService {
         validarDatas(request.getSleepStart(), request.getSleepEnd());
         assertSemSobreposicao(user.getId(), request.getSleepStart(), request.getSleepEnd(), log.getId());
         log.update(request.getSleepStart(), request.getSleepEnd(), request.getQuality(), request.getNotes());
-        sleepLogRepository.save(log);
+        salvar(log);
         return new SleepLogResponse(log.getId(), log.getSleepStart(), log.getSleepEnd(), log.getQuality(), log.getNotes());
     }
 
