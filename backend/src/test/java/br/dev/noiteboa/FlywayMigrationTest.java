@@ -35,7 +35,7 @@ class FlywayMigrationTest {
             .load();
         flyway.migrate();
 
-        assertEquals("4", flyway.info().current().getVersion().toString());
+        assertEquals("5", flyway.info().current().getVersion().toString());
 
         try (Connection c = DriverManager.getConnection(
                 "jdbc:postgresql://localhost:5432/sono?user=sono&password=sono_dev_only", "sono", "sono_dev_only");
@@ -56,6 +56,16 @@ class FlywayMigrationTest {
                 "SELECT id, '2026-10-02 06:00:00+00', '2026-10-01 22:00:00+00', 4 FROM users LIMIT 1");
             assertInsertFails(s, "INSERT INTO sleep_logs (user_id, sleep_start, sleep_end, quality) " +
                 "SELECT id, '2026-10-01 22:00:00+00', '2026-10-02 06:00:00+00', 7 FROM users LIMIT 1");
+
+            // V5: o banco recusa noites sobrepostas do mesmo usuário. A checagem do
+            // serviço é SELECT+INSERT, então duas transações simultâneas passariam por
+            // ela — a constraint é a última linha de defesa (#265).
+            assertInsertFails(s, "INSERT INTO sleep_logs (user_id, sleep_start, sleep_end, quality) " +
+                "SELECT id, '2026-10-01 23:00:00+00', '2026-10-02 07:00:00+00', 4 FROM users WHERE email = 'a@b.com'");
+
+            // Adjacente continua permitido (fim == início de outro)
+            s.execute("INSERT INTO sleep_logs (user_id, sleep_start, sleep_end, quality) " +
+                "SELECT id, '2026-10-02 06:00:00+00', '2026-10-02 08:00:00+00', 4 FROM users WHERE email = 'a@b.com'");
 
             // V4: amizade — consentimento duplo com par único, pessoas distintas e status válidos
             s.execute("INSERT INTO users (email, password_hash, display_name) VALUES ('c@d.com','x','C')");
