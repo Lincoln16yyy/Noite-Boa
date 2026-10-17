@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { api } from '../api/client';
 import type { Friend, FriendRequests, RankingEntry, SendResult, User } from '../api/types';
@@ -32,6 +32,10 @@ export default function Amigos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Requisição de ranking em andamento: a próxima troca de período cancela a
+  // anterior para que a resposta atrasada não sobrescreva a última escolha (#266).
+  const rankingRequest = useRef<AbortController | null>(null);
 
   async function carregar(periodo = dias) {
     const [meData, amigosData, convitesData, rankingData] = await Promise.all([
@@ -92,13 +96,25 @@ export default function Amigos() {
     }
   }
 
-  async function trocarPeriodo(novosDias: number, _signal?: AbortSignal) {
+  async function trocarPeriodo(novosDias: number) {
+    // Cancela a requisição anterior: alternar 7/30 rápido não pode deixar a
+    // resposta antiga chegar depois e sobrescrever o período novo (#266).
+    rankingRequest.current?.abort();
+    const controller = new AbortController();
+    rankingRequest.current = controller;
+
     setDias(novosDias);
     try {
-      const resultado = await api.get<{ ranking: RankingEntry[] }>(`/friends/ranking?days=${novosDias}`);
+      const resultado = await api.get<{ ranking: RankingEntry[] }>(
+        `/friends/ranking?days=${novosDias}`,
+        { signal: controller.signal },
+      );
+      if (controller.signal.aborted) return; // resposta de requisição cancelada: ignora
       setRanking(resultado.ranking);
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return; // ignora cancelamento
+      // O cliente converte abort em erro genérico, então checar o signal (e não
+      // err.name) é o que distingue cancelamento de falha real.
+      if (controller.signal.aborted) return;
       setError(err instanceof Error ? err.message : String(err));
     }
   }
@@ -274,10 +290,7 @@ export default function Amigos() {
               <Chip
                 key={opcao}
                 selected={dias === opcao}
-                onClick={() => {
-                  const controller = new AbortController();
-                  trocarPeriodo(opcao, controller.signal);
-                }}
+                onClick={() => trocarPeriodo(opcao)}
               >
                 {opcao} dias
               </Chip>

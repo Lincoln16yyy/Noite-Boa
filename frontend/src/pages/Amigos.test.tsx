@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Amigos from './Amigos';
 import { renderWithAuth } from '../test/test-utils';
@@ -159,6 +159,44 @@ describe('tela de Amigos', () => {
     await waitFor(() => expect(screen.getByText('21 noites · 70% dos dias')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: '30 dias' })).toHaveAttribute('aria-pressed', 'true');
     expect(calls('GET', 'days=30').length).toBe(1);
+  });
+
+  it('resposta atrasada do período antigo não sobrescreve o escolhido por último (#266)', async () => {
+    // A resposta dos 30 dias fica pendente até nós liberarmos, simulando a
+    // chegada fora de ordem depois de o usuário já ter voltado para 7 dias.
+    let liberar30: () => void = () => {};
+    const ranking30Pendente = new Promise<Response>((resolve) => {
+      liberar30 = () => resolve(jsonResponse(RANKING_30));
+    });
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      const method = options.method ?? 'GET';
+      if (path.includes('/api/me') && method === 'GET') return jsonResponse(ME);
+      if (path.includes('/friends/requests')) return jsonResponse({ sent: [], received: [] });
+      if (path.includes('/friends/ranking?days=30')) return ranking30Pendente;
+      if (path.includes('/friends/ranking')) return jsonResponse(RANKING_7);
+      if (path.includes('/api/friends')) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    openScreen();
+    await screen.findByText('3 noites · 43% dos dias'); // ranking de 7 carregado
+
+    fireEvent.click(screen.getByRole('button', { name: '30 dias' })); // dispara e fica pendente
+    fireEvent.click(screen.getByRole('button', { name: '7 dias' })); // última escolha
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '7 dias' })).toHaveAttribute('aria-pressed', 'true'),
+    );
+
+    // A resposta antiga chega atrasada e precisa ser ignorada.
+    await act(async () => {
+      liberar30();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.queryByText('21 noites · 70% dos dias')).not.toBeInTheDocument();
+    expect(screen.getByText('3 noites · 43% dos dias')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '7 dias' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('erro da API aparece como alerta sem quebrar a tela', async () => {

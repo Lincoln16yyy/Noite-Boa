@@ -53,4 +53,22 @@ describe('api client', () => {
     // não testa internamente, mas garante que a função existe e é exportada
     expect(typeof setRequestTimeout).toBe('function');
   });
+
+  // Issue #266: o cliente central precisa aceitar o signal e cancelar o fetch.
+  it('aceita signal externo e aborta o fetch quando cancelado (#266)', async () => {
+    const controller = new AbortController();
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_url: any, options: any) => {
+      return new Promise<Response>((_resolve, reject) => {
+        options.signal.addEventListener('abort', () => {
+          const erro = new Error('aborted');
+          erro.name = 'AbortError';
+          reject(erro);
+        });
+      });
+    });
+
+    const promessa = api.get('/friends/ranking?days=7', { signal: controller.signal });
+    controller.abort();
+    await expect(promessa).rejects.toThrow('Não foi possível conectar');
+  });
 });
