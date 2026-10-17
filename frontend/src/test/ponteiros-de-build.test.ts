@@ -9,28 +9,41 @@ import { resolve } from 'node:path';
  * `vite.config.ts` continuaram apontando para os nomes antigos. O Vite resolve
  * `.jsx` → `.tsx` e `.js` → `.ts` por conta própria, então a falha não aparecia:
  * o build e a suíte seguiam verdes. Isso mascara o erro e pode quebrar numa
- * futura troca de bundler/versão, então aqui os ponteiros são checados de fato.
+ * futura troca de bundler/versão.
+ *
+ * Dois cuidados aqui, por causa do review do PR #280: verificar apenas que o
+ * arquivo existe não basta (apontar para outro arquivo existente, como
+ * `src/setupTests.ts`, passaria); por isso cada ponteiro é comparado com o
+ * caminho esperado **e** conferido em disco.
  *
  * O diretório de trabalho dos testes é `frontend/` (raiz do projeto Vite).
  */
 const raiz = process.cwd();
 
-function arquivoReferenciadoExiste(caminho: string): boolean {
-  return existsSync(resolve(raiz, caminho.replace(/^\.?\//, '')));
+/** Caminhos que o projeto espera de fato. Mudar aqui é uma decisão consciente. */
+const ENTRY = '/src/main.tsx';
+const SETUP_FILES = './src/setupTests.ts';
+
+function semPontoInicial(caminho: string): string {
+  return caminho.replace(/^\.\//, '').replace(/^\//, '');
 }
 
-test('o entry do index.html aponta para um arquivo que existe', () => {
+function caminhoExiste(caminho: string): boolean {
+  return existsSync(resolve(raiz, semPontoInicial(caminho)));
+}
+
+test('o index.html carrega o entry TypeScript esperado, e esse arquivo existe', () => {
   const html = readFileSync(resolve(raiz, 'index.html'), 'utf8');
   const src = html.match(/<script[^>]+src="([^"]+)"/)?.[1];
 
-  expect(src).toBeDefined();
-  expect(arquivoReferenciadoExiste(src!)).toBe(true);
+  expect(src).toBe(ENTRY);
+  expect(caminhoExiste(src!)).toBe(true);
 });
 
-test('o setupFiles do vite.config.ts aponta para um arquivo que existe', () => {
+test('o setupFiles do Vite carrega o setup esperado, e esse arquivo existe', () => {
   const config = readFileSync(resolve(raiz, 'vite.config.ts'), 'utf8');
   const setupFiles = config.match(/setupFiles:\s*'([^']+)'/)?.[1];
 
-  expect(setupFiles).toBeDefined();
-  expect(arquivoReferenciadoExiste(setupFiles!)).toBe(true);
+  expect(setupFiles).toBe(SETUP_FILES);
+  expect(caminhoExiste(setupFiles!)).toBe(true);
 });
