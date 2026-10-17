@@ -185,6 +185,6 @@ estivesse fora, **bloquearia o próprio deploy** que consertaria o problema.
 - [ ] Blueprint sincronizada e serviço `noiteboa-api` na Render em estado **Live**.
 - [ ] Variáveis de ambiente preenchidas (Passo 2) — feito por humano.
 - [ ] `GET /actuator/health` respondendo `{"status":"UP"}` no endereço público.
-- [ ] Flyway com V1..V4 `success = true` no banco do Neon.
+- [ ] Flyway com V1..V5 `success = true` no banco do Neon.
 - [ ] Fluxo completo (cadastro → login → registro de sono) funcionando no front publicado.
 - [x] Workflow de deploy contínuo — issue #83 (`deploy.yml` + seção "Deploy contínuo").

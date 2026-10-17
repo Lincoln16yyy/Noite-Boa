@@ -21,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -47,25 +48,29 @@ class SleepLogOverlapNoBancoTest {
     @MockitoSpyBean
     SleepLogRepository sleepLogRepository;
 
+    /** Só os usuários criados aqui — o cleanup não encosta no que não é desta classe. */
+    private final List<UUID> usuariosCriados = new ArrayList<>();
+
     @AfterEach
     void cleanup() {
-        // Apaga só usuários de teste — o ON DELETE CASCADE leva as noites junto.
-        // De propósito não usa deleteAll(): a suíte não deve tocar em dado de
-        // desenvolvimento (#269).
-        userRepository.findAll().stream()
-            .filter(u -> u.getEmail().endsWith("@example.com"))
-            .forEach(userRepository::delete);
+        // Apaga pelos ids criados nesta classe (o ON DELETE CASCADE leva as
+        // noites junto). Não filtra por domínio @example.com: outra classe de
+        // teste pode ter contas dessas em uso, e apagar o que não é nosso é
+        // justamente o problema da #269 (review do PR #281).
+        usuariosCriados.forEach(userRepository::deleteById);
+        usuariosCriados.clear();
     }
 
     // ---- o banco é a última linha de defesa ----
 
     @Test
     void bancoRejeitaNoitesSobrepostas() {
+        OffsetDateTime base = OffsetDateTime.now();
         User user = usuario("sobrepostas@example.com");
-        salvarNoite(user, horasAtras(26), horasAtras(18));
+        salvarNoite(user, base.minusHours(26), base.minusHours(18));
 
         // Mesmo período, gravado direto: o serviço não está no caminho
-        assertThatThrownBy(() -> salvarNoite(user, horasAtras(20), horasAtras(12)))
+        assertThatThrownBy(() -> salvarNoite(user, base.minusHours(20), base.minusHours(12)))
             .isInstanceOf(DataIntegrityViolationException.class);
 
         assertThat(noitesDoUsuario(user)).isEqualTo(1);
@@ -73,19 +78,27 @@ class SleepLogOverlapNoBancoTest {
 
     @Test
     void bancoPermiteRegistrosAdjacentes() {
+        OffsetDateTime base = OffsetDateTime.now();
         User user = usuario("adjacentes@example.com");
-        salvarNoite(user, horasAtras(26), horasAtras(18));
-        salvarNoite(user, horasAtras(18), horasAtras(10)); // fim == início: permitido
+
+        // Fim de um == início do outro, sem buraco nenhum: é a fronteira que o
+        // tstzrange [início, fim) tem de aceitar. Derivar os dois intervalos do
+        // mesmo instante é essencial — com dois now() diferentes o segundo
+        // período começaria depois do fim do primeiro e o teste não exerceria
+        // adjacência de verdade (review do PR #281).
+        salvarNoite(user, base.minusHours(26), base.minusHours(18));
+        salvarNoite(user, base.minusHours(18), base.minusHours(10));
 
         assertThat(noitesDoUsuario(user)).isEqualTo(2);
     }
 
     @Test
     void bancoPermiteMesmoPeriodoEmOutroUsuario() {
+        OffsetDateTime base = OffsetDateTime.now();
         User a = usuario("mesmo-periodo-a@example.com");
         User b = usuario("mesmo-periodo-b@example.com");
-        salvarNoite(a, horasAtras(26), horasAtras(18));
-        salvarNoite(b, horasAtras(26), horasAtras(18));
+        salvarNoite(a, base.minusHours(26), base.minusHours(18));
+        salvarNoite(b, base.minusHours(26), base.minusHours(18));
 
         assertThat(noitesDoUsuario(a)).isEqualTo(1);
         assertThat(noitesDoUsuario(b)).isEqualTo(1);
@@ -95,8 +108,9 @@ class SleepLogOverlapNoBancoTest {
 
     @Test
     void sobreposicaoQuePassouPelaChecagemVira409() {
+        OffsetDateTime base = OffsetDateTime.now();
         User user = usuario("corrida@example.com");
-        salvarNoite(user, horasAtras(26), horasAtras(18));
+        salvarNoite(user, base.minusHours(26), base.minusHours(18));
 
         // Simula a corrida: a outra transação gravou depois do SELECT da checagem,
         // então a checagem do serviço não enxerga nada e quem barra é o banco.
@@ -104,8 +118,8 @@ class SleepLogOverlapNoBancoTest {
             .findByUserIdAndSleepStartLessThanAndSleepEndGreaterThan(any(), any(), any());
 
         CreateSleepLogRequest request = new CreateSleepLogRequest();
-        request.setSleepStart(horasAtras(20));
-        request.setSleepEnd(horasAtras(12));
+        request.setSleepStart(base.minusHours(20));
+        request.setSleepEnd(base.minusHours(12));
         request.setQuality((short) 4);
 
         assertThatThrownBy(() -> sleepService.create("corrida@example.com", request))
@@ -118,7 +132,10 @@ class SleepLogOverlapNoBancoTest {
     // ---- apoio ----
 
     private User usuario(String email) {
-        return userRepository.save(new User(UUID.randomUUID(), email, "hash-de-teste", "Teste", OffsetDateTime.now()));
+        User user = userRepository.save(
+            new User(UUID.randomUUID(), email, "hash-de-teste", "Teste", OffsetDateTime.now()));
+        usuariosCriados.add(user.getId());
+        return user;
     }
 
     private void salvarNoite(User user, OffsetDateTime inicio, OffsetDateTime fim) {
@@ -130,9 +147,5 @@ class SleepLogOverlapNoBancoTest {
         return sleepLogRepository
             .findByUserIdAndSleepStartGreaterThanOrderBySleepStartDesc(user.getId(), OffsetDateTime.now().minusDays(3650))
             .size();
-    }
-
-    private OffsetDateTime horasAtras(int horas) {
-        return OffsetDateTime.now().minusHours(horas);
     }
 }

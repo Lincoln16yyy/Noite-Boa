@@ -65,8 +65,11 @@ foram consultados nas páginas oficiais em **09/10/2026** e servem para a decis�
   `CORS_ALLOWED_ORIGINS`, com origens separadas por vírgula; normaliza espaços e
   barra final). O nome legado singular `CORS_ALLOWED_ORIGIN` também é aceito como
   fallback (issue #192), então uma variável antiga no dashboard não derruba o front.
-- **Migrações na subida do serviço:** `spring.flyway.enabled=true` aplica V1..V4
-  automaticamente no boot (apenas `CREATE`/`ALTER ADD COLUMN` — nada destrutivo).
+- **Migrações na subida do serviço:** `spring.flyway.enabled=true` aplica V1..V5
+  automaticamente no boot (migrações aditivas — `CREATE`, `ALTER ADD COLUMN`,
+  `ADD CONSTRAINT` — nada destrutivo; a V5 instala a extensão `btree_gist` em
+  `public` e recusa noites sobrepostas, então a role do deploy precisa poder
+  criar extensão no schema).
   Com 1 instância free não há corrida entre instâncias; se um dia houver múltiplas,
   mover migração para `preDeployCommand`.
 - **`JWT_SECRET` obrigatória no perfil `prod`:** sem a variável, o startup falha
