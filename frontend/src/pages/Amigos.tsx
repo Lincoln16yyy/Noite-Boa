@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { api } from '../api/client';
 import type { Friend, FriendRequests, RankingEntry, SendResult, User } from '../api/types';
@@ -33,17 +33,46 @@ export default function Amigos() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  async function carregar(periodo = dias) {
-    const [meData, amigosData, convitesData, rankingData] = await Promise.all([
+  // Requisição de ranking em andamento. TODA escrita do ranking passa por
+  // `carregarRanking`: a requisição mais nova cancela a anterior, então uma
+  // resposta atrasada (de uma troca de período ou de um `carregar()` em
+  // andamento) não sobrescreve a última escolha (#266).
+  const rankingRequest = useRef<AbortController | null>(null);
+
+  // Seleção vigente numa ref: um `carregar()` disparado antes da troca de período
+  // (ex.: aceitar um convite que demora) precisa buscar o período mais recente, e
+  // não o `dias` capturado no closure do clique (#266).
+  const periodoAtual = useRef(7);
+
+  async function carregarRanking(periodo: number): Promise<void> {
+    rankingRequest.current?.abort();
+    const controller = new AbortController();
+    rankingRequest.current = controller;
+    try {
+      const resultado = await api.get<{ ranking: RankingEntry[] }>(
+        `/friends/ranking?days=${periodo}`,
+        { signal: controller.signal },
+      );
+      if (controller.signal.aborted) return; // resposta de requisição cancelada: ignora
+      setRanking(resultado.ranking);
+    } catch (err: unknown) {
+      // O cliente converte abort em erro genérico, então checar o signal (e não
+      // err.name) é o que distingue cancelamento de falha real.
+      if (controller.signal.aborted) return;
+      throw err;
+    }
+  }
+
+  async function carregar() {
+    const [meData, amigosData, convitesData] = await Promise.all([
       api.get<User>('/me'),
       api.get<Friend[]>('/friends'),
       api.get<FriendRequests>('/friends/requests'),
-      api.get<{ ranking: RankingEntry[] }>(`/friends/ranking?days=${periodo}`),
     ]);
     setMe(meData);
     setAmigos(amigosData);
     setConvites(convitesData);
-    setRanking(rankingData.ranking);
+    await carregarRanking(periodoAtual.current);
   }
 
   useEffect(() => {
@@ -92,13 +121,12 @@ export default function Amigos() {
     }
   }
 
-  async function trocarPeriodo(novosDias: number, _signal?: AbortSignal) {
+  async function trocarPeriodo(novosDias: number) {
+    periodoAtual.current = novosDias;
     setDias(novosDias);
     try {
-      const resultado = await api.get<{ ranking: RankingEntry[] }>(`/friends/ranking?days=${novosDias}`);
-      setRanking(resultado.ranking);
+      await carregarRanking(novosDias);
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return; // ignora cancelamento
       setError(err instanceof Error ? err.message : String(err));
     }
   }
@@ -171,7 +199,7 @@ export default function Amigos() {
         </p>
       </section>
 
-      {error && <ErrorState message="Não foi possível completar a ação." detail={error} onRetry={() => carregar(dias)} />}
+      {error && <ErrorState message="Não foi possível completar a ação." detail={error} onRetry={() => carregar()} />}
       {success && (
         <p role="status" style={{ color: 'var(--color-sucesso-texto)' }}>
           {success}
@@ -274,10 +302,7 @@ export default function Amigos() {
               <Chip
                 key={opcao}
                 selected={dias === opcao}
-                onClick={() => {
-                  const controller = new AbortController();
-                  trocarPeriodo(opcao, controller.signal);
-                }}
+                onClick={() => trocarPeriodo(opcao)}
               >
                 {opcao} dias
               </Chip>

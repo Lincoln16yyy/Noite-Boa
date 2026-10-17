@@ -20,6 +20,13 @@ export interface RequestOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * Opções que os wrappers (`api.get`/`post`/`put`/`delete`) aceitam. O verbo e o
+ * corpo são decididos por cada método — deixar o chamador informá-los permitiria
+ * um `DELETE` disfarçado de `GET` (#266).
+ */
+export type MetodoOptions = Omit<RequestOptions, 'method' | 'body'>;
+
 function getToken(): string | null {
   return localStorage.getItem('token');
 }
@@ -66,13 +73,16 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   // Usa window.setTimeout explicitamente para evitar sombreamento do
   // setTimeout do módulo (issue #186).
   const timeoutId = window.setTimeout(() => controller.abort(), requestTimeout);
+  const abortarInterno = () => controller.abort();
 
-  // Se houver signal externo, aborta o controller interno quando ele disparar
+  // Se houver signal externo, aborta o controller interno quando ele disparar.
+  // O listener sai no `finally` para não acumular quando o chamador reutiliza
+  // o mesmo signal em várias requisições (#266).
   if (externalSignal) {
     if (externalSignal.aborted) {
       controller.abort();
     } else {
-      externalSignal.addEventListener('abort', () => controller.abort());
+      externalSignal.addEventListener('abort', abortarInterno);
     }
   }
 
@@ -82,8 +92,6 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       headers,
       signal: controller.signal,
     });
-
-    window.clearTimeout(timeoutId);
 
     if (!response.ok) {
       const message = await readProblemMessage(response);
@@ -103,8 +111,6 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (response.status === 204) return null as T; // 204 = sem corpo; quem chama tipa como void
     return (await response.json()) as T; // corpo JSON do recurso (tipo informado por quem chama)
   } catch (err) {
-    window.clearTimeout(timeoutId);
-
     if (err instanceof Error && (err.name === 'AbortError' || isNetworkError(err))) {
       throw new Error(
         'Não foi possível conectar ao servidor. Verifique sua conexão ou tente novamente mais tarde.',
@@ -112,15 +118,19 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       );
     }
     throw err;
+  } finally {
+    window.clearTimeout(timeoutId);
+    externalSignal?.removeEventListener('abort', abortarInterno);
   }
 }
 
 export const api = {
-  get: <T>(path: string): Promise<T> => request<T>(path),
-  post: <T>(path: string, body?: unknown): Promise<T> =>
-    request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
-  put: <T>(path: string, body?: unknown): Promise<T> =>
-    request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
-  delete: <T = void>(path: string): Promise<T> => request<T>(path, { method: 'DELETE' }),
+  get: <T>(path: string, options?: MetodoOptions): Promise<T> => request<T>(path, options),
+  post: <T>(path: string, body?: unknown, options?: MetodoOptions): Promise<T> =>
+    request<T>(path, { ...options, method: 'POST', body: JSON.stringify(body) }),
+  put: <T>(path: string, body?: unknown, options?: MetodoOptions): Promise<T> =>
+    request<T>(path, { ...options, method: 'PUT', body: JSON.stringify(body) }),
+  delete: <T = void>(path: string, options?: MetodoOptions): Promise<T> =>
+    request<T>(path, { ...options, method: 'DELETE' }),
   setRequestTimeout,
 };

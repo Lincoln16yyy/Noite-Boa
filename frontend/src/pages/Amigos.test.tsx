@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Amigos from './Amigos';
 import { renderWithAuth } from '../test/test-utils';
@@ -159,6 +159,130 @@ describe('tela de Amigos', () => {
     await waitFor(() => expect(screen.getByText('21 noites · 70% dos dias')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: '30 dias' })).toHaveAttribute('aria-pressed', 'true');
     expect(calls('GET', 'days=30').length).toBe(1);
+  });
+
+  it('resposta atrasada do período antigo não sobrescreve o escolhido por último (#266)', async () => {
+    // A resposta dos 30 dias fica pendente até nós liberarmos, simulando a
+    // chegada fora de ordem depois de o usuário já ter voltado para 7 dias.
+    let liberar30: ((valor: Response) => void) | undefined;
+    const ranking30Pendente = new Promise<Response>((resolve) => {
+      liberar30 = resolve;
+    });
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      const method = options.method ?? 'GET';
+      if (path.includes('/api/me') && method === 'GET') return jsonResponse(ME);
+      if (path.includes('/friends/requests')) return jsonResponse({ sent: [], received: [] });
+      if (path.includes('/friends/ranking?days=30')) return ranking30Pendente;
+      if (path.includes('/friends/ranking')) return jsonResponse(RANKING_7);
+      if (path.includes('/api/friends')) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    openScreen();
+    await screen.findByText('3 noites · 43% dos dias'); // ranking de 7 carregado
+
+    fireEvent.click(screen.getByRole('button', { name: '30 dias' })); // dispara e fica pendente
+    fireEvent.click(screen.getByRole('button', { name: '7 dias' })); // última escolha
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '7 dias' })).toHaveAttribute('aria-pressed', 'true'),
+    );
+
+    // A resposta antiga chega atrasada e precisa ser ignorada.
+    await act(async () => {
+      liberar30?.(jsonResponse(RANKING_30));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.queryByText('21 noites · 70% dos dias')).not.toBeInTheDocument();
+    expect(screen.getByText('3 noites · 43% dos dias')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '7 dias' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('carregar() em andamento não sobrescreve o período escolhido depois (#266)', async () => {
+    // A 1ª carga do ranking (7 dias) resolve normalmente; a 2ª — disparada por um
+    // carregar() depois de uma ação — fica pendente até nós liberarmos.
+    let liberar7: ((valor: Response) => void) | undefined;
+    const ranking7Pendente = new Promise<Response>((resolve) => {
+      liberar7 = resolve;
+    });
+    let chamadasRanking7 = 0;
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      const method = options.method ?? 'GET';
+      if (path.includes('/api/me') && method === 'PUT') return jsonResponse({ ...ME, ...JSON.parse(options.body) });
+      if (path.includes('/api/me')) return jsonResponse(ME);
+      if (path.includes('/friends/requests')) return jsonResponse(CONVITES);
+      if (path.includes('/friends/ranking?days=30')) return jsonResponse(RANKING_30);
+      if (path.includes('/friends/ranking?days=7')) {
+        chamadasRanking7 += 1;
+        return chamadasRanking7 === 1 ? jsonResponse(RANKING_7) : ranking7Pendente;
+      }
+      if (path.includes('/api/friends')) return jsonResponse(AMIGOS);
+      return jsonResponse({});
+    });
+
+    openScreen();
+    await screen.findByText('3 noites · 43% dos dias');
+
+    // Aceitar o convite dispara executar(...) -> carregar(), cujo ranking fica pendente
+    fireEvent.click(screen.getByRole('button', { name: 'Aceitar' }));
+    await waitFor(() => expect(chamadasRanking7).toBe(2));
+
+    // Nesse meio-tempo o usuário escolhe 30 dias
+    fireEvent.click(screen.getByRole('button', { name: '30 dias' }));
+    expect(await screen.findByText('21 noites · 70% dos dias')).toBeInTheDocument();
+
+    // A resposta atrasada do carregar() não pode trazer o ranking de 7 de volta
+    await act(async () => {
+      liberar7?.(jsonResponse(RANKING_7));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.queryByText('3 noites · 43% dos dias')).not.toBeInTheDocument();
+    expect(screen.getByText('21 noites · 70% dos dias')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '30 dias' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('refresh iniciado antes da troca de período busca a seleção mais recente (#266)', async () => {
+    // O aceite do convite demora; quando ele conclui, o carregar() dispara já
+    // depois de o usuário ter escolhido 30 dias. Ele precisa buscar 30 — não o
+    // `dias` capturado no closure do clique (era 7).
+    let liberarAceite: ((valor: Response) => void) | undefined;
+    const aceitePendente = new Promise<Response>((resolve) => {
+      liberarAceite = resolve;
+    });
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      const method = options.method ?? 'GET';
+      if (path.includes('/api/me')) return jsonResponse(ME);
+      if (path.includes('/friends/requests') && method === 'POST' && path.includes('/accept')) return aceitePendente;
+      if (path.includes('/friends/requests')) return jsonResponse(CONVITES);
+      if (path.includes('/friends/ranking?days=30')) return jsonResponse(RANKING_30);
+      if (path.includes('/friends/ranking')) return jsonResponse(RANKING_7);
+      if (path.includes('/api/friends')) return jsonResponse(AMIGOS);
+      return jsonResponse({});
+    });
+
+    openScreen();
+    await screen.findByText('3 noites · 43% dos dias');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aceitar' })); // aceite fica pendente
+    fireEvent.click(screen.getByRole('button', { name: '30 dias' })); // última seleção
+    expect(await screen.findByText('21 noites · 70% dos dias')).toBeInTheDocument();
+
+    // O aceite conclui e o carregar() finalmente dispara
+    await act(async () => {
+      liberarAceite?.(jsonResponse({ id: 'r1', status: 'accepted' }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // O refresh foi de 30 dias (2ª busca por 30), não de 7 (que segue com 1 busca)
+    await waitFor(() => expect(calls('GET', 'days=30').length).toBe(2));
+    expect(calls('GET', 'days=7').length).toBe(1);
+    expect(screen.getByText('21 noites · 70% dos dias')).toBeInTheDocument();
+    expect(screen.queryByText('3 noites · 43% dos dias')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '30 dias' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('erro da API aparece como alerta sem quebrar a tela', async () => {
