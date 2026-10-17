@@ -244,6 +244,47 @@ describe('tela de Amigos', () => {
     expect(screen.getByRole('button', { name: '30 dias' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('refresh iniciado antes da troca de período busca a seleção mais recente (#266)', async () => {
+    // O aceite do convite demora; quando ele conclui, o carregar() dispara já
+    // depois de o usuário ter escolhido 30 dias. Ele precisa buscar 30 — não o
+    // `dias` capturado no closure do clique (era 7).
+    let liberarAceite: ((valor: Response) => void) | undefined;
+    const aceitePendente = new Promise<Response>((resolve) => {
+      liberarAceite = resolve;
+    });
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      const method = options.method ?? 'GET';
+      if (path.includes('/api/me')) return jsonResponse(ME);
+      if (path.includes('/friends/requests') && method === 'POST' && path.includes('/accept')) return aceitePendente;
+      if (path.includes('/friends/requests')) return jsonResponse(CONVITES);
+      if (path.includes('/friends/ranking?days=30')) return jsonResponse(RANKING_30);
+      if (path.includes('/friends/ranking')) return jsonResponse(RANKING_7);
+      if (path.includes('/api/friends')) return jsonResponse(AMIGOS);
+      return jsonResponse({});
+    });
+
+    openScreen();
+    await screen.findByText('3 noites · 43% dos dias');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aceitar' })); // aceite fica pendente
+    fireEvent.click(screen.getByRole('button', { name: '30 dias' })); // última seleção
+    expect(await screen.findByText('21 noites · 70% dos dias')).toBeInTheDocument();
+
+    // O aceite conclui e o carregar() finalmente dispara
+    await act(async () => {
+      liberarAceite?.(jsonResponse({ id: 'r1', status: 'accepted' }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // O refresh foi de 30 dias (2ª busca por 30), não de 7 (que segue com 1 busca)
+    await waitFor(() => expect(calls('GET', 'days=30').length).toBe(2));
+    expect(calls('GET', 'days=7').length).toBe(1);
+    expect(screen.getByText('21 noites · 70% dos dias')).toBeInTheDocument();
+    expect(screen.queryByText('3 noites · 43% dos dias')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '30 dias' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('erro da API aparece como alerta sem quebrar a tela', async () => {
     fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);

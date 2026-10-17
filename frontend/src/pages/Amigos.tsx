@@ -39,6 +39,11 @@ export default function Amigos() {
   // andamento) não sobrescreve a última escolha (#266).
   const rankingRequest = useRef<AbortController | null>(null);
 
+  // Seleção vigente numa ref: um `carregar()` disparado antes da troca de período
+  // (ex.: aceitar um convite que demora) precisa buscar o período mais recente, e
+  // não o `dias` capturado no closure do clique (#266).
+  const periodoAtual = useRef(7);
+
   async function carregarRanking(periodo: number): Promise<void> {
     rankingRequest.current?.abort();
     const controller = new AbortController();
@@ -58,7 +63,7 @@ export default function Amigos() {
     }
   }
 
-  async function carregar(periodo = dias) {
+  async function carregar() {
     const [meData, amigosData, convitesData] = await Promise.all([
       api.get<User>('/me'),
       api.get<Friend[]>('/friends'),
@@ -67,7 +72,7 @@ export default function Amigos() {
     setMe(meData);
     setAmigos(amigosData);
     setConvites(convitesData);
-    await carregarRanking(periodo);
+    await carregarRanking(periodoAtual.current);
   }
 
   useEffect(() => {
@@ -117,6 +122,7 @@ export default function Amigos() {
   }
 
   async function trocarPeriodo(novosDias: number) {
+    periodoAtual.current = novosDias;
     setDias(novosDias);
     try {
       await carregarRanking(novosDias);
@@ -193,7 +199,7 @@ export default function Amigos() {
         </p>
       </section>
 
-      {error && <ErrorState message="Não foi possível completar a ação." detail={error} onRetry={() => carregar(dias)} />}
+      {error && <ErrorState message="Não foi possível completar a ação." detail={error} onRetry={() => carregar()} />}
       {success && (
         <p role="status" style={{ color: 'var(--color-sucesso-texto)' }}>
           {success}
