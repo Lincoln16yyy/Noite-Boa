@@ -110,7 +110,7 @@ Rode nesta ordem e **não pule nenhuma**:
    SELECT installed_rank, version, description, success
    FROM flyway_schema_history ORDER BY installed_rank;
    ```
-   esperado: versões `1` a `4`, todas com `success = true`.
+   esperado: versões `1` a `5`, todas com `success = true`.
 3. **Sem segredos nos logs:** procure nos logs se `JWT_SECRET`/senha aparecem
    (não devem).
 4. **Cadastro + login pela API:**
