@@ -16,16 +16,16 @@ public class MeController {
 
     @GetMapping("/api/me")
     public ResponseEntity<MeResponse> me(Authentication authentication) {
-        String email = (String) authentication.getPrincipal();
-        var user = userRepository.findByEmailIgnoreCase(email)
+        java.util.UUID userId = (java.util.UUID) authentication.getPrincipal();
+        var user = userRepository.findById(userId)
             .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED));
         return ResponseEntity.ok(new MeResponse(user.getId(), user.getEmail(), user.getDisplayName(), user.getTimezone(), user.isShareWithFriends()));
     }
 
     @org.springframework.web.bind.annotation.DeleteMapping("/api/me")
     public ResponseEntity<Void> delete(Authentication authentication) {
-        String email = (String) authentication.getPrincipal();
-        var user = userRepository.findByEmailIgnoreCase(email)
+        java.util.UUID userId = (java.util.UUID) authentication.getPrincipal();
+        var user = userRepository.findById(userId)
             .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED));
         userRepository.delete(user);
         return ResponseEntity.noContent().build();
@@ -34,8 +34,8 @@ public class MeController {
     @org.springframework.web.bind.annotation.PutMapping("/api/me")
     public ResponseEntity<MeResponse> update(Authentication authentication,
             @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody br.dev.noiteboa.auth.dto.UpdateMeRequest request) {
-        String email = (String) authentication.getPrincipal();
-        var user = userRepository.findByEmailIgnoreCase(email)
+        java.util.UUID userId = (java.util.UUID) authentication.getPrincipal();
+        var user = userRepository.findById(userId)
             .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED));
         if (request.getTimezone() == null && request.getShareWithFriends() == null) {
             throw new org.springframework.web.server.ResponseStatusException(

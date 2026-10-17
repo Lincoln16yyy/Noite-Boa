@@ -25,8 +25,8 @@ public class GoalService {
      */
     public record GoalWithFlag(SleepGoal goal, boolean saved) {}
 
-    public GoalWithFlag findOrDefault(String email) {
-        User user = userRepository.findByEmailIgnoreCase(email)
+    public GoalWithFlag findOrDefault(java.util.UUID userId) {
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED));
         return sleepGoalRepository.findById(user.getId())
             .<GoalWithFlag>map(g -> new GoalWithFlag(g, true))
@@ -37,8 +37,8 @@ public class GoalService {
             });
     }
 
-    public SleepGoal upsert(String email, GoalRequest request) {
-        User user = userRepository.findByEmailIgnoreCase(email)
+    public SleepGoal upsert(java.util.UUID userId, GoalRequest request) {
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED));
         SleepGoal goal = sleepGoalRepository.findById(user.getId())
             .map(existing -> {

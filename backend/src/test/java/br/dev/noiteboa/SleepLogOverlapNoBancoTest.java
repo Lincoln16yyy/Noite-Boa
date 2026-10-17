@@ -122,7 +122,7 @@ class SleepLogOverlapNoBancoTest {
         request.setSleepEnd(base.minusHours(12));
         request.setQuality((short) 4);
 
-        assertThatThrownBy(() -> sleepService.create("corrida@example.com", request))
+        assertThatThrownBy(() -> sleepService.create(user.getId(), request))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
 

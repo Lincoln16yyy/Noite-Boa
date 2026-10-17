@@ -1,5 +1,6 @@
 package br.dev.noiteboa;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,8 +37,13 @@ class JwtProdSecretTest {
     @Test
     void comVariavelPresenteAProducaoSobeEAssinaToken() {
         assertTrue(context.isActive(), "contexto com perfil prod deveria subir");
-        String token = jwtService.generateToken(java.util.UUID.randomUUID());
+        java.util.UUID userId = java.util.UUID.randomUUID();
+        String token = jwtService.generateToken(userId);
         assertFalse(token.isBlank(), "JWT_SECRET válida deveria assinar tokens");
+        // Não basta não estar em branco (review do PR #282): o token precisa
+        // assinar de verdade e carregar o subject esperado — é ele que o filtro
+        // usa para resolver a conta.
+        assertEquals(userId, jwtService.parseUserId(token));
     }
 
     @Test
