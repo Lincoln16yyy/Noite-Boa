@@ -69,7 +69,10 @@ foram consultados nas páginas oficiais em **09/10/2026** e servem para a decis�
   automaticamente no boot (migrações aditivas — `CREATE`, `ALTER ADD COLUMN`,
   `ADD CONSTRAINT` — nada destrutivo; a V5 instala a extensão `btree_gist` em
   `public` e recusa noites sobrepostas, então a role do deploy precisa poder
-  criar extensão no schema).
+  criar extensão no schema). Se a extensão já existir em **outro** schema, a V5
+  a relocaliza para `public` (`ALTER EXTENSION ... SET SCHEMA public`), o que
+  exige que a role do deploy **seja dona** da extensão (ou superuser) — só
+  `CREATE` no schema não basta.
   Com 1 instância free não há corrida entre instâncias; se um dia houver múltiplas,
   mover migração para `preDeployCommand`.
 - **`JWT_SECRET` obrigatória no perfil `prod`:** sem a variável, o startup falha
