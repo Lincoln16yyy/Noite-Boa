@@ -29,10 +29,9 @@ class SleepLogCreateTest {
 
     @AfterEach
     void cleanup() {
-        sleepLogRepository.deleteAll();
-        userRepository.findAll().stream()
-            .filter(u -> u.getEmail().endsWith("@example.com"))
-            .forEach(userRepository::delete);
+        // Só contas de teste (@example.com). Antes havia sleepLogRepository.deleteAll(),
+        // que apagava as noites do banco de desenvolvimento inteiro (#269).
+        br.dev.noiteboa.support.LimpezaDeTeste.limpar(userRepository);
     }
 
     private String token(String email) throws Exception {
@@ -54,7 +53,11 @@ class SleepLogCreateTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").exists());
 
-        var logs = sleepLogRepository.findAll();
+        // Escopado ao dono: o banco pode ter noites de outras contas (dev), então
+        // um findAll() global não prova nada (#269).
+        var dono = userRepository.findByEmailIgnoreCase("sono@example.com").orElseThrow();
+        var logs = sleepLogRepository.findByUserIdAndSleepStartGreaterThanOrderBySleepStartDesc(
+            dono.getId(), java.time.OffsetDateTime.now().minusDays(3650));
         org.junit.jupiter.api.Assertions.assertEquals(1, logs.size());
         org.junit.jupiter.api.Assertions.assertEquals("sono@example.com", logs.get(0).getUser().getEmail());
     }

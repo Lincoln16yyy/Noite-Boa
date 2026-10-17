@@ -26,8 +26,8 @@ class SleepLogUpdateDeleteTest {
 
     @AfterEach
     void cleanup() {
-        sleepLogRepository.deleteAll();
-        userRepository.findAll().stream().filter(u -> u.getEmail().endsWith("@example.com")).forEach(userRepository::delete);
+        // Só contas de teste (@example.com); sem deleteAll() global (#269).
+        br.dev.noiteboa.support.LimpezaDeTeste.limpar(userRepository);
     }
 
     private String token(String email) throws Exception {

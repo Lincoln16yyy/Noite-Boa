@@ -26,8 +26,8 @@ class DeleteAccountTest {
 
     @AfterEach
     void cleanup() {
-        sleepLogRepository.deleteAll();
-        userRepository.findAll().stream().filter(u -> u.getEmail().endsWith("@example.com")).forEach(userRepository::delete);
+        // Só contas de teste (@example.com); sem deleteAll() global (#269).
+        br.dev.noiteboa.support.LimpezaDeTeste.limpar(userRepository);
     }
 
     private String token(String email) throws Exception {
@@ -43,6 +43,7 @@ class DeleteAccountTest {
     @Test
     void deletingAccountRemovesDataAndTokenStops() throws Exception {
         String token = token("excluir@example.com");
+        var conta = userRepository.findByEmailIgnoreCase("excluir@example.com").orElseThrow();
         String body = "{\"sleepStart\":\"2026-10-01T22:00:00Z\",\"sleepEnd\":\"2026-10-02T06:00:00Z\",\"quality\":4}";
         mockMvc.perform(post("/api/sleep-logs").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON).content(body))
@@ -51,8 +52,11 @@ class DeleteAccountTest {
         mockMvc.perform(delete("/api/me").header("Authorization", "Bearer " + token))
             .andExpect(status().isNoContent());
 
-        Assertions.assertTrue(userRepository.findAll().stream().noneMatch(u -> u.getEmail().equals("excluir@example.com")));
-        Assertions.assertTrue(sleepLogRepository.findAll().isEmpty());
+        // Escopado à conta excluída: o banco pode ter dados de outras contas (dev),
+        // então um findAll() global não provaria o cascade (#269).
+        Assertions.assertTrue(userRepository.findById(conta.getId()).isEmpty());
+        Assertions.assertTrue(sleepLogRepository.findByUserIdAndSleepStartGreaterThanOrderBySleepStartDesc(
+            conta.getId(), java.time.OffsetDateTime.now().minusDays(3650)).isEmpty());
 
         mockMvc.perform(get("/api/me").header("Authorization", "Bearer " + token))
             .andExpect(status().isUnauthorized());

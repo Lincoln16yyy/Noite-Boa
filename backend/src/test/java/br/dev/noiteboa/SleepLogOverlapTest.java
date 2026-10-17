@@ -31,15 +31,10 @@ class SleepLogOverlapTest {
     @Autowired
     UserRepository userRepository;
 
-    @Autowired
-    br.dev.noiteboa.sleep.SleepLogRepository sleepLogRepository;
-
     @AfterEach
     void cleanup() {
-        sleepLogRepository.deleteAll();
-        userRepository.findAll().stream()
-            .filter(u -> u.getEmail().endsWith("@example.com"))
-            .forEach(userRepository::delete);
+        // Contas de teste e seus dados (cascade). Sem deleteAll() global (#269).
+        br.dev.noiteboa.support.LimpezaDeTeste.limpar(userRepository);
     }
 
     private String token(String email) throws Exception {
