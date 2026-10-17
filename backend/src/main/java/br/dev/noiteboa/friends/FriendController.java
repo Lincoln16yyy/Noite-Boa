@@ -32,50 +32,50 @@ public class FriendController {
 
     @GetMapping
     public List<FriendshipService.FriendListItem> list(Authentication authentication) {
-        return service.listFriends(email(authentication));
+        return service.listFriends(usuario(authentication));
     }
 
     @DeleteMapping("/{friendshipId}")
     public ResponseEntity<Void> remove(Authentication authentication, @PathVariable UUID friendshipId) {
-        service.removeFriend(email(authentication), friendshipId);
+        service.removeFriend(usuario(authentication), friendshipId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/requests")
     public FriendshipService.RequestsResponse requests(Authentication authentication) {
-        return service.listRequests(email(authentication));
+        return service.listRequests(usuario(authentication));
     }
 
     @PostMapping("/requests")
     public ResponseEntity<FriendshipService.SendResult> invite(Authentication authentication,
             @Valid @RequestBody InviteRequest request) {
-        return ResponseEntity.ok(service.sendRequest(email(authentication), request.email()));
+        return ResponseEntity.ok(service.sendRequest(usuario(authentication), request.email()));
     }
 
     @PostMapping("/requests/{id}/accept")
     public FriendshipService.FriendResponse accept(Authentication authentication, @PathVariable UUID id) {
-        return service.accept(email(authentication), id);
+        return service.accept(usuario(authentication), id);
     }
 
     @PostMapping("/requests/{id}/decline")
     public ResponseEntity<Void> decline(Authentication authentication, @PathVariable UUID id) {
-        service.decline(email(authentication), id);
+        service.decline(usuario(authentication), id);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/requests/{id}")
     public ResponseEntity<Void> cancel(Authentication authentication, @PathVariable UUID id) {
-        service.cancel(email(authentication), id);
+        service.cancel(usuario(authentication), id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/ranking")
     public FriendshipService.RankingResponse ranking(Authentication authentication,
             @RequestParam(defaultValue = "7") int days) {
-        return service.ranking(email(authentication), days);
+        return service.ranking(usuario(authentication), days);
     }
 
-    private static String email(Authentication authentication) {
-        return (String) authentication.getPrincipal();
+    private static UUID usuario(Authentication authentication) {
+        return (UUID) authentication.getPrincipal();
     }
 }

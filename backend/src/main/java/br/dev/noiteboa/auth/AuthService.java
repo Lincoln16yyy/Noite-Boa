@@ -53,7 +53,7 @@ public class AuthService {
             throw new org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.UNAUTHORIZED, "Credenciais inválidas");
         }
-        String token = jwtService.generateToken(user.getEmail());
+        String token = jwtService.generateToken(user.getId());
         return new br.dev.noiteboa.auth.dto.LoginResponse(token, jwtService.getExpirationSeconds());
     }
 }

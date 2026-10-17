@@ -45,8 +45,8 @@ public class FriendshipService {
     // ---------- amizade ----------
 
     @Transactional(readOnly = true)
-    public List<FriendListItem> listFriends(String email) {
-        User me = requireUser(email);
+    public List<FriendListItem> listFriends(UUID userId) {
+        User me = requireUser(userId);
         return friendships.findFriendships(me.getId(), FriendshipStatus.ACCEPTED).stream()
             .map(f -> {
                 User other = f.getRequester().getId().equals(me.getId()) ? f.getAddressee() : f.getRequester();
@@ -58,8 +58,8 @@ public class FriendshipService {
     }
 
     @Transactional(readOnly = true)
-    public RequestsResponse listRequests(String email) {
-        User me = requireUser(email);
+    public RequestsResponse listRequests(UUID userId) {
+        User me = requireUser(userId);
         List<RequestResponse> sent = friendships.findByRequesterIdAndStatus(me.getId(), FriendshipStatus.PENDING).stream()
             .sorted(Comparator.comparing(Friendship::getCreatedAt).reversed())
             .map(f -> new RequestResponse(f.getId(), toFriend(f.getAddressee()), f.getCreatedAt()))
@@ -72,8 +72,8 @@ public class FriendshipService {
     }
 
     @Transactional
-    public SendResult sendRequest(String email, String inviteeEmail) {
-        User me = requireUser(email);
+    public SendResult sendRequest(UUID userId, String inviteeEmail) {
+        User me = requireUser(userId);
         String normalized = inviteeEmail == null ? "" : inviteeEmail.trim().toLowerCase(Locale.ROOT);
         if (normalized.isEmpty() || normalized.equalsIgnoreCase(me.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Você não pode convidar a si mesmo.");
@@ -123,23 +123,23 @@ public class FriendshipService {
     }
 
     @Transactional
-    public FriendResponse accept(String email, UUID requestId) {
-        Friendship f = loadForAddressee(email, requestId);
+    public FriendResponse accept(UUID userId, UUID requestId) {
+        Friendship f = loadForAddressee(userId, requestId);
         f.accept();
         friendships.save(f);
         return toFriend(f.getRequester());
     }
 
     @Transactional
-    public void decline(String email, UUID requestId) {
-        Friendship f = loadForAddressee(email, requestId);
+    public void decline(UUID userId, UUID requestId) {
+        Friendship f = loadForAddressee(userId, requestId);
         f.decline(); // mantém o registro para evitar reconvite imediato em spam
         friendships.save(f);
     }
 
     @Transactional
-    public void cancel(String email, UUID requestId) {
-        User me = requireUser(email);
+    public void cancel(UUID userId, UUID requestId) {
+        User me = requireUser(userId);
         Friendship f = friendships.findById(requestId)
             .filter(x -> x.getRequester().getId().equals(me.getId()))
             .filter(x -> x.getStatus() == FriendshipStatus.PENDING)
@@ -148,8 +148,8 @@ public class FriendshipService {
     }
 
     @Transactional
-    public void removeFriend(String email, UUID friendshipId) {
-        User me = requireUser(email);
+    public void removeFriend(UUID userId, UUID friendshipId) {
+        User me = requireUser(userId);
         Friendship f = friendships.findById(friendshipId)
             .filter(x -> x.getStatus() == FriendshipStatus.ACCEPTED)
             .filter(x -> x.getRequester().getId().equals(me.getId()) || x.getAddressee().getId().equals(me.getId()))
@@ -160,11 +160,11 @@ public class FriendshipService {
     // ---------- ranking ----------
 
     @Transactional(readOnly = true)
-    public RankingResponse ranking(String email, int days) {
+    public RankingResponse ranking(UUID userId, int days) {
         if (days != 7 && days != 30) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe 7 ou 30 dias.");
         }
-        User me = requireUser(email);
+        User me = requireUser(userId);
         OffsetDateTime desde = OffsetDateTime.now().minusDays(days);
 
         // regra de servidor: eu + amigos aceitos que optaram por compartilhar.
@@ -200,13 +200,13 @@ public class FriendshipService {
 
     // ---------- apoio ----------
 
-    private User requireUser(String email) {
-        return users.findByEmailIgnoreCase(email)
+    private User requireUser(UUID userId) {
+        return users.findById(userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
-    private Friendship loadForAddressee(String email, UUID requestId) {
-        User me = requireUser(email);
+    private Friendship loadForAddressee(UUID userId, UUID requestId) {
+        User me = requireUser(userId);
         return friendships.findById(requestId)
             .filter(x -> x.getAddressee().getId().equals(me.getId()))
             .filter(x -> x.getStatus() == FriendshipStatus.PENDING)

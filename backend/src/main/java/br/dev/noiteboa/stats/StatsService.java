@@ -34,12 +34,12 @@ public class StatsService {
         this.sleepGoalRepository = sleepGoalRepository;
     }
 
-    public Summary summary(String email, int days) {
-        return doSummary(email, days);
+    public Summary summary(java.util.UUID userId, int days) {
+        return doSummary(userId, days);
     }
 
-    private Summary doSummary(String email, int days) {
-        User user = userRepository.findByEmailIgnoreCase(email)
+    private Summary doSummary(java.util.UUID userId, int days) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.UNAUTHORIZED));
         ZoneId zone = ZoneId.of(user.getTimezone() != null ? user.getTimezone() : "America/Sao_Paulo");

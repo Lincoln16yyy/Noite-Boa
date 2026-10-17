@@ -21,8 +21,8 @@ public class SleepController {
 
     @PostMapping("/api/sleep-logs")
     public ResponseEntity<SleepLogResponse> create(Authentication authentication, @Valid @RequestBody CreateSleepLogRequest request) {
-        String email = (String) authentication.getPrincipal();
-        SleepLogResponse response = sleepService.create(email, request);
+        java.util.UUID userId = (java.util.UUID) authentication.getPrincipal();
+        SleepLogResponse response = sleepService.create(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -33,7 +33,7 @@ public class SleepController {
             @org.springframework.web.bind.annotation.RequestParam(required = false) java.time.OffsetDateTime to,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size) {
-        String email = (String) authentication.getPrincipal();
+        java.util.UUID userId = (java.util.UUID) authentication.getPrincipal();
 
         // validação de parâmetros de paginação (issue #96)
         if (page < 0) {
@@ -50,20 +50,20 @@ public class SleepController {
         }
 
         int cappedSize = Math.min(size, 100);
-        var result = sleepService.list(email, from, to, page, cappedSize);
+        var result = sleepService.list(userId, from, to, page, cappedSize);
         return ResponseEntity.ok(result);
     }
 
     @org.springframework.web.bind.annotation.PutMapping("/api/sleep-logs/{id}")
     public ResponseEntity<SleepLogResponse> update(Authentication authentication, @org.springframework.web.bind.annotation.PathVariable java.util.UUID id, @Valid @RequestBody CreateSleepLogRequest request) {
-        String email = (String) authentication.getPrincipal();
-        return ResponseEntity.ok(sleepService.update(email, id, request));
+        java.util.UUID userId = (java.util.UUID) authentication.getPrincipal();
+        return ResponseEntity.ok(sleepService.update(userId, id, request));
     }
 
     @org.springframework.web.bind.annotation.DeleteMapping("/api/sleep-logs/{id}")
     public ResponseEntity<Void> delete(Authentication authentication, @org.springframework.web.bind.annotation.PathVariable java.util.UUID id) {
-        String email = (String) authentication.getPrincipal();
-        sleepService.delete(email, id);
+        java.util.UUID userId = (java.util.UUID) authentication.getPrincipal();
+        sleepService.delete(userId, id);
         return ResponseEntity.noContent().build();
     }
 }

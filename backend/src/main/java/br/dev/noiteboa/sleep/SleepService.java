@@ -80,7 +80,7 @@ public class SleepService {
         }
     }
 
-    public SleepLogResponse create(String email, CreateSleepLogRequest request) {
+    public SleepLogResponse create(UUID userId, CreateSleepLogRequest request) {
         if (request.getSleepEnd().isBefore(request.getSleepStart()) || request.getSleepEnd().isEqual(request.getSleepStart())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fim deve ser após o início");
         }
@@ -88,7 +88,7 @@ public class SleepService {
         if (duration.toHours() > 24) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duração máxima é 24h");
         }
-        User user = userRepository.findByEmailIgnoreCase(email)
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         validarDatas(request.getSleepStart(), request.getSleepEnd());
         assertSemSobreposicao(user.getId(), request.getSleepStart(), request.getSleepEnd(), null);
@@ -97,16 +97,16 @@ public class SleepService {
         return new SleepLogResponse(log.getId(), log.getSleepStart(), log.getSleepEnd(), log.getQuality(), log.getNotes());
     }
 
-    public org.springframework.data.domain.Page<SleepLogResponse> list(String email, java.time.OffsetDateTime from, java.time.OffsetDateTime to, int page, int size) {
-        br.dev.noiteboa.auth.User user = userRepository.findByEmailIgnoreCase(email)
+    public org.springframework.data.domain.Page<SleepLogResponse> list(UUID userId, java.time.OffsetDateTime from, java.time.OffsetDateTime to, int page, int size) {
+        br.dev.noiteboa.auth.User user = userRepository.findById(userId)
             .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED));
         var pageable = org.springframework.data.domain.PageRequest.of(page, size);
         return sleepLogRepository.search(user.getId(), from, to, pageable)
             .map(s -> new SleepLogResponse(s.getId(), s.getSleepStart(), s.getSleepEnd(), s.getQuality(), s.getNotes()));
     }
 
-    public SleepLogResponse update(String email, java.util.UUID id, br.dev.noiteboa.sleep.dto.CreateSleepLogRequest request) {
-        br.dev.noiteboa.auth.User user = userRepository.findByEmailIgnoreCase(email)
+    public SleepLogResponse update(UUID userId, java.util.UUID id, br.dev.noiteboa.sleep.dto.CreateSleepLogRequest request) {
+        br.dev.noiteboa.auth.User user = userRepository.findById(userId)
             .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED));
         var log = sleepLogRepository.findById(id).orElse(null);
         if (log == null || !log.getUser().getId().equals(user.getId())) {
@@ -125,8 +125,8 @@ public class SleepService {
         return new SleepLogResponse(log.getId(), log.getSleepStart(), log.getSleepEnd(), log.getQuality(), log.getNotes());
     }
 
-    public void delete(String email, java.util.UUID id) {
-        br.dev.noiteboa.auth.User user = userRepository.findByEmailIgnoreCase(email)
+    public void delete(UUID userId, java.util.UUID id) {
+        br.dev.noiteboa.auth.User user = userRepository.findById(userId)
             .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED));
         var log = sleepLogRepository.findById(id).orElse(null);
         if (log == null || !log.getUser().getId().equals(user.getId())) {

@@ -22,7 +22,7 @@ public class StatsController {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.BAD_REQUEST, "days deve ser 7 ou 30");
         }
-        String email = (String) authentication.getPrincipal();
-        return statsService.summary(email, days);
+        java.util.UUID userId = (java.util.UUID) authentication.getPrincipal();
+        return statsService.summary(userId, days);
     }
 }
