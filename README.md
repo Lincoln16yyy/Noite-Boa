@@ -53,6 +53,16 @@ SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run   # idem, com o Swagger habilitad
 mvn -B verify    # compila e roda todos os testes (também é o que a CI faz)
 ```
 
+> **Dados de desenvolvimento:** por padrão a suíte roda no **mesmo banco** do
+> `spring-boot:run` (`sono`). Ela só remove contas de teste — e-mail terminando
+> em `@example.com`, domínio reservado pela RFC 2606 — e, pelo `ON DELETE
+> CASCADE`, os dados ligados a elas; as suas noites reais ficam intactas. Para
+> isolar de vez, aponte a suíte para outro banco (crie-o uma vez):
+> ```bash
+> docker compose exec db psql -U sono -d postgres -c 'CREATE DATABASE sono_sweep OWNER sono;'
+> POSTGRES_DB=sono_sweep mvn -B verify
+> ```
+
 Conferindo que subiu:
 
 ```bash

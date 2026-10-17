@@ -51,11 +51,9 @@ class StatsAndRankingWindowTest {
 
     @AfterEach
     void cleanup() {
-        sleepLogRepository.deleteAll();
-        friendshipRepository.deleteAll();
-        userRepository.findAll().stream()
-            .filter(u -> u.getEmail().endsWith("@example.com"))
-            .forEach(userRepository::delete);
+        // Contas de teste (@example.com) e, por cascade, noites e amizades delas.
+        // Sem deleteAll() global: o banco é o mesmo do dev (#269).
+        br.dev.noiteboa.support.LimpezaDeTeste.limpar(userRepository);
     }
 
     private String token(String email) throws Exception {

@@ -21,6 +21,13 @@ public interface SleepLogRepository extends JpaRepository<SleepLog, UUID> {
         UUID userId, OffsetDateTime since);
 
     /**
+     * Histórico completo do usuário, do mais recente ao mais antigo — sem
+     * recorte de janela. Usado para conferir posse/cascade sem depender de uma
+     * data de corte que envelhece (#269, review do PR #284).
+     */
+    java.util.List<SleepLog> findByUserIdOrderBySleepStartDesc(UUID userId);
+
+    /**
      * Média da duração (em horas) das noites do usuário na janela
      * ({@code from}, {@code to}], ou seja, terminando exatamente onde a janela
      * atual começa (#206). {@code null} se não houver nenhuma noite na janela.
