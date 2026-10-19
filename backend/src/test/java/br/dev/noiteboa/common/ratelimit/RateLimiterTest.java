@@ -93,6 +93,37 @@ class RateLimiterTest {
     }
 
     @Test
+    void chavesMaisAntigasSaemQuandoOMapaEnche() throws InterruptedException {
+        RateLimiter limiter = new RateLimiter(1_000, Duration.ofHours(1), 10);
+        for (int i = 0; i < 11; i++) {
+            limiter.tentar("login:ip-" + i, 5, Duration.ofHours(1));
+            Thread.sleep(2); // garante ordem de "última tentativa"
+        }
+
+        assertThat(limiter.temChave("login:ip-0")).as("chave mais antiga evictada").isFalse();
+        assertThat(limiter.temChave("login:ip-10")).as("chave mais recente preservada").isTrue();
+    }
+
+    @Test
+    void chaveEmUsoRecenteSobreviveAEviccao() throws InterruptedException {
+        RateLimiter limiter = new RateLimiter(1_000, Duration.ofHours(1), 10);
+        String alvo = "login-email:alvo@example.com";
+        limiter.tentar(alvo, 1, Duration.ofHours(1)); // a mais antiga
+        for (int i = 0; i < 9; i++) {
+            limiter.tentar("login:ip-" + i, 1, Duration.ofHours(1));
+            Thread.sleep(2);
+        }
+
+        // Toque recente no alvo: mesmo barrado (limite 1), conta como uso.
+        assertThat(limiter.tentar(alvo, 1, Duration.ofHours(1))).isPresent();
+        Thread.sleep(2);
+        limiter.tentar("login:ip-9", 1, Duration.ofHours(1)); // chave nova dispara a evicção
+
+        assertThat(limiter.temChave(alvo)).as("chave em uso preservada").isTrue();
+        assertThat(limiter.temChave("login:ip-0")).as("chave mais antiga saiu").isFalse();
+    }
+
+    @Test
     void janelaNovaPassaAValerNaProximaChamada() throws InterruptedException {
         RateLimiter limiter = limiterDeTeste();
         String chave = "login-email:alvo@example.com";
