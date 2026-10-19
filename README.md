@@ -53,15 +53,10 @@ SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run   # idem, com o Swagger habilitad
 mvn -B verify    # compila e roda todos os testes (também é o que a CI faz)
 ```
 
-> **Dados de desenvolvimento:** por padrão a suíte roda no **mesmo banco** do
-> `spring-boot:run` (`sono`). Ela só remove contas de teste — e-mail terminando
-> em `@example.com`, domínio reservado pela RFC 2606 — e, pelo `ON DELETE
-> CASCADE`, os dados ligados a elas; as suas noites reais ficam intactas. Para
-> isolar de vez, aponte a suíte para outro banco (crie-o uma vez):
-> ```bash
-> docker compose exec db psql -U sono -d postgres -c 'CREATE DATABASE sono_sweep OWNER sono;'
-> POSTGRES_DB=sono_sweep mvn -B verify
-> ```
+> **Banco dos testes:** a suíte sobe um **PostgreSQL 16 efêmero** via
+> Testcontainers e o descarta no fim — não usa o banco de desenvolvimento nem
+> exige `POSTGRES_DB`. O único pré-requisito é o Docker (o mesmo do
+> `docker compose`), que já é necessário para rodar o projeto.
 
 Conferindo que subiu:
 
@@ -90,7 +85,7 @@ npm run build # typecheck + build de produção em frontend/dist
 
 ### O que a CI roda
 
-O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa, em cada PR: `mvn -B verify` (com PostgreSQL 16 como serviço), `npm ci && npm run typecheck && npm run lint && npm test && npm run build` e um **teste de fumaça E2E** no navegador ([`tools/e2e`](tools/e2e)). **Só faça o merge com tudo verde.**
+O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa, em cada PR: `mvn -B verify` (os testes sobem o PostgreSQL 16 efêmero via Testcontainers), `npm ci && npm run typecheck && npm run lint && npm test && npm run build` e um **teste de fumaça E2E** no navegador ([`tools/e2e`](tools/e2e)). **Só faça o merge com tudo verde.**
 
 ### Teste de fumaça E2E
 

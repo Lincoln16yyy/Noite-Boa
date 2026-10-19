@@ -14,15 +14,16 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * Issue #269: a limpeza da suíte não pode apagar dados que não sejam de teste.
+ * Issue #269: a limpeza da suíte não apaga dados fora do marcador de teste.
  *
- * <p>O banco usado nos testes é o mesmo do desenvolvimento, então remover uma
- * conta real (e-mail fora de {@code @example.com}) seria destrutivo. Este teste
- * prova as duas metades: o dado de teste some (com os filhos, via cascade) e o
- * dado "real" permanece.</p>
+ * <p>Este teste nasceu quando a suíte rodava no mesmo banco do desenvolvimento.
+ * Hoje o banco é efêmero (Testcontainers, #270), mas a limpeza continua
+ * filtrando por {@code @example.com}: aqui ficam provadas as duas metades — o
+ * dado de teste some (com os filhos, via cascade) e um e-mail fora do marcador
+ * permanece.</p>
  */
 @SpringBootTest
-class LimpezaDeTesteNaoApagaDadosReaisTest {
+class LimpezaDeTesteNaoApagaDadosReaisTest extends TesteComBanco {
 
     @Autowired
     UserRepository userRepository;

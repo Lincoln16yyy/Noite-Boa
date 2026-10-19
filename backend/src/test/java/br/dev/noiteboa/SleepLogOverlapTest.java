@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.dev.noiteboa.support.TesteComBanco;
 import br.dev.noiteboa.auth.UserRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,7 @@ import java.time.OffsetDateTime;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class SleepLogOverlapTest {
+class SleepLogOverlapTest extends TesteComBanco {
 
     @Autowired
     MockMvc mockMvc;

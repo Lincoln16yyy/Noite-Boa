@@ -3,12 +3,13 @@ package br.dev.noiteboa.support;
 import br.dev.noiteboa.auth.UserRepository;
 
 /**
- * Limpeza padrão da suíte: remove <b>somente</b> dados de teste do banco.
+ * Limpeza padrão da suíte: remove os dados de teste do banco efêmero.
  *
  * <p>O marcador é o domínio {@code @example.com} (reservado pela RFC 2606, que
- * nenhuma pessoa real usa). Apagar globalmente com {@code deleteAll()} é
- * proibido aqui: a suíte roda no mesmo PostgreSQL do {@code spring-boot:run} e
- * levaria junto os dados reais do desenvolvedor (#269).</p>
+ * nenhuma pessoa real usa). Hoje a suíte usa um PostgreSQL efêmero
+ * (Testcontainers, issue #270); o filtro mantém a limpeza previsível caso os
+ * testes apontem para outro banco e evita apagar dados que um teste específico
+ * queira preservar (#269).</p>
  *
  * <p>As chaves estrangeiras de {@code sleep_logs}, {@code sleep_goals} e
  * {@code friendships} têm {@code ON DELETE CASCADE}, então remover a conta de

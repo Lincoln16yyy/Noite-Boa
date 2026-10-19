@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 
+import br.dev.noiteboa.support.TesteComBanco;
 import br.dev.noiteboa.auth.User;
 import br.dev.noiteboa.auth.UserRepository;
 import br.dev.noiteboa.sleep.SleepLog;
@@ -36,7 +37,7 @@ import java.util.UUID;
  * conforme o escalonador.
  */
 @SpringBootTest
-class SleepLogOverlapNoBancoTest {
+class SleepLogOverlapNoBancoTest extends TesteComBanco {
 
     @Autowired
     SleepService sleepService;

@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.dev.noiteboa.support.TesteComBanco;
 import br.dev.noiteboa.auth.User;
 import br.dev.noiteboa.auth.UserRepository;
 import br.dev.noiteboa.friends.Friendship;
@@ -36,7 +37,7 @@ import java.util.UUID;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class StatsAndRankingWindowTest {
+class StatsAndRankingWindowTest extends TesteComBanco {
 
     // O serviço agrupa por dia no fuso do perfil (padrão America/Sao_Paulo).
     // O teste precisa montar as datas no mesmo fuso, senão o resultado muda com

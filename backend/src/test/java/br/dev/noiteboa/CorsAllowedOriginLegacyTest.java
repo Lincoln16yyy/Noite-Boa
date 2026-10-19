@@ -1,5 +1,6 @@
 package br.dev.noiteboa;
 
+import br.dev.noiteboa.support.TesteComBanco;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -23,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest(properties = "cors.allowed-origin=https://legado.vercel.app")
 @AutoConfigureMockMvc
-class CorsAllowedOriginLegacyTest {
+class CorsAllowedOriginLegacyTest extends TesteComBanco {
 
     @Autowired
     MockMvc mockMvc;

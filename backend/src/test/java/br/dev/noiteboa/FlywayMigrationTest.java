@@ -9,36 +9,32 @@ import java.sql.Statement;
 
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Valida que a migração Flyway roda em um banco limpo.
- * Requer um Postgres acessível (ver docker-compose.yml).
+ * O banco é efêmero (Testcontainers), então o teste não toca o Postgres de dev.
  */
+@Testcontainers
 class FlywayMigrationTest {
 
     private static final String SCHEMA = "flyway_test";
 
-    /**
-     * Mesmas variáveis do application.yml: assim a suíte não toca o banco de dev
-     * quando `POSTGRES_DB` está setado (#269; review do PR #284). Sem as variáveis
-     * o padrão continua `sono`, como no CI.
-     */
+    @Container
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
+
     private static String url() {
-        return "jdbc:postgresql://" + env("DB_HOST", "localhost") + ":" + env("DB_PORT", "5432")
-            + "/" + env("POSTGRES_DB", "sono");
+        return POSTGRES.getJdbcUrl();
     }
 
     private static String usuario() {
-        return env("POSTGRES_USER", "sono");
+        return POSTGRES.getUsername();
     }
 
     private static String senha() {
-        return env("POSTGRES_PASSWORD", "sono_dev_only");
-    }
-
-    private static String env(String chave, String padrao) {
-        String valor = System.getenv(chave);
-        return valor == null || valor.isBlank() ? padrao : valor;
+        return POSTGRES.getPassword();
     }
 
     @Test

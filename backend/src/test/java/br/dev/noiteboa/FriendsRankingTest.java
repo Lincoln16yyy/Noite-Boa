@@ -4,6 +4,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.dev.noiteboa.support.TesteComBanco;
 import br.dev.noiteboa.auth.User;
 import br.dev.noiteboa.auth.UserRepository;
 import br.dev.noiteboa.friends.Friendship;
@@ -37,7 +38,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class FriendsRankingTest {
+class FriendsRankingTest extends TesteComBanco {
 
     @Autowired
     MockMvc mockMvc;
