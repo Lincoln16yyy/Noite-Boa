@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.dev.noiteboa.support.TesteComBanco;
 import br.dev.noiteboa.auth.User;
 import br.dev.noiteboa.auth.UserRepository;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -31,7 +32,7 @@ import java.util.UUID;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class AccountEnumerationTest {
+class AccountEnumerationTest extends TesteComBanco {
 
     @Autowired
     MockMvc mockMvc;

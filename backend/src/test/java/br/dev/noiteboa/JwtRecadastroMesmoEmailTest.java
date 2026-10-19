@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.dev.noiteboa.support.TesteComBanco;
 import br.dev.noiteboa.auth.User;
 import br.dev.noiteboa.auth.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,7 +38,7 @@ import java.util.Map;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class JwtRecadastroMesmoEmailTest {
+class JwtRecadastroMesmoEmailTest extends TesteComBanco {
 
     /**
      * IP só deste teste: o limite de cadastro é 5 por hora POR IP e a suíte

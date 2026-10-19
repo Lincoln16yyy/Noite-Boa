@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.dev.noiteboa.support.TesteComBanco;
 import br.dev.noiteboa.auth.UserRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ import java.util.UUID;
     "noiteboa.ratelimit.cadastro.limite=5",
     "noiteboa.ratelimit.cadastro.janela-segundos=2",
 })
-class AuthRateLimitTest {
+class AuthRateLimitTest extends TesteComBanco {
 
     @Autowired
     MockMvc mockMvc;

@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.dev.noiteboa.support.TesteComBanco;
 import br.dev.noiteboa.auth.UserRepository;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -23,7 +24,7 @@ import org.springframework.test.web.servlet.MvcResult;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class FriendsFlowTest {
+class FriendsFlowTest extends TesteComBanco {
 
     @Autowired
     MockMvc mockMvc;

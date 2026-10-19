@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import br.dev.noiteboa.support.TesteComBanco;
 import br.dev.noiteboa.auth.jwt.JwtService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +27,7 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest(
     properties = "JWT_SECRET=nao-e-segredo-real-de-teste-0123456789abcdef0123456789abcdef")
 @ActiveProfiles("prod")
-class JwtProdSecretTest {
+class JwtProdSecretTest extends TesteComBanco {
 
     @Autowired
     private org.springframework.context.ConfigurableApplicationContext context;
@@ -50,11 +51,16 @@ class JwtProdSecretTest {
     void comVariavelAusenteAProducaoFalhaNaInicializacao() {
         // --JWT_SECRET= tem precedência máxima (fonte de linha de comando) e
         // simula a variável ausente mesmo em ambiente que a tenha definida.
+        // O contexto é montado na mão, então o datasource do container precisa
+        // ser passado aqui: sem banco, a falha seria de conexão, não do segredo.
         RuntimeException erro = assertThrows(RuntimeException.class, () ->
             new SpringApplicationBuilder(NoiteBoaApplication.class)
                 .web(WebApplicationType.NONE)
                 .profiles("prod")
-                .run("--JWT_SECRET="));
+                .run("--JWT_SECRET=",
+                    "--spring.datasource.url=" + POSTGRES.getJdbcUrl(),
+                    "--spring.datasource.username=" + POSTGRES.getUsername(),
+                    "--spring.datasource.password=" + POSTGRES.getPassword()));
 
         Throwable raiz = erro;
         while (raiz.getCause() != null && raiz.getCause() != raiz) {

@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.dev.noiteboa.support.TesteComBanco;
 import br.dev.noiteboa.auth.UserRepository;
 import br.dev.noiteboa.common.GlobalExceptionHandler;
 import br.dev.noiteboa.friends.Friendship;
@@ -47,7 +48,7 @@ import java.util.UUID;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class CorridaUnicidade409Test {
+class CorridaUnicidade409Test extends TesteComBanco {
 
     @Autowired
     MockMvc mockMvc;

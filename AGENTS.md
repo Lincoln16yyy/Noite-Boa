@@ -25,8 +25,8 @@ docs/       ADRs e documentação
 
 ## Comandos
 ```bash
-docker compose up -d          # sobe o PostgreSQL local
-cd backend && mvn -B verify   # compila, roda testes
+docker compose up -d          # PostgreSQL local (só para rodar o app com `spring-boot:run`)
+cd backend && mvn -B verify   # compila e roda os testes (banco efêmero via Testcontainers: exige Docker, não o compose)
 cd frontend && npm ci && npm run typecheck && npm run lint && npm test && npm run build
 ```
 Se um comando ainda não existe (estrutura inicial), diga isso no PR e não invente.

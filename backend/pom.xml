@@ -19,6 +19,9 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- Docker 29 exige API >= 1.40; o 1.21.3 (gerenciado pelo Boot 3.5.7)
+             negocia com 1.32 e falha. 1.21.4 traz o docker-java atualizado. -->
+        <testcontainers.version>1.21.4</testcontainers.version>
     </properties>
 
     <dependencies>
@@ -63,6 +66,17 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Testes de integração contra um PostgreSQL 16 efêmero (issue #270). -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
