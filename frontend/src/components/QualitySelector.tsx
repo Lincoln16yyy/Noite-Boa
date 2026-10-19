@@ -56,7 +56,7 @@ export default function QualitySelector({
       <legend id={`${groupId}-legend`} className="overline" style={legendStyle}>
         {legend}
       </legend>
-      <div style={groupStyle} role="radiogroup" aria-labelledby={`${groupId}-legend`}>
+      <div style={groupStyle}>
         {QUALITY_OPTIONS.map((option) => (
           <label key={option.value} style={labelStyle}>
             <input
