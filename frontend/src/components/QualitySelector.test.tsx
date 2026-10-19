@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import QualitySelector from './QualitySelector';
 
 describe('QualitySelector (issue #158)', () => {
@@ -15,6 +15,9 @@ describe('QualitySelector (issue #158)', () => {
     const grupos = screen.getAllByRole('radiogroup');
     expect(grupos).toHaveLength(1);
     expect(grupos[0]).toHaveAccessibleName('Como foi a noite?');
+    // E as cinco notas estão DENTRO do grupo: uma nota solta fora passaria no
+    // teste global de radios e deixaria o agrupamento acessível quebrado.
+    expect(within(grupos[0]).getAllByRole('radio')).toHaveLength(5);
   });
 
   it('agrupa as 5 notas numa grade de 5 colunas (uma linha no celular)', () => {
