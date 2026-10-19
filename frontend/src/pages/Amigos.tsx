@@ -64,6 +64,9 @@ export default function Amigos() {
   }
 
   async function carregar() {
+    // Nova carga recomeça sem o erro da tentativa anterior: sem isto, um retry
+    // bem-sucedido mantém o alerta antigo na tela mesmo com os dados de volta (#267).
+    setError('');
     const [meData, amigosData, convitesData] = await Promise.all([
       api.get<User>('/me'),
       api.get<Friend[]>('/friends'),

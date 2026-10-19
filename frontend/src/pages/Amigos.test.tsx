@@ -285,6 +285,30 @@ describe('tela de Amigos', () => {
     expect(screen.getByRole('button', { name: '30 dias' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('limpa o alerta depois de "Tentar novamente" bem-sucedido (#267)', async () => {
+    // Primeira carga falha; o usuário tenta de novo e a API volta.
+    let apiForaDoAr = true;
+    fetchMock.mockImplementation(async (url: any) => {
+      const path = String(url);
+      if (apiForaDoAr && path.includes('/api/me')) return jsonResponse({ detail: 'API fora do ar' }, 500);
+      if (path.includes('/api/me')) return jsonResponse(ME);
+      if (path.includes('/friends/requests')) return jsonResponse(CONVITES);
+      if (path.includes('/friends/ranking')) return jsonResponse(RANKING_7);
+      if (path.includes('/api/friends')) return jsonResponse(AMIGOS);
+      return jsonResponse({});
+    });
+
+    openScreen();
+    expect(await screen.findByRole('alert')).toHaveTextContent('API fora do ar');
+
+    apiForaDoAr = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+
+    // Os dados voltam para a tela e o alerta antigo não pode continuar aparecendo.
+    expect(await screen.findByText('3 noites · 43% dos dias')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
   it('erro da API aparece como alerta sem quebrar a tela', async () => {
     fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);
