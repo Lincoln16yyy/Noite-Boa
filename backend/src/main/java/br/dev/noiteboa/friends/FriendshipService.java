@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -165,7 +166,6 @@ public class FriendshipService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe 7 ou 30 dias.");
         }
         User me = requireUser(userId);
-        OffsetDateTime desde = OffsetDateTime.now().minusDays(days);
 
         // regra de servidor: eu + amigos aceitos que optaram por compartilhar.
         // Quem tem share_with_friends = false não entra no cálculo (nem por UI).
@@ -179,6 +179,11 @@ public class FriendshipService {
         List<RankingEntry> ranking = participantes.stream()
             .map(u -> {
                 ZoneId zone = ZoneId.of(u.getTimezone() != null ? u.getTimezone() : "America/Sao_Paulo");
+                // #275: a janela são os últimos `days` dias locais, hoje incluso.
+                // Uma janela de `days`×24h cobre pedaços de `days + 1` datas
+                // locais (a noite que começou antes do corte + a de hoje), então
+                // a contagem podia passar do total e o % passar de 100.
+                OffsetDateTime desde = LocalDate.now(zone).minusDays(days - 1L).atStartOfDay(zone).toOffsetDateTime();
                 // noite = dia local (do início do sono) com pelo menos um registro
                 // (#98: o limite de data vai para a consulta, não varre o histórico)
                 Set<java.time.LocalDate> diasComRegistro = sleepLogs
