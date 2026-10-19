@@ -4,7 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 
 /**
  * Issue #268: a limpeza de chaves vencidas podava TODAS as chaves com a janela
@@ -14,14 +18,17 @@ import java.time.Duration;
  */
 class RateLimiterTest {
 
-    /** Gatilho baixo e limpeza sem intervalo para o teste não criar 50 mil chaves nem esperar. */
-    private static RateLimiter limiterDeTeste() {
-        return new RateLimiter(10, Duration.ZERO);
+    /** Relógio controlado pelo teste: nada aqui depende de sleep ou do relógio real. */
+    private final RelogioFalso relogio = new RelogioFalso();
+
+    /** Gatilho baixo e limpeza sem intervalo para o teste não criar 50 mil chaves. */
+    private RateLimiter limiter(int maxChaves) {
+        return new RateLimiter(10, Duration.ZERO, maxChaves, relogio);
     }
 
     @Test
-    void limpezaNaoAfrouxaOTetoDeUmaChaveComJanelaLonga() throws InterruptedException {
-        RateLimiter limiter = limiterDeTeste();
+    void limpezaNaoAfrouxaOTetoDeUmaChaveComJanelaLonga() {
+        RateLimiter limiter = limiter(100_000);
         String email = "login-email:alvo@example.com";
         Duration janelaEmail = Duration.ofHours(1);
         int limiteEmail = 3;
@@ -36,7 +43,7 @@ class RateLimiterTest {
 
         // As tentativas acima precisam ser mais antigas que a janela curta da
         // limpeza, senão o caso do bug nem é exercitado.
-        Thread.sleep(20);
+        relogio.avancar(Duration.ofSeconds(30));
 
         // Enche o mapa acima do gatilho com chaves de janela curta (login por IP).
         Duration janelaCurta = Duration.ofMillis(1);
@@ -52,15 +59,15 @@ class RateLimiterTest {
     }
 
     @Test
-    void limpezaRemoveAsChavesDeJanelaCurtaVencidas() throws InterruptedException {
-        RateLimiter limiter = limiterDeTeste();
+    void limpezaRemoveAsChavesDeJanelaCurtaVencidas() {
+        RateLimiter limiter = limiter(100_000);
         String email = "login-email:alvo@example.com";
         limiter.tentar(email, 3, Duration.ofHours(1));
 
         for (int i = 0; i < 12; i++) {
             limiter.tentar("login:ip-" + i, 5, Duration.ofMillis(1));
         }
-        Thread.sleep(20); // as chaves curtas venceram
+        relogio.avancar(Duration.ofMillis(20)); // as chaves curtas venceram
 
         // Qualquer chamada acima do gatilho dispara a limpeza (intervalo zero).
         for (int i = 0; i < 3; i++) {
@@ -78,13 +85,13 @@ class RateLimiterTest {
     }
 
     @Test
-    void limpezaNaoRodaDentroDoIntervalo() throws InterruptedException {
+    void limpezaNaoRodaDentroDoIntervalo() {
         // Intervalo de 1 h: a varredura não pode acontecer a cada requisição.
-        RateLimiter limiter = new RateLimiter(10, Duration.ofHours(1));
+        RateLimiter limiter = new RateLimiter(10, Duration.ofHours(1), 100_000, relogio);
         for (int i = 0; i < 12; i++) {
             limiter.tentar("login:ip-" + i, 5, Duration.ofMillis(1));
         }
-        Thread.sleep(20);
+        relogio.avancar(Duration.ofMillis(20));
         limiter.tentar("login:gatilho", 5, Duration.ofMillis(1));
 
         assertThat(limiter.temChave("login:ip-0"))
@@ -93,11 +100,11 @@ class RateLimiterTest {
     }
 
     @Test
-    void chavesMaisAntigasSaemQuandoOMapaEnche() throws InterruptedException {
-        RateLimiter limiter = new RateLimiter(1_000, Duration.ofHours(1), 10);
+    void chavesMaisAntigasSaemQuandoOMapaEnche() {
+        RateLimiter limiter = limiter(10);
         for (int i = 0; i < 11; i++) {
             limiter.tentar("login:ip-" + i, 5, Duration.ofHours(1));
-            Thread.sleep(2); // garante ordem de "última tentativa"
+            relogio.avancar(Duration.ofMillis(1));
         }
 
         assertThat(limiter.temChave("login:ip-0")).as("chave mais antiga evictada").isFalse();
@@ -105,33 +112,34 @@ class RateLimiterTest {
     }
 
     @Test
-    void chaveEmUsoRecenteSobreviveAEviccao() throws InterruptedException {
-        RateLimiter limiter = new RateLimiter(1_000, Duration.ofHours(1), 10);
+    void chaveQueEstaBarrandoSoBreviveAEviccao() {
+        RateLimiter limiter = limiter(10);
         String alvo = "login-email:alvo@example.com";
-        limiter.tentar(alvo, 1, Duration.ofHours(1)); // a mais antiga
+        limiter.tentar(alvo, 1, Duration.ofHours(1)); // bloqueada e a MAIS ANTIGA
+
+        // Chaves abaixo do próprio limite, mais recentes que o alvo.
         for (int i = 0; i < 9; i++) {
-            limiter.tentar("login:ip-" + i, 1, Duration.ofHours(1));
-            Thread.sleep(2);
+            relogio.avancar(Duration.ofMillis(1));
+            limiter.tentar("login:ip-" + i, 5, Duration.ofHours(1));
         }
+        relogio.avancar(Duration.ofMillis(1));
+        limiter.tentar("login:ip-9", 5, Duration.ofHours(1)); // chave nova dispara a evicção
 
-        // Toque recente no alvo: mesmo barrado (limite 1), conta como uso.
-        assertThat(limiter.tentar(alvo, 1, Duration.ofHours(1))).isPresent();
-        Thread.sleep(2);
-        limiter.tentar("login:ip-9", 1, Duration.ofHours(1)); // chave nova dispara a evicção
-
-        assertThat(limiter.temChave(alvo)).as("chave em uso preservada").isTrue();
-        assertThat(limiter.temChave("login:ip-0")).as("chave mais antiga saiu").isFalse();
+        // Sem a ordem por "bloqueada", a mais antiga (o alvo) sairia e o teto
+        // por e-mail dele zeraria — exatamente o ataque que o teto deve impedir.
+        assertThat(limiter.temChave(alvo)).as("chave que está barrando preservada").isTrue();
+        assertThat(limiter.temChave("login:ip-0")).as("chave mais antiga sem bloqueio saiu").isFalse();
     }
 
     @Test
-    void janelaNovaPassaAValerNaProximaChamada() throws InterruptedException {
-        RateLimiter limiter = limiterDeTeste();
+    void janelaNovaPassaAValerNaProximaChamada() {
+        RateLimiter limiter = limiter(100_000);
         String chave = "login-email:alvo@example.com";
 
         assertThat(limiter.tentar(chave, 1, Duration.ofHours(1))).isEmpty();
         assertThat(limiter.tentar(chave, 1, Duration.ofHours(1))).as("teto de 1 h").isPresent();
 
-        Thread.sleep(20);
+        relogio.avancar(Duration.ofMillis(20));
         // A chamada agora declara uma janela de 1 ms: a tentativa antiga vence.
         assertThat(limiter.tentar(chave, 1, Duration.ofMillis(1)))
             .as("a chave passa a usar a janela nova")
@@ -140,7 +148,7 @@ class RateLimiterTest {
 
     @Test
     void limparUmaChaveNaoAfetaAsOutras() {
-        RateLimiter limiter = limiterDeTeste();
+        RateLimiter limiter = limiter(100_000);
         String a = "login:ip-a";
         String b = "login:ip-b";
         assertThat(limiter.tentar(a, 1, Duration.ofMinutes(1))).isEmpty();
@@ -150,5 +158,29 @@ class RateLimiterTest {
 
         assertThat(limiter.tentar(a, 1, Duration.ofMinutes(1))).isEmpty();
         assertThat(limiter.tentar(b, 1, Duration.ofMinutes(1))).isPresent();
+    }
+
+    private static final class RelogioFalso extends Clock {
+
+        private Instant agora = Instant.parse("2026-01-01T12:00:00Z");
+
+        void avancar(Duration duracao) {
+            agora = agora.plus(duracao);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zona) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return agora;
+        }
     }
 }

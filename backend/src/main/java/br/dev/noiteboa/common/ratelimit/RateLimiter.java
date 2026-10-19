@@ -2,6 +2,7 @@ package br.dev.noiteboa.common.ratelimit;
 
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -39,16 +40,18 @@ public class RateLimiter {
     /**
      * Teto de chaves. Sem ele, um atacante que tenta login com milhões de e-mails
      * distintos (cada chave vive 1 h) esgota o heap e derruba o serviço. Ao encher,
-     * saem as chaves com a tentativa mais antiga — uma conta sob ataque está sempre
-     * "recente", então continua protegida (#268).
+     * saem primeiro as chaves que NÃO estão barrando tentativas e, entre elas, as
+     * de uso mais antigo — quem está sob ataque é tocado a cada tentativa e
+     * permanece "bloqueada", então é o último a sair (#268).
      */
     private static final int MAX_CHAVES = 100_000;
 
     private final int limparQuandoMaioresQue;
     private final long intervaloLimpezaNanos;
     private final int maxChaves;
+    private final Clock relogio;
 
-    /** Quando foi a última varredura (nanoTime). */
+    /** Quando foi a última varredura (nanoTime, monotônico). */
     private final AtomicLong ultimaLimpeza = new AtomicLong(System.nanoTime());
 
     /** Uma varredura por vez: um mapa grande não pode ter duas em paralelo. */
@@ -58,18 +61,23 @@ public class RateLimiter {
     private final AtomicBoolean liberandoEspaco = new AtomicBoolean();
 
     public RateLimiter() {
-        this(LIMPAR_QUANDO_MAIORES_QUE, INTERVALO_LIMPEZA, MAX_CHAVES);
+        this(LIMPAR_QUANDO_MAIORES_QUE, INTERVALO_LIMPEZA, MAX_CHAVES, Clock.systemUTC());
     }
 
     RateLimiter(int limparQuandoMaioresQue, Duration intervaloLimpeza) {
-        this(limparQuandoMaioresQue, intervaloLimpeza, MAX_CHAVES);
+        this(limparQuandoMaioresQue, intervaloLimpeza, MAX_CHAVES, Clock.systemUTC());
     }
 
-    /** Tudo configurável: o teste não cria 100 mil chaves nem espera 10 s. */
     RateLimiter(int limparQuandoMaioresQue, Duration intervaloLimpeza, int maxChaves) {
+        this(limparQuandoMaioresQue, intervaloLimpeza, maxChaves, Clock.systemUTC());
+    }
+
+    /** Tudo configurável: o teste não cria 100 mil chaves, não espera e controla o tempo. */
+    RateLimiter(int limparQuandoMaioresQue, Duration intervaloLimpeza, int maxChaves, Clock relogio) {
         this.limparQuandoMaioresQue = limparQuandoMaioresQue;
         this.intervaloLimpezaNanos = intervaloLimpeza.toNanos();
         this.maxChaves = maxChaves;
+        this.relogio = relogio;
     }
 
     /**
@@ -84,7 +92,7 @@ public class RateLimiter {
                 // ser descartada pela própria requisição que a está usando.
                 liberarEspaco();
             }
-            Entrada entrada = tentativas.computeIfAbsent(chave, k -> new Entrada(janela));
+            Entrada entrada = tentativas.computeIfAbsent(chave, k -> new Entrada(janela, relogio.instant()));
             synchronized (entrada.fila) {
                 if (tentativas.get(chave) != entrada) {
                     // A limpeza, o `limpar` ou a evicção descartou esta entrada
@@ -93,16 +101,18 @@ public class RateLimiter {
                     continue;
                 }
                 entrada.janela = janela; // a limpeza usa a janela vigente da chave
-                Instant agora = Instant.now(); // dentro do lock: a fila fica em ordem
+                Instant agora = relogio.instant(); // dentro do lock: a fila fica em ordem
                 Instant corte = agora.minus(entrada.janela);
                 while (!entrada.fila.isEmpty() && entrada.fila.peekFirst().isBefore(corte)) {
                     entrada.fila.pollFirst();
                 }
                 entrada.ultima = agora; // uso recente, mesmo quando a tentativa é barrada
                 if (entrada.fila.size() >= limite) {
+                    entrada.bloqueada = true;
                     return Optional.of(Duration.between(agora, entrada.fila.peekFirst().plus(entrada.janela)));
                 }
                 entrada.fila.addLast(agora);
+                entrada.bloqueada = entrada.fila.size() >= limite;
             }
             if (tentativas.size() > limparQuandoMaioresQue) {
                 limparSeNecessario();
@@ -130,14 +140,17 @@ public class RateLimiter {
      * varrer tudo a cada requisição viraria custo de CPU do atacante (#268).
      */
     private void limparSeNecessario() {
-        long agora = System.nanoTime();
-        if (agora - ultimaLimpeza.get() < intervaloLimpezaNanos) {
+        if (System.nanoTime() - ultimaLimpeza.get() < intervaloLimpezaNanos) {
             return; // limpou há pouco
         }
         if (!varrendo.compareAndSet(false, true)) {
             return; // outra requisição está varrendo
         }
         try {
+            long agora = System.nanoTime();
+            if (agora - ultimaLimpeza.get() < intervaloLimpezaNanos) {
+                return; // outra varredura terminou enquanto esperávamos a flag
+            }
             ultimaLimpeza.set(agora);
             limparVencidas();
         } finally {
@@ -146,7 +159,7 @@ public class RateLimiter {
     }
 
     private void limparVencidas() {
-        Instant agora = Instant.now();
+        Instant agora = relogio.instant();
         for (Map.Entry<String, Entrada> e : tentativas.entrySet()) {
             Entrada entrada = e.getValue();
             synchronized (entrada.fila) {
@@ -166,21 +179,47 @@ public class RateLimiter {
         }
     }
 
-    /** Remove as chaves com a tentativa mais antiga até folgar 10% do teto. */
+    /**
+     * Remove as chaves menos críticas até folgar 10% do teto. A ordem é:
+     * primeiro as que não estão barrando tentativas, depois as bloqueadas;
+     * dentro de cada grupo, a de uso mais antigo. Chaves tocadas depois do
+     * snapshot são poupadas na primeira passada.
+     */
     private void liberarEspaco() {
         if (!liberandoEspaco.compareAndSet(false, true)) {
             return; // outra requisição já está liberando espaço
         }
         try {
             int alvo = maxChaves - maxChaves / 10;
-            List<Map.Entry<String, Entrada>> maisAntigas = new ArrayList<>(tentativas.entrySet());
-            maisAntigas.sort(Comparator.comparing(e -> e.getValue().ultima));
-            for (Map.Entry<String, Entrada> e : maisAntigas) {
+            List<Candidata> candidatas = new ArrayList<>(tentativas.size());
+            for (Map.Entry<String, Entrada> e : tentativas.entrySet()) {
+                Entrada entrada = e.getValue();
+                candidatas.add(new Candidata(e.getKey(), entrada, entrada.ultima, entrada.bloqueada));
+            }
+            // Ordena sobre valores capturados: ler `ultima` ao vivo no comparador
+            // pode mudar a ordem no meio do sort e lançar IllegalArgumentException.
+            candidatas.sort(Comparator.comparing(Candidata::bloqueada).thenComparing(Candidata::ultima));
+
+            for (Candidata c : candidatas) {
                 if (tentativas.size() <= alvo) {
                     break;
                 }
-                synchronized (e.getValue().fila) {
-                    tentativas.remove(e.getKey(), e.getValue());
+                synchronized (c.entrada().fila) {
+                    if (c.entrada().ultima.isAfter(c.ultima())) {
+                        continue; // foi usada depois do snapshot: poupa
+                    }
+                    tentativas.remove(c.chave(), c.entrada());
+                }
+            }
+
+            // Segunda passada: memória primeiro. Se as chaves foram todas tocadas
+            // durante a evicção, ainda assim o teto precisa valer.
+            for (Candidata c : candidatas) {
+                if (tentativas.size() <= alvo) {
+                    break;
+                }
+                synchronized (c.entrada().fila) {
+                    tentativas.remove(c.chave(), c.entrada());
                 }
             }
         } finally {
@@ -193,15 +232,20 @@ public class RateLimiter {
         return tentativas.containsKey(chave);
     }
 
+    /** Candidata à evicção com os valores capturados no snapshot. */
+    private record Candidata(String chave, Entrada entrada, Instant ultima, boolean bloqueada) {
+    }
+
     /** Tentativas de uma chave, a janela vigente e o último uso (para a evicção). */
     private static final class Entrada {
         private final Deque<Instant> fila = new ConcurrentLinkedDeque<>();
         private volatile Duration janela;
         private volatile Instant ultima;
+        private volatile boolean bloqueada;
 
-        private Entrada(Duration janela) {
+        private Entrada(Duration janela, Instant agora) {
             this.janela = janela;
-            this.ultima = Instant.now();
+            this.ultima = agora;
         }
     }
 }
