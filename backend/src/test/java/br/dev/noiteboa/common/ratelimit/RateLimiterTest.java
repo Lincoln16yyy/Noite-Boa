@@ -1,10 +1,23 @@
 package br.dev.noiteboa.common.ratelimit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Issue #268: a limpeza de chaves vencidas podava TODAS as chaves com a janela
@@ -13,6 +26,63 @@ import java.time.Duration;
  * (cenário de ataque), abrindo espaço para brute force de uma conta.
  */
 class RateLimiterTest {
+
+    @Test
+    void limpezaNaoSeRepeteEnquantoOIntervaloNaoPassa() {
+        AtomicLong tempo = new AtomicLong();
+        RateLimiter limiter = new RateLimiter(1, tempo::get);
+        Map<?, ?> entradas = spy(new ConcurrentHashMap<>());
+        ReflectionTestUtils.setField(limiter, "tentativas", entradas);
+
+        assertThat(limiter.tentar("login:primeiro", 5, Duration.ofHours(1))).isEmpty();
+        verify(entradas, never()).entrySet();
+
+        for (int i = 0; i < 10; i++) {
+            assertThat(limiter.tentar("login:ip-" + i, 5, Duration.ofHours(1))).isEmpty();
+        }
+
+        verify(entradas, times(1)).entrySet();
+
+        tempo.set(Duration.ofMinutes(1).toNanos() - 1);
+        assertThat(limiter.tentar("login:antes-do-intervalo", 5, Duration.ofHours(1))).isEmpty();
+        verify(entradas, times(1)).entrySet();
+
+        tempo.incrementAndGet();
+        assertThat(limiter.tentar("login:no-intervalo", 5, Duration.ofHours(1))).isEmpty();
+        verify(entradas, times(2)).entrySet();
+
+        assertThat(limiter.tentar("login:mesmo-instante", 5, Duration.ofHours(1))).isEmpty();
+        verify(entradas, times(2)).entrySet();
+    }
+
+    @Test
+    void chamadasConcorrentesDisparamUmaUnicaLimpezaPorIntervalo() throws Exception {
+        AtomicLong tempo = new AtomicLong();
+        RateLimiter limiter = new RateLimiter(1, tempo::get);
+        Map<?, ?> entradas = spy(new ConcurrentHashMap<>());
+        ReflectionTestUtils.setField(limiter, "tentativas", entradas);
+        limiter.tentar("login:primeiro", 5, Duration.ofHours(1));
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int intervalo = 0; intervalo < 2; intervalo++) {
+                tempo.set(Duration.ofMinutes(intervalo).toNanos());
+                CyclicBarrier inicio = new CyclicBarrier(16);
+                var resultados = new ArrayList<Future<?>>();
+                for (int i = 0; i < 16; i++) {
+                    String chave = "login:concorrente-" + intervalo + "-" + i;
+                    resultados.add(executor.submit(() -> {
+                        inicio.await(5, TimeUnit.SECONDS);
+                        assertThat(limiter.tentar(chave, 5, Duration.ofHours(1))).isEmpty();
+                        return null;
+                    }));
+                }
+                for (Future<?> resultado : resultados) {
+                    resultado.get(10, TimeUnit.SECONDS);
+                }
+                verify(entradas, times(intervalo + 1)).entrySet();
+            }
+        }
+    }
 
     @Test
     void limpezaNaoAfrouxaOTetoDeUmaChaveComJanelaLonga() throws InterruptedException {

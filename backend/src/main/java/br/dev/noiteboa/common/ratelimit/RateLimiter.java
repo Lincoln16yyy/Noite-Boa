@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 
 /**
  * Limitador de tentativas em memória (issue #104) — sem dependência nova.
@@ -27,8 +29,11 @@ public class RateLimiter {
 
     /** Acima disto, varre entradas já vencidas para não reter memória de chaves mortas. */
     private static final int LIMPAR_QUANDO_MAIORES_QUE = 50_000;
+    private static final long INTERVALO_LIMPEZA_NANOS = Duration.ofMinutes(1).toNanos();
 
     private final int limparQuandoMaioresQue;
+    private final LongSupplier nanoTime;
+    private final AtomicLong ultimaLimpeza;
 
     public RateLimiter() {
         this(LIMPAR_QUANDO_MAIORES_QUE);
@@ -36,7 +41,13 @@ public class RateLimiter {
 
     /** Gatilho configurável: o teste não precisa criar 50 mil chaves. */
     RateLimiter(int limparQuandoMaioresQue) {
+        this(limparQuandoMaioresQue, System::nanoTime);
+    }
+
+    RateLimiter(int limparQuandoMaioresQue, LongSupplier nanoTime) {
         this.limparQuandoMaioresQue = limparQuandoMaioresQue;
+        this.nanoTime = nanoTime;
+        this.ultimaLimpeza = new AtomicLong(nanoTime.getAsLong() - INTERVALO_LIMPEZA_NANOS);
     }
 
     /**
@@ -59,7 +70,13 @@ public class RateLimiter {
             entrada.fila.addLast(agora);
         }
         if (tentativas.size() > limparQuandoMaioresQue) {
-            limparVencidas();
+            long agoraNanos = nanoTime.getAsLong();
+            long anterior = ultimaLimpeza.get();
+            // Reserva o intervalo antes de varrer: só uma chamada concorrente ganha.
+            if (agoraNanos - anterior >= INTERVALO_LIMPEZA_NANOS
+                    && ultimaLimpeza.compareAndSet(anterior, agoraNanos)) {
+                limparVencidas();
+            }
         }
         return Optional.empty();
     }
