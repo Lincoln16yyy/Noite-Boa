@@ -30,7 +30,10 @@ export default function Amigos() {
   const [dias, setDias] = useState(7);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
+  // Erros de ação (ex.: convidar, remover): o usuário repete a própria ação.
   const [error, setError] = useState('');
+  // Erros da carga da tela: o "Tentar novamente" recarrega os dados.
+  const [erroDaCarga, setErroDaCarga] = useState('');
   const [success, setSuccess] = useState('');
 
   // Requisição de ranking em andamento. TODA escrita do ranking passa por
@@ -64,21 +67,28 @@ export default function Amigos() {
   }
 
   async function carregar() {
-    const [meData, amigosData, convitesData] = await Promise.all([
-      api.get<User>('/me'),
-      api.get<Friend[]>('/friends'),
-      api.get<FriendRequests>('/friends/requests'),
-    ]);
-    setMe(meData);
-    setAmigos(amigosData);
-    setConvites(convitesData);
-    await carregarRanking(periodoAtual.current);
+    // Limpa só o erro da CARGA: um retry bem-sucedido precisa sumir com o alerta
+    // (#267), mas erros de ação têm ciclo próprio — apagá-los aqui esconderia
+    // uma ação que ainda não foi aplicada. Se a carga falhar de novo, o catch
+    // repõe o alerta, então o botão de retry não some.
+    setErroDaCarga('');
+    try {
+      const [meData, amigosData, convitesData] = await Promise.all([
+        api.get<User>('/me'),
+        api.get<Friend[]>('/friends'),
+        api.get<FriendRequests>('/friends/requests'),
+      ]);
+      setMe(meData);
+      setAmigos(amigosData);
+      setConvites(convitesData);
+      await carregarRanking(periodoAtual.current);
+    } catch (err: unknown) {
+      setErroDaCarga(err instanceof Error ? err.message : String(err));
+    }
   }
 
   useEffect(() => {
-    carregar()
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
-      .finally(() => setLoading(false));
+    carregar().finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -199,7 +209,14 @@ export default function Amigos() {
         </p>
       </section>
 
-      {error && <ErrorState message="Não foi possível completar a ação." detail={error} onRetry={() => carregar()} />}
+      {erroDaCarga && (
+        <ErrorState
+          message="Não foi possível carregar seus amigos."
+          detail={erroDaCarga}
+          onRetry={() => carregar()}
+        />
+      )}
+      {error && <ErrorState message="Não foi possível completar a ação." detail={error} />}
       {success && (
         <p role="status" style={{ color: 'var(--color-sucesso-texto)' }}>
           {success}
