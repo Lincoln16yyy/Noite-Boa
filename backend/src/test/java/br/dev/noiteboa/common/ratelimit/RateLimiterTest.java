@@ -14,10 +14,14 @@ import java.time.Duration;
  */
 class RateLimiterTest {
 
+    /** Gatilho baixo e limpeza sem intervalo para o teste não criar 50 mil chaves nem esperar. */
+    private static RateLimiter limiterDeTeste() {
+        return new RateLimiter(10, Duration.ZERO);
+    }
+
     @Test
     void limpezaNaoAfrouxaOTetoDeUmaChaveComJanelaLonga() throws InterruptedException {
-        // Gatilho baixo para o teste não precisar criar 50 mil chaves.
-        RateLimiter limiter = new RateLimiter(10);
+        RateLimiter limiter = limiterDeTeste();
         String email = "login-email:alvo@example.com";
         Duration janelaEmail = Duration.ofHours(1);
         int limiteEmail = 3;
@@ -48,8 +52,49 @@ class RateLimiterTest {
     }
 
     @Test
+    void limpezaRemoveAsChavesDeJanelaCurtaVencidas() throws InterruptedException {
+        RateLimiter limiter = limiterDeTeste();
+        String email = "login-email:alvo@example.com";
+        limiter.tentar(email, 3, Duration.ofHours(1));
+
+        for (int i = 0; i < 12; i++) {
+            limiter.tentar("login:ip-" + i, 5, Duration.ofMillis(1));
+        }
+        Thread.sleep(20); // as chaves curtas venceram
+
+        // Qualquer chamada acima do gatilho dispara a limpeza (intervalo zero).
+        for (int i = 0; i < 3; i++) {
+            limiter.tentar("login:gatilho-" + i, 5, Duration.ofMillis(1));
+        }
+
+        // Se `limparVencidas` virasse um no-op, a chave curta continuaria no mapa
+        // e este teste falharia — o teste do teto por e-mail sozinho não pega isso.
+        assertThat(limiter.temChave("login:ip-0"))
+            .as("chave curta vencida foi podada")
+            .isFalse();
+        assertThat(limiter.temChave(email))
+            .as("chave de 1 h preservada")
+            .isTrue();
+    }
+
+    @Test
+    void limpezaNaoRodaDentroDoIntervalo() throws InterruptedException {
+        // Intervalo de 1 h: a varredura não pode acontecer a cada requisição.
+        RateLimiter limiter = new RateLimiter(10, Duration.ofHours(1));
+        for (int i = 0; i < 12; i++) {
+            limiter.tentar("login:ip-" + i, 5, Duration.ofMillis(1));
+        }
+        Thread.sleep(20);
+        limiter.tentar("login:gatilho", 5, Duration.ofMillis(1));
+
+        assertThat(limiter.temChave("login:ip-0"))
+            .as("sem varredura dentro do intervalo")
+            .isTrue();
+    }
+
+    @Test
     void janelaNovaPassaAValerNaProximaChamada() throws InterruptedException {
-        RateLimiter limiter = new RateLimiter(10);
+        RateLimiter limiter = limiterDeTeste();
         String chave = "login-email:alvo@example.com";
 
         assertThat(limiter.tentar(chave, 1, Duration.ofHours(1))).isEmpty();
@@ -64,7 +109,7 @@ class RateLimiterTest {
 
     @Test
     void limparUmaChaveNaoAfetaAsOutras() {
-        RateLimiter limiter = new RateLimiter(10);
+        RateLimiter limiter = limiterDeTeste();
         String a = "login:ip-a";
         String b = "login:ip-b";
         assertThat(limiter.tentar(a, 1, Duration.ofMinutes(1))).isEmpty();
