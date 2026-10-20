@@ -62,5 +62,18 @@ export function precisaDePrimeiroUso(): Promise<boolean> {
 
 export function marcarOnboardingConcluido(): void {
   localStorage.setItem(CHAVE_ONBOARDING, '1');
-  sondagem = null; // quem estava observando reavalia na próxima rota
+  esquecerSondagem(); // quem estava observando reavalia na próxima rota
+}
+
+/**
+ * Descarta a memoização da sonda (#273). É chamada no logout: a sondagem vale
+ * para a conta que estava logada, e a mesma aba pode receber outra conta em
+ * seguida. Sem isso, a conta nova herda o "não é primeiro uso" da anterior e
+ * pula o fluxo.
+ *
+ * O indicador do aparelho (localStorage) NÃO é apagado: ele continua sendo
+ * preferência do aparelho, não da sessão.
+ */
+export function esquecerSondagem(): void {
+  sondagem = null;
 }

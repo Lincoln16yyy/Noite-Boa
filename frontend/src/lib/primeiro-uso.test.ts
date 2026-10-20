@@ -118,6 +118,20 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('duas sessões no mesmo módulo: A com dados sai, B recém-criada recebe true (#273)', async () => {
+    const { precisaDePrimeiroUso, esquecerSondagem } = await carregar();
+    // A já usa o app: a sonda memoiza "não é primeiro uso".
+    instalarFetch({ comNoite: true, comMeta: true });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+
+    // Logout descarta a memória; B (recém-criada) loga no mesmo aparelho.
+    esquecerSondagem();
+    instalarFetch({ comNoite: false, comMeta: false });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true);
+    // e a conta B é sondada de novo (não herdou o false de A)
+    expect((globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(4);
+  });
+
   it('ao concluir o fluxo a memoização é descartada', async () => {
     const { marcarOnboardingConcluido, precisaDePrimeiroUso } = await carregar();
     instalarFetch({ comNoite: false, comMeta: false });

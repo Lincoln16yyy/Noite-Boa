@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { api, clearSession } from '../api/client';
+import { esquecerSondagem } from '../lib/primeiro-uso';
 import type { LoginResult, RegisterResult, User } from '../api/types';
 
 /** Valor do contexto de autenticação. */
@@ -72,6 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     clearSession();
+    // A sonda do primeiro uso é por conta: a próxima conta desta aba precisa
+    // ser sondada de novo (#273). O indicador do aparelho continua.
+    esquecerSondagem();
     setUser(null);
     window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
   }, []);
