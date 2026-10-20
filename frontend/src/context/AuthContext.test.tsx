@@ -8,9 +8,10 @@ function BotaoSair() {
   return <button onClick={logout}>Sair</button>;
 }
 
-/** Mostra o e-mail do usuário atual para provar qual sessão ficou no estado. */
+/** Mostra o e-mail do usuário atual (e o carregamento) para provar a sessão. */
 function MostraUsuario() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  if (loading) return <p>carregando</p>;
   return <p>{user?.email ?? 'sem usuário'}</p>;
 }
 
@@ -176,8 +177,9 @@ describe('AuthProvider', () => {
       window.dispatchEvent(new StorageEvent('storage', { key: 'token', newValue: 'jwt-B' }));
     });
 
-    // Enquanto o /me de B não chega, a conta A não pode continuar na tela.
-    expect(await screen.findByText('sem usuário')).toBeInTheDocument();
+    // Enquanto o /me de B não chega, a conta A não pode continuar na tela: o
+    // estado volta para carregando.
+    expect(await screen.findByText('carregando')).toBeInTheDocument();
     expect(screen.queryByText('a@example.com')).not.toBeInTheDocument();
 
     await act(async () => {
@@ -209,6 +211,30 @@ describe('AuthProvider', () => {
     });
 
     expect(await screen.findByText('sem usuário')).toBeInTheDocument();
+  });
+
+  it('localStorage.clear() durante o carregamento inicial sai do esqueleto (#292)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    // O /me inicial nunca responde: o app ficaria carregando.
+    vi.mocked(globalThis.fetch).mockImplementation(
+      () => new Promise<Response>(() => {}),
+    );
+
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+      </AuthProvider>,
+    );
+    expect(screen.getByText('carregando')).toBeInTheDocument();
+
+    localStorage.clear();
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: null }));
+    });
+
+    // Sem token não há o que esperar: sai do esqueleto.
+    expect(screen.getByText('sem usuário')).toBeInTheDocument();
+    expect(screen.queryByText('carregando')).not.toBeInTheDocument();
   });
 
   it('resposta antiga de /me não derruba a consulta mais nova (#292)', async () => {

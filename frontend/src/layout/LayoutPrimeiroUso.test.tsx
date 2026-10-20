@@ -115,10 +115,13 @@ describe('Layout — primeiro uso (issue #215)', () => {
       return jsonResponse({ targetMinutes: 480, hasGoal: true });
     });
 
-    // A rota /onboarding cai no Layout (como no app), sem marcador próprio.
+    // /onboarding dentro do Layout, com marcador próprio (como a página real).
     renderWithAuth(
       <Routes>
         <Route path="/hoje" element={<p>marcador hoje</p>} />
+        <Route path="/onboarding" element={<Layout />}>
+          <Route index element={<p>marcador onboarding</p>} />
+        </Route>
         <Route path="*" element={<Layout />} />
       </Routes>,
       { user: usuario, route: '/onboarding' },
@@ -126,6 +129,7 @@ describe('Layout — primeiro uso (issue #215)', () => {
 
     // Já tem noite e meta: a sonda resolve `false` e tira a pessoa do fluxo.
     await screen.findByText('marcador hoje');
+    expect(screen.queryByText('marcador onboarding')).not.toBeInTheDocument();
   });
 
   it('falha na sonda não tira a pessoa de /onboarding (#292)', async () => {
@@ -139,6 +143,9 @@ describe('Layout — primeiro uso (issue #215)', () => {
     renderWithAuth(
       <Routes>
         <Route path="/hoje" element={<p>marcador hoje</p>} />
+        <Route path="/onboarding" element={<Layout />}>
+          <Route index element={<p>marcador onboarding</p>} />
+        </Route>
         <Route path="*" element={<Layout />} />
       </Routes>,
       { user: usuario, route: '/onboarding' },
@@ -152,6 +159,8 @@ describe('Layout — primeiro uso (issue #215)', () => {
       });
       expect(sondadas).toHaveLength(2);
     });
+    // E continua em /onboarding: nem /hoje nem outra rota qualquer.
+    expect(screen.getByText('marcador onboarding')).toBeInTheDocument();
     expect(screen.queryByText('marcador hoje')).not.toBeInTheDocument();
   });
 });

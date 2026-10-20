@@ -114,11 +114,16 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       // outra conta logou (token diferente, não nulo), o 401 é da sessão
       // antiga e não pode derrubar a nova. Sem token no envio = falha de
       // autenticação (ex.: senha errada): só mostra o erro.
-      const tokenAtual = getToken();
-      if (response.status === 401 && token && (tokenAtual === null || tokenAtual === token)) {
-        clearSession();
-        window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
-        throw new Error('Sessão expirada. Faça login novamente.');
+      if (response.status === 401 && token) {
+        // Reconfere imediatamente antes de limpar: outra aba pode ter gravado
+        // um token novo entre a leitura acima e o `removeItem` — nesse caso a
+        // sessão que entrou não pode ser derrubada (review do PR #292).
+        const tokenAgora = getToken();
+        if (tokenAgora === null || tokenAgora === token) {
+          clearSession();
+          window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+          throw new Error('Sessão expirada. Faça login novamente.');
+        }
       }
 
       throw new Error(message || `Erro ${response.status}`);
