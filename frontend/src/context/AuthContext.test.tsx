@@ -66,12 +66,18 @@ describe('AuthProvider', () => {
 
     await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
 
-    // Conta B já tem noite: se herdasse a sonda memoizada de A, receberia `true`.
-    // O reset explícito (`clearSession` → `esquecerSondagem`) tem teste próprio
-    // em `lib/primeiro-uso.test.ts`, com token nulo — caso em que o escopo por
-    // token não invalidaria a memória sozinho. Aqui se prova o fluxo completo.
+    // O reset do logout não pode depender do escopo por token: com o MESMO
+    // token de antes, a sonda tem de ser refeita. Sem o `esquecerSondagem` do
+    // `clearSession`, a memória de A responderia `true` (review do PR #292).
     simularSonda({ comNoite: true, comMeta: true });
+    localStorage.setItem('token', 'jwt-A');
     await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+
+    // Conta B (token novo) também sonda do zero. O resultado de B é o OPOSTO do
+    // de A, para que herdar a memória de A falhe (review do PR #292).
+    simularSonda({ comNoite: false, comMeta: false });
+    localStorage.setItem('token', 'jwt-B');
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true);
   });
 
   it('resposta atrasada do /me de uma conta não sobrescreve a outra (#292)', async () => {
