@@ -146,7 +146,7 @@ jobs:
       - name: Smoke — front publicado (Vercel)
         if: success() && steps.guard.outputs.superseded != 'true'
         run: |
-          for P in "" cadastro login dashboard; do
+          for P in "" cadastro login hoje; do
             CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 "$FRONT_URL/$P" || true)
             if [ "$CODE" != "200" ]; then
               echo "::error::$FRONT_URL/$P → HTTP $CODE"

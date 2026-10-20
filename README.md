@@ -125,7 +125,7 @@ node brand-board.mjs                 # regenera docs/brand-board.png com telas r
 | POST | `/auth/register` | Cria a conta (201) | — |
 | POST | `/auth/login` | Devolve o token JWT (200) | — |
 | GET | `/me` | Perfil e fuso horário | Bearer |
-| PUT | `/me` | Atualiza o fuso horário | Bearer |
+| PUT | `/me` | Atualiza o fuso horário e o compartilhamento com amigos (`shareWithFriends`) | Bearer |
 | DELETE | `/me` | Exclui a conta e todos os dados | Bearer |
 | POST | `/sleep-logs` | Registra uma noite (201) | Bearer |
 | GET | `/sleep-logs` | Lista: filtros `from`/`to`, paginação `page`/`size` (máx. 100), ordem do mais recente | Bearer |
@@ -133,7 +133,7 @@ node brand-board.mjs                 # regenera docs/brand-board.png com telas r
 | DELETE | `/sleep-logs/{id}` | Exclui uma noite | Bearer |
 | GET | `/goal` | Meta de sono (cria a padrão se não existir) | Bearer |
 | PUT | `/goal` | Atualiza a meta (240–720 min + horários) | Bearer |
-| GET | `/stats/summary?days=7\|30` | Média, constância, dívida de sono e série diária | Bearer |
+| GET | `/stats/summary?days=7\|30` | Média, constância, dívida de sono, série diária e média do período anterior (`previousAverageHours`, anulável) | Bearer |
 
 - **Autenticação:** header `Authorization: Bearer <token>`. O front-end guarda o token no `localStorage` e o envia automaticamente; sem token (ou com ele expirado), as rotas protegidas respondem **401**.
 - **Erros:** no formato `ProblemDetail` (RFC 9457), com `status`, `title` e `detail` — ex.: `{"status":409,"detail":"E-mail já cadastrado"}`.
