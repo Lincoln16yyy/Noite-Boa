@@ -35,6 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Evita setState após o desmonte (o /me pendente pode responder tarde e o
   // jsdom já ter sido desmontado nos testes — "window is not defined").
   const montado = useRef(true);
+  // Geração das consultas ao /me. Respostas de gerações antigas não escrevem
+  // no estado: duas consultas podem se sobrepor (uma do evento, outra da
+  // troca de token) e a mais lenta não pode sobrescrever a mais nova.
+  const geracao = useRef(0);
 
   useEffect(() => {
     montado.current = true;
@@ -46,16 +50,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = useCallback(async () => {
     // O /me vale para a sessão que o pediu. Se o token mudar até a resposta
     // (outra conta logou), o resultado é de uma sessão que já saiu e não pode
-    // sobrescrever o usuário atual (review do PR #292).
+    // sobrescrever o usuário atual. Mesmo com o token igual, só a consulta mais
+    // recente pode escrever no estado (review do PR #292).
+    const minhaGeracao = ++geracao.current;
     const tokenDaRequisicao = getToken();
-    const mesmaSessao = () => montado.current && getToken() === tokenDaRequisicao;
+    const atual = () =>
+      montado.current && geracao.current === minhaGeracao && getToken() === tokenDaRequisicao;
     try {
       const me = await api.get<User>('/me');
-      if (mesmaSessao()) setUser(me);
+      if (atual()) setUser(me);
     } catch {
-      if (mesmaSessao()) setUser(null);
+      if (atual()) setUser(null);
     } finally {
-      if (montado.current) {
+      if (montado.current && geracao.current === minhaGeracao) {
         if (getToken() === tokenDaRequisicao) {
           setLoading(false);
         } else {
@@ -76,7 +83,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Escuta eventos de mudança de sessão (login/logout/401)
   useEffect(() => {
     const handleSessionChange = () => {
-      setSessao(getToken());
+      const token = getToken();
+      setSessao(token);
+      if (!token) {
+        // Sessão encerrada (logout/401): não deixa a conta anterior visível e
+        // não há o que consultar sem token.
+        setUser(null);
+        setLoading(false);
+        return;
+      }
       void refreshUser();
     };
     window.addEventListener('noiteboa:session-change', handleSessionChange);
@@ -89,8 +104,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // (review do PR #292).
   useEffect(() => {
     const handleStorage = (evento: StorageEvent) => {
-      if (evento.key !== 'token') return;
-      setSessao(getToken());
+      // `localStorage.clear()` chega com `key` nulo (qualquer chave mudou).
+      if (evento.key !== null && evento.key !== 'token') return;
+      const token = getToken();
+      setSessao(token);
+      // Esconde a conta anterior enquanto o /me da nova não chega: as páginas
+      // não podem continuar mostrando (nem salvar) dados da sessão que saiu.
+      setUser(null);
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
       void refreshUser();
     };
     window.addEventListener('storage', handleStorage);

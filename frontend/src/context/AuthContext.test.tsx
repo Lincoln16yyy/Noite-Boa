@@ -150,11 +150,15 @@ describe('AuthProvider', () => {
 
   it('outra aba trocando o token atualiza sessão e usuário nesta aba (#292)', async () => {
     localStorage.setItem('token', 'jwt-A');
+    let responderB: ((resposta: Response) => void) | undefined;
     let chamadasMe = 0;
     vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
       if (String(url).includes('/api/me')) {
         chamadasMe += 1;
-        return new Response(JSON.stringify(chamadasMe === 1 ? usuarioA : usuarioB), { status: 200 });
+        if (chamadasMe === 1) return new Response(JSON.stringify(usuarioA), { status: 200 });
+        return new Promise<Response>((resolve) => {
+          responderB = resolve;
+        });
       }
       return new Response('null', { status: 200 });
     });
@@ -172,6 +176,75 @@ describe('AuthProvider', () => {
       window.dispatchEvent(new StorageEvent('storage', { key: 'token', newValue: 'jwt-B' }));
     });
 
+    // Enquanto o /me de B não chega, a conta A não pode continuar na tela.
+    expect(await screen.findByText('sem usuário')).toBeInTheDocument();
+    expect(screen.queryByText('a@example.com')).not.toBeInTheDocument();
+
+    await act(async () => {
+      responderB?.(new Response(JSON.stringify(usuarioB), { status: 200 }));
+    });
     expect(await screen.findByText('b@example.com')).toBeInTheDocument();
+  });
+
+  it('localStorage.clear() em outra aba derruba a sessão desta (#292)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/api/me')) {
+        return new Response(JSON.stringify(usuarioA), { status: 200 });
+      }
+      return new Response('null', { status: 200 });
+    });
+
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+
+    // `clear()` chega com `key` nulo: qualquer chave pode ter mudado.
+    localStorage.clear();
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: null }));
+    });
+
+    expect(await screen.findByText('sem usuário')).toBeInTheDocument();
+  });
+
+  it('resposta antiga de /me não derruba a consulta mais nova (#292)', async () => {
+    localStorage.setItem('token', 'jwt-B');
+    let rejeitarAntiga: ((erro: unknown) => void) | undefined;
+    let chamadasMe = 0;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/api/me')) {
+        chamadasMe += 1;
+        if (chamadasMe === 1) {
+          return new Promise<Response>((_, reject) => {
+            rejeitarAntiga = reject;
+          });
+        }
+        return new Response(JSON.stringify(usuarioB), { status: 200 });
+      }
+      return new Response('null', { status: 200 });
+    });
+
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+      </AuthProvider>,
+    );
+
+    // Uma segunda consulta chega (evento) e resolve B enquanto a primeira
+    // ainda está em voo.
+    act(() => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+    expect(await screen.findByText('b@example.com')).toBeInTheDocument();
+
+    // A primeira, mais lenta, falha depois: não pode zerar o usuário da nova.
+    await act(async () => {
+      rejeitarAntiga?.(new TypeError('Failed to fetch'));
+    });
+    expect(screen.getByText('b@example.com')).toBeInTheDocument();
   });
 });

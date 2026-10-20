@@ -131,7 +131,7 @@ describe('Layout — primeiro uso (issue #215)', () => {
   it('falha na sonda não tira a pessoa de /onboarding (#292)', async () => {
     // /me funciona, mas as duas chamadas da sonda falham: não dá para afirmar
     // que o fluxo é dispensável, então não redireciona.
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
       if (String(url).includes('/me')) return jsonResponse(usuario);
       return jsonResponse({ detail: 'indisponível' }, 503);
     });
@@ -144,9 +144,13 @@ describe('Layout — primeiro uso (issue #215)', () => {
       { user: usuario, route: '/onboarding' },
     );
 
-    await waitFor(() => expect(screen.getByRole('banner')).toBeInTheDocument());
-    await new Promise((r) => {
-      setTimeout(r, 300);
+    // Prova que a sonda rodou e falhou (as duas chamadas), em vez de só esperar.
+    await waitFor(() => {
+      const sondadas = fetchMock.mock.calls.filter(([url]) => {
+        const caminho = String(url);
+        return caminho.includes('/sleep-logs') || caminho.includes('/goal');
+      });
+      expect(sondadas).toHaveLength(2);
     });
     expect(screen.queryByText('marcador hoje')).not.toBeInTheDocument();
   });

@@ -262,7 +262,9 @@ export default function Layout() {
         {/* key = roda a animação de entrada a cada troca de tela (issue #216).
             Com prefers-reduced-motion a classe não anima (ui.css). */}
         <div key={location.pathname} className="ui-screen-enter">
-          <Outlet />
+          {/* A chave remonta a página quando a conta muda: o estado que ela
+              carregou (formulários, listas) é da sessão anterior (PR #292). */}
+          <Outlet key={sessao} />
         </div>
       </main>
     </div>
