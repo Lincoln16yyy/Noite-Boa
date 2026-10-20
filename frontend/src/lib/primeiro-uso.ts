@@ -1,4 +1,4 @@
-import { api } from '../api/client';
+import { api, getToken } from '../api/client';
 import type { Goal, SleepLogPage } from '../api/types';
 
 /**
@@ -11,6 +11,8 @@ import type { Goal, SleepLogPage } from '../api/types';
  * aparelho, não da sessão.
  */
 export const CHAVE_ONBOARDING = 'noiteboa.onboarding-concluido';
+
+export { esquecerSondagem } from './sonda';
 
 export function onboardingConcluido(): boolean {
   return localStorage.getItem(CHAVE_ONBOARDING) === '1';
@@ -31,9 +33,10 @@ export function onboardingConcluido(): boolean {
  * o app na primeira tela por causa de um timeout seria pior que a Hoje vazia.
  *
  * O resultado é memoizado por sessão, para as rotas não refazerem as duas
- * chamadas a cada navegação.
+ * chamadas a cada navegação. O estado da memória fica em `lib/sonda.ts`, que o
+ * cliente de API também usa para esquecê-la quando a sessão termina (#273).
  */
-let sondagem: Promise<boolean> | null = null;
+import { esquecerSondagem, esquecerSondagemSe, guardarSondagem, sondagemAtual } from './sonda';
 
 async function sondar(): Promise<boolean> {
   const [logs, goal] = await Promise.all([
@@ -45,22 +48,49 @@ async function sondar(): Promise<boolean> {
   return semNoite && semMeta;
 }
 
-export function precisaDePrimeiroUso(): Promise<boolean> {
+/**
+ * `true` = primeiro uso; `false` = não é; `null` = não deu para saber (falha
+ * de rede/API). Quem redireciona não pode tratar `null` como "não é": um erro
+ * momentâneo não confirma nada (review do PR #292).
+ */
+export function precisaDePrimeiroUso(): Promise<boolean | null> {
   if (onboardingConcluido()) return Promise.resolve(false);
-  if (!sondagem) {
-    sondagem = sondar().catch(() => {
+  const cache = sondagemAtual();
+  if (cache) return cache;
+
+  // As duas chamadas da sonda leem o token dentro do cliente de API. Se a
+  // sessão trocar no meio, elas podem sair de contas diferentes: o resultado
+  // não vale para nenhuma e não deve ser usado nem memoizado (review do PR
+  // #292).
+  const tokenDaSonda = getToken();
+  const atual = sondar()
+    .then((resultado) => {
+      if (getToken() === tokenDaSonda) return resultado;
+      // A sessão mudou no meio: o resultado não vale para conta nenhuma. Se
+      // esta sonda chegou a ser memoizada sob o token antigo, descarta — senão
+      // um `null` ficaria guardado e, ao voltar para aquele token, a próxima
+      // consulta o reaproveitaria (review do PR #292).
+      esquecerSondagemSe(atual);
+      return null;
+    })
+    .catch(() => {
       // Falha NÃO memoiza: sem resposta não dá para saber se é primeiro uso, e
-      // prender esse "false" até o fim da sessão esconderia o fluxo de quem
+      // prender esse resultado até o fim da sessão esconderia o fluxo de quem
       // acabou de criar a conta — foi o que o teste ponta a ponta com a API
       // real pegou (a sonda rodava em /login, sem sessão, e levava 401).
-      sondagem = null;
-      return false;
+      // Só descarta se esta ainda for a sonda corrente: uma sessão nova pode ter
+      // começado enquanto esta estava em voo (review do PR #292).
+      esquecerSondagemSe(atual);
+      return null;
     });
-  }
-  return sondagem;
+  // A sonda fica guardada sob o token capturado acima. Se a sessão mudou no
+  // meio, o `.then` a descarta ao resolver; guardar sob o token atual poderia
+  // entregar o resultado de A para B (review do PR #292).
+  guardarSondagem(atual, tokenDaSonda);
+  return atual;
 }
 
 export function marcarOnboardingConcluido(): void {
   localStorage.setItem(CHAVE_ONBOARDING, '1');
-  sondagem = null; // quem estava observando reavalia na próxima rota
+  esquecerSondagem(); // quem estava observando reavalia na próxima rota
 }

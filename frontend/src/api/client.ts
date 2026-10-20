@@ -1,3 +1,5 @@
+import { esquecerSondagem } from '../lib/sonda';
+
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 /** Tempo padrão de timeout (ms) — pode ser alterado via `api.setTimeout(ms)` */
@@ -27,12 +29,33 @@ export interface RequestOptions {
  */
 export type MetodoOptions = Omit<RequestOptions, 'method' | 'body'>;
 
-function getToken(): string | null {
+/**
+ * Token da sessão atual. Exportado para quem precisa saber se a sessão que
+ * iniciou uma requisição ainda é a mesma quando a resposta chega (review do
+ * PR #292).
+ */
+export function getToken(): string | null {
   return localStorage.getItem('token');
 }
 
 export function clearSession(): void {
   localStorage.removeItem('token');
+  // A sondagem do primeiro uso vale para a conta que estava logada. Toda saída
+  // de sessão passa por aqui (logout, exclusão da conta, 401), então a próxima
+  // conta desta aba é sondada de novo (#273).
+  esquecerSondagem();
+}
+
+/**
+ * Limpa a sessão apenas se o token atual ainda for `token` (inclusive `null`).
+ * Fecha a maior parte da janela em que outra aba troca a conta entre a resposta
+ * e a limpeza — a checagem e o `removeItem` ficam no mesmo bloco síncrono
+ * (review do PR #292). Devolve se limpou.
+ */
+export function clearSessionIfCurrent(token: string | null): boolean {
+  if (getToken() !== token) return false;
+  clearSession();
+  return true;
 }
 
 /**
@@ -96,13 +119,27 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (!response.ok) {
       const message = await readProblemMessage(response);
 
-      // 401 com sessão ativa = token expirado/inválido: limpa e avisa o contexto.
-      // 401 sem sessão = falha de autenticação (ex.: senha errada): só mostra o erro.
-      const hadSession = Boolean(getToken());
-      if (response.status === 401 && hadSession) {
-        clearSession();
-        window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
-        throw new Error('Sessão expirada. Faça login novamente.');
+      // 401 com a mesma sessão que fez a requisição = token expirado/inválido:
+      // limpa e avisa o contexto. Também vale quando não há mais token algum
+      // (outra aba deslogou durante a requisição): a sessão desta janela
+      // acabou e ela não recebeu o evento da outra (review do PR #292). Se
+      // outra conta logou (token diferente, não nulo), o 401 é da sessão
+      // antiga e não pode derrubar a nova. Sem token no envio = falha de
+      // autenticação (ex.: senha errada): só mostra o erro.
+      if (response.status === 401 && token) {
+        const tokenAgora = getToken();
+        // `null` = outra aba deslogou durante a requisição (a sessão desta
+        // janela acabou); igual = token expirou. Diferente e não nulo = outra
+        // conta assumiu, e o 401 é da sessão antiga, que não pode derrubar a
+        // nova. A limpeza reconfere o token imediatamente antes do `removeItem`
+        // (review do PR #292).
+        if (
+          (tokenAgora === null || tokenAgora === token) &&
+          clearSessionIfCurrent(tokenAgora)
+        ) {
+          window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+          throw new Error('Sessão expirada. Faça login novamente.');
+        }
       }
 
       throw new Error(message || `Erro ${response.status}`);

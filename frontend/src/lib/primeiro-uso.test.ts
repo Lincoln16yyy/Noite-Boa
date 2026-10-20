@@ -82,22 +82,25 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('erro de rede não empurra ninguém para o fluxo', async () => {
+  it('erro de rede não afirma nada: nem primeiro uso nem o contrário', async () => {
     const { precisaDePrimeiroUso } = await carregar();
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('rede fora'));
-    await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+    await expect(precisaDePrimeiroUso()).resolves.toBeNull();
   });
 
   it('a falha não memoiza: com a rede de volta a sonda tenta de novo', async () => {
     const { precisaDePrimeiroUso } = await carregar();
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('rede fora'));
-    await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('rede fora'));
+    await expect(precisaDePrimeiroUso()).resolves.toBeNull();
 
-    // Sempre memoizar o "false" da falha esconderia o fluxo de quem acabou de
+    // Sempre memoizar o resultado da falha esconderia o fluxo de quem acabou de
     // criar a conta (o 401 da sonda em /login, sem sessão, fazia exatamente
     // isso — pegado no E2E com a API real).
     instalarFetch({ comNoite: false, comMeta: false });
     await expect(precisaDePrimeiroUso()).resolves.toBe(true);
+    // As duas chamadas foram refeitas de verdade (2 da falha + 2 desta): não
+    // pode ter respondido `true` de um cache deixado pela falha.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it('back-end antigo (sem hasGoal) também não empurra', async () => {
@@ -116,6 +119,106 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     await precisaDePrimeiroUso();
     await precisaDePrimeiroUso();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('duas sessões no mesmo módulo: A com dados sai, B recém-criada recebe true (#273)', async () => {
+    const { precisaDePrimeiroUso, esquecerSondagem } = await carregar();
+    // A já usa o app: a sonda memoiza "não é primeiro uso".
+    instalarFetch({ comNoite: true, comMeta: true });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+
+    // Logout descarta a memória; B (recém-criada) loga no mesmo aparelho.
+    esquecerSondagem();
+    instalarFetch({ comNoite: false, comMeta: false });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true);
+    // e a conta B é sondada de novo (não herdou o false de A)
+    expect((globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(4);
+  });
+
+  it('clearSession descarta a sonda: toda saída de sessão passa por ela (#273)', async () => {
+    const { precisaDePrimeiroUso } = await carregar();
+    const { clearSession } = await import('../api/client');
+
+    instalarFetch({ comNoite: true, comMeta: true });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(false); // A já usa o app
+
+    clearSession(); // logout, exclusão de conta e 401 passam por aqui
+
+    instalarFetch({ comNoite: false, comMeta: false });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true); // B, recém-criada
+  });
+
+  it('sonda antiga que falha não apaga a sonda da sessão nova (#292)', async () => {
+    const { precisaDePrimeiroUso, esquecerSondagem } = await carregar();
+
+    // Conta A: as chamadas ficam pendentes até nós rejeitarmos.
+    let rejeitarAntiga: ((erro: unknown) => void) | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/sleep-logs')) {
+        return new Promise<Response>((_, reject) => { rejeitarAntiga = reject; });
+      }
+      return jsonResponse({ targetMinutes: 480, hasGoal: false });
+    });
+    const antiga = precisaDePrimeiroUso();
+
+    esquecerSondagem(); // logout enquanto a sonda de A está em voo
+    instalarFetch({ comNoite: false, comMeta: false }); // conta B
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true);
+
+    rejeitarAntiga?.(new Error('rede fora')); // A falha atrasada
+    await expect(antiga).resolves.toBeNull();
+
+    // A sonda de B continua memoizada: nenhuma chamada nova.
+    const chamadas = (globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length;
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true);
+    expect((globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(chamadas);
+  });
+
+  it('troca de conta em outra aba (token compartilhado) invalida a sonda (#292)', async () => {
+    const { precisaDePrimeiroUso } = await carregar();
+    localStorage.setItem('token', 'jwt-A');
+    instalarFetch({ comNoite: true, comMeta: true });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(false); // A já usa o app
+
+    // Outra aba troca de conta: o token (compartilhado) muda, mas o evento
+    // `session-change` não chega nesta janela.
+    localStorage.setItem('token', 'jwt-B');
+    instalarFetch({ comNoite: false, comMeta: false });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true); // B, recém-criada
+  });
+
+  it('sessão que muda no meio da sonda não usa nem memoiza o resultado (#292)', async () => {
+    const { precisaDePrimeiroUso } = await carregar();
+    localStorage.setItem('token', 'jwt-A');
+
+    // O /sleep-logs de A fica pendente; a sonda já fica memoizada sob A.
+    let responderLogs: ((resposta: Response) => void) | undefined;
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/sleep-logs')) {
+        return new Promise<Response>((resolve) => {
+          responderLogs = resolve;
+        });
+      }
+      return jsonResponse({ targetMinutes: 480, hasGoal: true });
+    });
+
+    const pendente = precisaDePrimeiroUso();
+    // Outra aba troca a conta antes de a primeira chamada responder.
+    localStorage.setItem('token', 'jwt-B');
+    responderLogs?.(jsonResponse({ content: [] }));
+
+    // Mistura de conta A (sem noites) com B (com meta): não dá para decidir.
+    await expect(pendente).resolves.toBeNull();
+
+    // Voltar para A não pode reaproveitar um `null` memoizado da sonda antiga.
+    localStorage.setItem('token', 'jwt-A');
+    fetchMock.mockImplementation(async (url) => {
+      if (String(url).includes('/sleep-logs')) return jsonResponse({ content: [{ id: 'a1' }] });
+      return jsonResponse({ targetMinutes: 480, hasGoal: true });
+    });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+    // Refizeram as duas chamadas (as 2 da primeira sonda + 2 desta).
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it('ao concluir o fluxo a memoização é descartada', async () => {
