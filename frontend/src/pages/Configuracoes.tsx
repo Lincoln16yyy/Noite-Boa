@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, clearSession } from '../api/client';
+import { api, clearSession, getToken } from '../api/client';
 import type { Goal, User } from '../api/types';
 import {
   agendarLembrete,
@@ -148,8 +148,13 @@ export default function Configuracoes() {
     setError('');
     setSuccess('');
 
+    // Sessão que pediu a exclusão: se outra aba entrar com outra conta enquanto
+    // o DELETE está em voo, a sessão nova não pode ser derrubada nem levada
+    // para /?deleted=true (review do PR #292).
+    const tokenDaExclusao = getToken();
     try {
       await api.delete('/me');
+      if (getToken() !== tokenDaExclusao) return;
       clearSession();
       // Avisa o AuthProvider para derrubar o usuário da sessão
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));

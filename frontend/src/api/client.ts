@@ -47,6 +47,18 @@ export function clearSession(): void {
 }
 
 /**
+ * Limpa a sessão apenas se o token atual ainda for `token` (inclusive `null`).
+ * Fecha a maior parte da janela em que outra aba troca a conta entre a resposta
+ * e a limpeza — a checagem e o `removeItem` ficam no mesmo bloco síncrono
+ * (review do PR #292). Devolve se limpou.
+ */
+export function clearSessionIfCurrent(token: string | null): boolean {
+  if (getToken() !== token) return false;
+  clearSession();
+  return true;
+}
+
+/**
  * Configura o timeout global (ms) — usado em testes para simular timeout rápido.
  *
  * Renomeado de `setTimeout` para evitar sombreamento do `window.setTimeout`
@@ -115,12 +127,16 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       // antiga e não pode derrubar a nova. Sem token no envio = falha de
       // autenticação (ex.: senha errada): só mostra o erro.
       if (response.status === 401 && token) {
-        // Reconfere imediatamente antes de limpar: outra aba pode ter gravado
-        // um token novo entre a leitura acima e o `removeItem` — nesse caso a
-        // sessão que entrou não pode ser derrubada (review do PR #292).
         const tokenAgora = getToken();
-        if (tokenAgora === null || tokenAgora === token) {
-          clearSession();
+        // `null` = outra aba deslogou durante a requisição (a sessão desta
+        // janela acabou); igual = token expirou. Diferente e não nulo = outra
+        // conta assumiu, e o 401 é da sessão antiga, que não pode derrubar a
+        // nova. A limpeza reconfere o token imediatamente antes do `removeItem`
+        // (review do PR #292).
+        if (
+          (tokenAgora === null || tokenAgora === token) &&
+          clearSessionIfCurrent(tokenAgora)
+        ) {
           window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
           throw new Error('Sessão expirada. Faça login novamente.');
         }

@@ -1,4 +1,4 @@
-import { api } from '../api/client';
+import { api, getToken } from '../api/client';
 import type { Goal, SleepLogPage } from '../api/types';
 
 /**
@@ -58,17 +58,24 @@ export function precisaDePrimeiroUso(): Promise<boolean | null> {
   const cache = sondagemAtual();
   if (cache) return cache;
 
-  const atual = sondar().catch(() => {
-    // Falha NÃO memoiza: sem resposta não dá para saber se é primeiro uso, e
-    // prender esse resultado até o fim da sessão esconderia o fluxo de quem
-    // acabou de criar a conta — foi o que o teste ponta a ponta com a API
-    // real pegou (a sonda rodava em /login, sem sessão, e levava 401).
-    // Só descarta se esta ainda for a sonda corrente: uma sessão nova pode ter
-    // começado enquanto esta estava em voo (review do PR #292).
-    if (sondagemAtual() === atual) esquecerSondagem();
-    return null;
-  });
-  guardarSondagem(atual);
+  // As duas chamadas da sonda leem o token dentro do cliente de API. Se a
+  // sessão trocar no meio, elas podem sair de contas diferentes: o resultado
+  // não vale para nenhuma e não deve ser usado nem memoizado (review do PR
+  // #292).
+  const tokenDaSonda = getToken();
+  const atual = sondar()
+    .then((resultado) => (getToken() === tokenDaSonda ? resultado : null))
+    .catch(() => {
+      // Falha NÃO memoiza: sem resposta não dá para saber se é primeiro uso, e
+      // prender esse resultado até o fim da sessão esconderia o fluxo de quem
+      // acabou de criar a conta — foi o que o teste ponta a ponta com a API
+      // real pegou (a sonda rodava em /login, sem sessão, e levava 401).
+      // Só descarta se esta ainda for a sonda corrente: uma sessão nova pode ter
+      // começado enquanto esta estava em voo (review do PR #292).
+      if (sondagemAtual() === atual) esquecerSondagem();
+      return null;
+    });
+  if (getToken() === tokenDaSonda) guardarSondagem(atual);
   return atual;
 }
 

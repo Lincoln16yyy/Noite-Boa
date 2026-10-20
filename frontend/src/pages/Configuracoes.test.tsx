@@ -271,6 +271,35 @@ describe('tela de Configurações', () => {
     await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
   });
 
+  it('exclusão da conta não derruba a sessão que entrou durante o pedido (#292)', async () => {
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'DELETE') {
+        // Outra aba entrou com outra conta enquanto o DELETE estava em voo.
+        localStorage.setItem('token', 'jwt-B');
+        return new Response(null, { status: 204 });
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+    renderWithAuth(
+      <Routes>
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/" element={<h1>Página inicial</h1>} />
+      </Routes>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+    fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), {
+      target: { value: 'EXCLUIR' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
+    await waitFor(() => expect(calls('DELETE', '/me').length).toBe(1));
+
+    // A sessão nova continua de pé e não é levada para a página de exclusão.
+    expect(localStorage.getItem('token')).toBe('jwt-B');
+    expect(screen.queryByRole('heading', { name: 'Página inicial' })).not.toBeInTheDocument();
+  });
+
   it('mantém a sessão e mostra erro quando a exclusão falha no servidor', async () => {
     fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);

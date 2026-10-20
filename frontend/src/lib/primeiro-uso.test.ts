@@ -184,6 +184,31 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     await expect(precisaDePrimeiroUso()).resolves.toBe(true); // B, recém-criada
   });
 
+  it('sessão que muda no meio da sonda não usa resultado misturado (#292)', async () => {
+    const { precisaDePrimeiroUso } = await carregar();
+    localStorage.setItem('token', 'jwt-A');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/sleep-logs')) {
+        // Outra aba troca a conta enquanto a primeira chamada da sonda sai.
+        localStorage.setItem('token', 'jwt-B');
+        return jsonResponse({ content: [] });
+      }
+      return jsonResponse({ targetMinutes: 480, hasGoal: true });
+    });
+
+    // Mistura de conta A (sem noites) com B (com meta): não dá para decidir.
+    await expect(precisaDePrimeiroUso()).resolves.toBeNull();
+
+    // Não ficou memoizado sob nenhuma das contas: com a sessão estável (B), a
+    // próxima consulta refaz as duas chamadas.
+    fetchMock.mockImplementation(async (url) => {
+      if (String(url).includes('/sleep-logs')) return jsonResponse({ content: [{ id: 'b1' }] });
+      return jsonResponse({ targetMinutes: 480, hasGoal: true });
+    });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
   it('ao concluir o fluxo a memoização é descartada', async () => {
     const { marcarOnboardingConcluido, precisaDePrimeiroUso } = await carregar();
     instalarFetch({ comNoite: false, comMeta: false });
