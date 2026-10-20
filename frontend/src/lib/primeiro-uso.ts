@@ -36,7 +36,7 @@ export function onboardingConcluido(): boolean {
  * chamadas a cada navegação. O estado da memória fica em `lib/sonda.ts`, que o
  * cliente de API também usa para esquecê-la quando a sessão termina (#273).
  */
-import { esquecerSondagem, guardarSondagem, sondagemAtual } from './sonda';
+import { esquecerSondagem, esquecerSondagemSe, guardarSondagem, sondagemAtual } from './sonda';
 
 async function sondar(): Promise<boolean> {
   const [logs, goal] = await Promise.all([
@@ -64,7 +64,15 @@ export function precisaDePrimeiroUso(): Promise<boolean | null> {
   // #292).
   const tokenDaSonda = getToken();
   const atual = sondar()
-    .then((resultado) => (getToken() === tokenDaSonda ? resultado : null))
+    .then((resultado) => {
+      if (getToken() === tokenDaSonda) return resultado;
+      // A sessão mudou no meio: o resultado não vale para conta nenhuma. Se
+      // esta sonda chegou a ser memoizada sob o token antigo, descarta — senão
+      // um `null` ficaria guardado e, ao voltar para aquele token, a próxima
+      // consulta o reaproveitaria (review do PR #292).
+      esquecerSondagemSe(atual);
+      return null;
+    })
     .catch(() => {
       // Falha NÃO memoiza: sem resposta não dá para saber se é primeiro uso, e
       // prender esse resultado até o fim da sessão esconderia o fluxo de quem
@@ -72,7 +80,7 @@ export function precisaDePrimeiroUso(): Promise<boolean | null> {
       // real pegou (a sonda rodava em /login, sem sessão, e levava 401).
       // Só descarta se esta ainda for a sonda corrente: uma sessão nova pode ter
       // começado enquanto esta estava em voo (review do PR #292).
-      if (sondagemAtual() === atual) esquecerSondagem();
+      esquecerSondagemSe(atual);
       return null;
     });
   if (getToken() === tokenDaSonda) guardarSondagem(atual);

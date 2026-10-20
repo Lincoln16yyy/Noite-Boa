@@ -90,7 +90,7 @@ describe('indicador do primeiro uso (no aparelho)', () => {
 
   it('a falha não memoiza: com a rede de volta a sonda tenta de novo', async () => {
     const { precisaDePrimeiroUso } = await carregar();
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('rede fora'));
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('rede fora'));
     await expect(precisaDePrimeiroUso()).resolves.toBeNull();
 
     // Sempre memoizar o resultado da falha esconderia o fluxo de quem acabou de
@@ -98,6 +98,9 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     // isso — pegado no E2E com a API real).
     instalarFetch({ comNoite: false, comMeta: false });
     await expect(precisaDePrimeiroUso()).resolves.toBe(true);
+    // As duas chamadas foram refeitas de verdade (2 da falha + 2 desta): não
+    // pode ter respondido `true` de um cache deixado pela falha.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it('back-end antigo (sem hasGoal) também não empurra', async () => {
@@ -184,28 +187,37 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     await expect(precisaDePrimeiroUso()).resolves.toBe(true); // B, recém-criada
   });
 
-  it('sessão que muda no meio da sonda não usa resultado misturado (#292)', async () => {
+  it('sessão que muda no meio da sonda não usa nem memoiza o resultado (#292)', async () => {
     const { precisaDePrimeiroUso } = await carregar();
     localStorage.setItem('token', 'jwt-A');
+
+    // O /sleep-logs de A fica pendente; a sonda já fica memoizada sob A.
+    let responderLogs: ((resposta: Response) => void) | undefined;
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
       if (String(url).includes('/sleep-logs')) {
-        // Outra aba troca a conta enquanto a primeira chamada da sonda sai.
-        localStorage.setItem('token', 'jwt-B');
-        return jsonResponse({ content: [] });
+        return new Promise<Response>((resolve) => {
+          responderLogs = resolve;
+        });
       }
       return jsonResponse({ targetMinutes: 480, hasGoal: true });
     });
 
-    // Mistura de conta A (sem noites) com B (com meta): não dá para decidir.
-    await expect(precisaDePrimeiroUso()).resolves.toBeNull();
+    const pendente = precisaDePrimeiroUso();
+    // Outra aba troca a conta antes de a primeira chamada responder.
+    localStorage.setItem('token', 'jwt-B');
+    responderLogs?.(jsonResponse({ content: [] }));
 
-    // Não ficou memoizado sob nenhuma das contas: com a sessão estável (B), a
-    // próxima consulta refaz as duas chamadas.
+    // Mistura de conta A (sem noites) com B (com meta): não dá para decidir.
+    await expect(pendente).resolves.toBeNull();
+
+    // Voltar para A não pode reaproveitar um `null` memoizado da sonda antiga.
+    localStorage.setItem('token', 'jwt-A');
     fetchMock.mockImplementation(async (url) => {
-      if (String(url).includes('/sleep-logs')) return jsonResponse({ content: [{ id: 'b1' }] });
+      if (String(url).includes('/sleep-logs')) return jsonResponse({ content: [{ id: 'a1' }] });
       return jsonResponse({ targetMinutes: 480, hasGoal: true });
     });
     await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+    // Refizeram as duas chamadas (as 2 da primeira sonda + 2 desta).
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 

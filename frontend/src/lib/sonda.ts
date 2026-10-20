@@ -29,3 +29,16 @@ export function esquecerSondagem(): void {
   sondagem = null;
   tokenDaSondagem = null;
 }
+
+/**
+ * Esquece a sondagem somente se ela ainda for `promessa`. Compara a promessa
+ * diretamente (sem passar pelo token): uma sonda que terminou depois de a
+ * sessão mudar continua guardada sob o token antigo e precisa ser descartada
+ * mesmo que o token atual já seja outro (review do PR #292).
+ */
+export function esquecerSondagemSe(promessa: Promise<boolean | null>): void {
+  if (sondagem === promessa) {
+    sondagem = null;
+    tokenDaSondagem = null;
+  }
+}
