@@ -188,6 +188,48 @@ class FriendsRankingTest extends TesteComBanco {
             .andExpect(jsonPath("$.ranking[0].nights").value(7));
     }
 
+    /**
+     * Review do Sourcery no PR #290: só o limite inferior deixaria a noite de
+     * amanhã (início no futuro) entrar como uma data a mais e estourar 100%.
+     */
+    @Test
+    void nightStartingTomorrowDoesNotEnterTheWindow() throws Exception {
+        String anaToken = loginToken("ana-futuro@example.com", "Ana");
+        User ana = userRepository.findByEmailIgnoreCase("ana-futuro@example.com").orElseThrow();
+        ana.updateTimezone(fusoComHoraLocal(15).getId());
+        userRepository.save(ana);
+
+        for (int k = 6; k >= 1; k--) {
+            seedNight(ana, k); // 22h de today-6 até today-1; a de today-1 termina às 6h de hoje
+        }
+        seedNightAt(ana, 0, 7, 1);   // 7h de hoje: completa as 7 datas no passado
+        seedNightAt(ana, -1, 1, 1);  // 1h de amanhã: início no futuro, fora da janela
+
+        mockMvc.perform(get("/api/friends/ranking?days=7").header("Authorization", "Bearer " + anaToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ranking[0].nights").value(7))
+            .andExpect(jsonPath("$.ranking[0].consistencyPercent").value(100));
+    }
+
+    /**
+     * Review do Sourcery no PR #290: a noite que começa exatamente à meia-noite
+     * do primeiro dia da janela precisa contar (limite inferior inclusivo).
+     */
+    @Test
+    void nightExactlyAtWindowStartCounts() throws Exception {
+        String anaToken = loginToken("ana-meianoite@example.com", "Ana");
+        User ana = userRepository.findByEmailIgnoreCase("ana-meianoite@example.com").orElseThrow();
+        ana.updateTimezone(fusoComHoraLocal(15).getId());
+        userRepository.save(ana);
+
+        seedNightAt(ana, 6, 0, 1); // 00:00 de today-6 = início exato da janela de 7 dias
+
+        mockMvc.perform(get("/api/friends/ranking?days=7").header("Authorization", "Bearer " + anaToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ranking[0].nights").value(1))
+            .andExpect(jsonPath("$.ranking[0].consistencyPercent").value(14)); // 1/7
+    }
+
     @Test
     void rankingNeverExposesRawSleepData() throws Exception {
         String anaToken = loginToken("ana-raw@example.com", "Ana");

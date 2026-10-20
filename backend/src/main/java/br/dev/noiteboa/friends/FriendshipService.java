@@ -13,8 +13,10 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -176,6 +178,9 @@ public class FriendshipService {
             .filter(User::isShareWithFriends)
             .forEach(participantes::add);
 
+        // uma data de referência por fuso, compartilhada por todos os participantes
+        Map<ZoneId, LocalDate> hojePorFuso = new HashMap<>();
+
         List<RankingEntry> ranking = participantes.stream()
             .map(u -> {
                 ZoneId zone = ZoneId.of(u.getTimezone() != null ? u.getTimezone() : "America/Sao_Paulo");
@@ -183,11 +188,17 @@ public class FriendshipService {
                 // Uma janela de `days`×24h cobre pedaços de `days + 1` datas
                 // locais (a noite que começou antes do corte + a de hoje), então
                 // a contagem podia passar do total e o % passar de 100.
-                OffsetDateTime desde = LocalDate.now(zone).minusDays(days - 1L).atStartOfDay(zone).toOffsetDateTime();
+                // A data de referência é única por fuso: se a requisição cruzar a
+                // meia-noite, todos os participantes do mesmo fuso são comparados
+                // na mesma janela (review do Sourcery no PR #290).
+                LocalDate hoje = hojePorFuso.computeIfAbsent(zone, LocalDate::now);
+                OffsetDateTime desde = hoje.minusDays(days - 1L).atStartOfDay(zone).toOffsetDateTime();
+                OffsetDateTime ate = hoje.plusDays(1).atStartOfDay(zone).toOffsetDateTime();
                 // noite = dia local (do início do sono) com pelo menos um registro
                 // (#98: o limite de data vai para a consulta, não varre o histórico)
                 Set<java.time.LocalDate> diasComRegistro = sleepLogs
-                    .findByUserIdAndSleepStartGreaterThanOrderBySleepStartDesc(u.getId(), desde).stream()
+                    .findByUserIdAndSleepStartGreaterThanEqualAndSleepStartLessThanOrderBySleepStartDesc(
+                        u.getId(), desde, ate).stream()
                     .map(l -> l.getSleepStart().atZoneSameInstant(zone).toLocalDate())
                     .collect(Collectors.toSet());
                 int noites = diasComRegistro.size();
