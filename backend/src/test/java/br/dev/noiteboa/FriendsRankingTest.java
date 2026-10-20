@@ -230,6 +230,31 @@ class FriendsRankingTest extends TesteComBanco {
             .andExpect(jsonPath("$.ranking[0].consistencyPercent").value(14)); // 1/7
     }
 
+    /**
+     * Review do Sourcery no PR #290: o `SleepService` aceita fim até 5 min no
+     * futuro (tolerância de relógio), então um registro pode começar daqui a
+     * pouco. No ranking ele é a mesma data local de hoje — não pode virar uma
+     * noite a mais.
+     */
+    @Test
+    void nightStartingLaterTodayStillCountsOnceForToday() throws Exception {
+        String anaToken = loginToken("ana-hoje@example.com", "Ana");
+        User ana = userRepository.findByEmailIgnoreCase("ana-hoje@example.com").orElseThrow();
+        ana.updateTimezone(fusoComHoraLocal(15).getId());
+        userRepository.save(ana);
+
+        for (int k = 6; k >= 1; k--) {
+            seedNight(ana, k); // 22h de today-6 até today-1
+        }
+        seedNightAt(ana, 0, 7, 1);  // 7h de hoje, no passado
+        seedNightAt(ana, 0, 20, 1); // 20h de hoje: ainda no futuro, mas é a mesma data
+
+        mockMvc.perform(get("/api/friends/ranking?days=7").header("Authorization", "Bearer " + anaToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ranking[0].nights").value(7))
+            .andExpect(jsonPath("$.ranking[0].consistencyPercent").value(100));
+    }
+
     @Test
     void rankingNeverExposesRawSleepData() throws Exception {
         String anaToken = loginToken("ana-raw@example.com", "Ana");
