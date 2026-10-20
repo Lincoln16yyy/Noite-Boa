@@ -1,59 +1,49 @@
 package br.dev.noiteboa;
 
+import br.dev.noiteboa.common.SecurityConfig;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Exercita o {@code corsConfigurationSource()} do {@link SecurityConfig} de
+ * verdade (#272). Antes, este teste reimplementava a normalização e o fallback,
+ * então passava mesmo se a produção mudasse — e afirmava o contrário do
+ * fallback real (lista vazia → {@code http://localhost:5173}, não lista vazia).
+ *
+ * Os outros testes de CORS ({@code CorsAllowedOriginLegacyTest},
+ * {@code CorsAllowedOriginsPluralTest}, {@code CorsAllowedOriginPatternsTest})
+ * cobrem o preflight de ponta a ponta; este cobre a montagem da lista.
+ */
 class CorsConfigurationTest {
 
-    /**
-     * Normaliza uma origem: trim, remove barra final, lower case.
-     * Ex.: "  https://app.vercel.app/  " → "https://app.vercel.app"
-     */
-    private String normalizeOrigin(String origin) {
-        if (origin == null) return "";
-        String normalized = origin.trim().toLowerCase();
-        if (normalized.endsWith("/")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-        return normalized;
+    /** Monta o {@link CorsConfiguration} de {@code /**} com a propriedade dada. */
+    private static CorsConfiguration configurar(String origins) {
+        SecurityConfig securityConfig = new SecurityConfig();
+        ReflectionTestUtils.setField(securityConfig, "corsAllowedOrigins", origins);
+
+        UrlBasedCorsConfigurationSource source =
+            (UrlBasedCorsConfigurationSource) securityConfig.corsConfigurationSource();
+        return source.getCorsConfigurations().get("/**");
     }
 
     @Test
-    void normalizeOriginHandlesWhitespaceAndTrailingSlash() {
-        assertThat(normalizeOrigin("  https://app.vercel.app/  ")).isEqualTo("https://app.vercel.app");
-        assertThat(normalizeOrigin("https://app2.vercel.app/")).isEqualTo("https://app2.vercel.app");
-        assertThat(normalizeOrigin("HTTP://APP.VERCEL.APP/")).isEqualTo("http://app.vercel.app");
-        assertThat(normalizeOrigin("  ")).isEqualTo("");
-        assertThat(normalizeOrigin("")).isEqualTo("");
-        assertThat(normalizeOrigin("https://app.vercel.app")).isEqualTo("https://app.vercel.app");
+    void normalizaEspacosBarraFinalEMaiusculas() {
+        CorsConfiguration config = configurar(
+            "  HTTPS://App.Vercel.App/  , https://app2.vercel.app/ , ");
+
+        assertThat(config.getAllowedOriginPatterns())
+            .containsExactly("https://app.vercel.app", "https://app2.vercel.app");
     }
 
     @Test
-    void parseMultipleOrigins() {
-        String originsEnv = "https://app1.vercel.app,https://app2.vercel.app/";
-        List<String> allowedOrigins = List.of(originsEnv.split(","))
-            .stream()
-            .map(s -> s.trim().toLowerCase())
-            .map(s -> s.endsWith("/") ? s.substring(0, s.length() - 1) : s)
-            .filter(s -> !s.isEmpty())
-            .toList();
+    void listaVaziaUsaLocalhost() {
+        CorsConfiguration config = configurar("  ,  ");
 
-        assertThat(allowedOrigins).containsExactly("https://app1.vercel.app", "https://app2.vercel.app");
-    }
-
-    @Test
-    void emptyOriginsDefaultsToLocalhost() {
-        String originsEnv = "";
-        List<String> allowedOrigins = List.of(originsEnv.split(","))
-            .stream()
-            .map(s -> s.trim().toLowerCase())
-            .map(s -> s.endsWith("/") ? s.substring(0, s.length() - 1) : s)
-            .filter(s -> !s.isEmpty())
-            .toList();
-
-        assertThat(allowedOrigins).isEmpty();
+        assertThat(config.getAllowedOriginPatterns())
+            .containsExactly("http://localhost:5173");
     }
 }
