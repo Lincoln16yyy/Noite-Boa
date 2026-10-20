@@ -73,9 +73,11 @@ describe('AuthProvider', () => {
     localStorage.setItem('token', 'jwt-A');
     await expect(precisaDePrimeiroUso()).resolves.toBe(false);
 
-    // Conta B (token novo) também sonda do zero, sem herdar o resultado de A.
+    // Conta B (token novo) também sonda do zero. O resultado de B é o OPOSTO do
+    // de A, para que herdar a memória de A falhe (review do PR #292).
+    simularSonda({ comNoite: false, comMeta: false });
     localStorage.setItem('token', 'jwt-B');
-    await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true);
   });
 
   it('resposta atrasada do /me de uma conta não sobrescreve a outra (#292)', async () => {
