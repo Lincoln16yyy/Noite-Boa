@@ -60,8 +60,11 @@ public class RateLimiter {
     /** Uma liberação de espaço por vez. */
     private final AtomicBoolean liberandoEspaco = new AtomicBoolean();
 
-    public RateLimiter() {
-        this(LIMPAR_QUANDO_MAIORES_QUE, INTERVALO_LIMPEZA, MAX_CHAVES, Clock.systemUTC());
+    /** Relógio vem do contexto ({@link br.dev.noiteboa.common.TimeConfig}) para o teste
+     *  controlar a janela sem dormir (#279). */
+    @org.springframework.beans.factory.annotation.Autowired
+    public RateLimiter(Clock relogio) {
+        this(LIMPAR_QUANDO_MAIORES_QUE, INTERVALO_LIMPEZA, MAX_CHAVES, relogio);
     }
 
     RateLimiter(int limparQuandoMaioresQue, Duration intervaloLimpeza) {

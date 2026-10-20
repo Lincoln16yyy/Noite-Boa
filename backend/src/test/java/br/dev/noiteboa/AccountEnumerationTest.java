@@ -27,8 +27,9 @@ import java.util.UUID;
  *   inexistente (inclusive no reenvio do convite pendente — senão o duplo
  *   clique denuncia a existência);
  * - o login não pode diferenciar e-mail inexistente de senha errada nem em
- *   mensagem nem em tempo: a comparação BCrypt roda nos dois casos (piso de
- *   tempo no teste: sem o hash falso, a rota cai para ~1ms).
+ *   mensagem nem em tempo: a comparação BCrypt roda nos dois casos. O "roda
+ *   mesmo sem conta" é provado em `AuthServiceTest` (sem medir tempo,
+ *   #279); aqui só a resposta é comparada.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -41,9 +42,6 @@ class AccountEnumerationTest extends TesteComBanco {
     UserRepository userRepository;
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
-
-    /** BCrypt custa dezenas de ms; o caminho sem comparação custa ~1ms. Piso generoso. */
-    private static final long PISO_BCRIPT_MS = 15;
 
     @AfterEach
     void cleanup() {
@@ -116,19 +114,5 @@ class AccountEnumerationTest extends TesteComBanco {
         // mesma mensagem nos dois casos
         assertThat(semConta.getResponse().getContentAsString())
             .isEqualTo(senhaErrada.getResponse().getContentAsString());
-
-        // mesmo piso de tempo: BCrypt roda também quando a conta não existe
-        long comContaMs = tempoLogin("carol-enum@example.com", "errada");
-        long semContaMs = tempoLogin("sumido-qualquer@example.com", "qualquer");
-        assertThat(comContaMs).isGreaterThanOrEqualTo(PISO_BCRIPT_MS);
-        assertThat(semContaMs).isGreaterThanOrEqualTo(PISO_BCRIPT_MS);
-    }
-
-    private long tempoLogin(String email, String password) throws Exception {
-        long inicio = System.nanoTime();
-        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}"))
-            .andExpect(status().isUnauthorized());
-        return (System.nanoTime() - inicio) / 1_000_000;
     }
 }

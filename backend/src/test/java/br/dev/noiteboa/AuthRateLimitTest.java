@@ -12,11 +12,19 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 /**
@@ -27,7 +35,8 @@ import java.util.UUID;
  * - a janela reinicia sozinha; IPs diferentes não se atrapalham.
  *
  * A janela é encurtada para 2s aqui (o limite continua no padrão de produção,
- * 5) para testar o reinício sem esperar um minuto.
+ * 5). O relógio do {@code RateLimiter} é substituído por um ajustável: o teste
+ * avança o tempo em vez de dormir (#279).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -40,6 +49,41 @@ import java.util.UUID;
     "noiteboa.ratelimit.cadastro.janela-segundos=2",
 })
 class AuthRateLimitTest extends TesteComBanco {
+
+    /** Relógio ajustável: avança a janela do limitador sem esperar de verdade (#279). */
+    static final class RelogioAjustavel extends Clock {
+        private Instant agora = Instant.parse("2026-01-01T00:00:00Z");
+
+        void avancar(Duration duracao) {
+            agora = agora.plus(duracao);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zona) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return agora;
+        }
+    }
+
+    @TestConfiguration
+    static class RelogioDeTeste {
+        static final RelogioAjustavel RELOGIO = new RelogioAjustavel();
+
+        @Bean
+        @Primary
+        Clock relogioDeTeste() {
+            return RELOGIO;
+        }
+    }
 
     @Autowired
     MockMvc mockMvc;
@@ -133,7 +177,7 @@ class AuthRateLimitTest extends TesteComBanco {
         mockMvc.perform(deIp(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body), "10.2.0.2"))
             .andExpect(status().isTooManyRequests());
 
-        Thread.sleep(2200); // janela de teste: 2s
+        RelogioDeTeste.RELOGIO.avancar(Duration.ofMillis(2100)); // janela de teste: 2s
 
         mockMvc.perform(deIp(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body), "10.2.0.2"))
             .andExpect(status().isUnauthorized()); // liberado de novo

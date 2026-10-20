@@ -1,6 +1,5 @@
 package br.dev.noiteboa;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -191,21 +190,16 @@ class StatsSummaryTest extends TesteComBanco {
     }
 
     @Test
-    void deletedAccountGetsFast401OnSummary() throws Exception {
+    void deletedAccountGets401OnSummary() throws Exception {
         String token = token("stats-deletado@example.com");
         mockMvc.perform(delete("/api/me").header("Authorization", "Bearer " + token))
             .andExpect(status().isNoContent());
 
-        // Um usuário inexistente deve receber 401 rápido. Hoje (retry do #133) a
-        // chamada espera ~600ms e vira 500 "Falha após 3 tentativas".
+        // O bug do #133 respondia 500 depois de ~600ms (3 tentativas). O 401
+        // prova o comportamento; o tempo não é mais afirmado (#279) — medi-lo
+        // vira flaky em runner lento sem cobrir nada além disto.
         mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + token))
             .andExpect(status().isUnauthorized());
-
-        long start = System.nanoTime();
-        mockMvc.perform(get("/api/stats/summary?days=7").header("Authorization", "Bearer " + token))
-            .andExpect(status().isUnauthorized());
-        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
-        assertTrue(elapsedMs < 100, "401 de usuário inexistente deveria ser rápido; levou " + elapsedMs + "ms");
     }
 
     @Test
