@@ -124,6 +124,42 @@ describe('tela de Amigos', () => {
     expect(JSON.parse(calls('POST', '/friends/requests')[0][1].body)).toEqual({ email: 'fabio@exemplo.com' });
   });
 
+  it('envia o convite uma única vez em duplo clique (#274)', async () => {
+    openScreen();
+    fireEvent.change(await screen.findByLabelText('E-mail do amigo'), { target: { value: 'fabio@exemplo.com' } });
+    const botao = screen.getByRole('button', { name: 'Enviar convite' });
+
+    // A resposta do POST fica pendente: a segunda requisição, se escapasse,
+    // aconteceria com a primeira ainda em voo.
+    const respostaPadrao = fetchMock.getMockImplementation();
+    let liberar: ((valor: Response) => void) | undefined;
+    fetchMock.mockImplementation((url: any, options: any = {}) => {
+      if (String(url).includes('/friends/requests') && (options.method ?? 'GET') === 'POST') {
+        return new Promise<Response>((resolve) => { liberar = resolve; });
+      }
+      return respostaPadrao(url, options);
+    });
+
+    // dois cliques no mesmo batch do React: o estado ainda é o antigo,
+    // então só um cadeado por ref impede a segunda requisição
+    await act(async () => {
+      // dispatchEvent (em vez de fireEvent) não abre um act por clique: os dois
+      // handlers rodam antes do re-render, então o estado ainda é o antigo e só
+      // um cadeado por ref impede a segunda requisição (review do PR #291).
+      botao.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      botao.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+
+    expect(botao).toBeDisabled();
+    expect(calls('POST', '/friends/requests')).toHaveLength(1);
+
+    await act(async () => {
+      liberar?.(jsonResponse({ id: 'n1', status: 'pending', friend: null }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Enviar convite' })).not.toBeDisabled());
+  });
+
   it('aceita convite recebido', async () => {
     openScreen();
     fireEvent.click((await screen.findAllByText('Aceitar'))[0]);

@@ -35,6 +35,11 @@ export default function Amigos() {
   // Erros da carga da tela: o "Tentar novamente" recarrega os dados.
   const [erroDaCarga, setErroDaCarga] = useState('');
   const [success, setSuccess] = useState('');
+  // Ação em andamento (#274): sem guarda, dois cliques repetem o convite ou o
+  // aceite/remoção. O ref é o cadeado (estado é snapshot: dois handlers no mesmo
+  // batch veriam `acaoEmVoo = null`); o estado só controla o `disabled`.
+  const [acaoEmVoo, setAcaoEmVoo] = useState<string | null>(null);
+  const emVooRef = useRef(false);
 
   // Requisição de ranking em andamento. TODA escrita do ranking passa por
   // `carregarRanking`: a requisição mais nova cancela a anterior, então uma
@@ -105,6 +110,9 @@ export default function Amigos() {
 
   async function enviarConvite(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (emVooRef.current) return;
+    emVooRef.current = true;
+    setAcaoEmVoo('convidar');
     setError('');
     setSuccess('');
     try {
@@ -118,16 +126,25 @@ export default function Amigos() {
       await carregar();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      emVooRef.current = false;
+      setAcaoEmVoo(null);
     }
   }
 
-  async function executar(acao: () => Promise<unknown>, aoPronto: () => Promise<unknown>) {
+  async function executar(chave: string, acao: () => Promise<unknown>, aoPronto: () => Promise<unknown>) {
+    if (emVooRef.current) return;
+    emVooRef.current = true;
+    setAcaoEmVoo(chave);
     setError('');
     try {
       await acao();
       await aoPronto();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      emVooRef.current = false;
+      setAcaoEmVoo(null);
     }
   }
 
@@ -200,7 +217,7 @@ export default function Amigos() {
             placeholder="amigo@exemplo.com"
             required
           />
-          <Button type="submit" variant="primary" style={{ alignSelf: 'flex-end' }}>
+          <Button type="submit" variant="primary" disabled={acaoEmVoo !== null} style={{ alignSelf: 'flex-end' }}>
             Enviar convite
           </Button>
         </form>
@@ -234,8 +251,10 @@ export default function Amigos() {
               <span style={{ flex: '1 1 160px', fontWeight: 700 }}>{convite.friend?.displayName}</span>
               <Button
                 variant="primary"
+                disabled={acaoEmVoo !== null}
                 onClick={() =>
                   executar(
+                    `aceitar:${convite.id}`,
                     () => api.post(`/friends/requests/${convite.id}/accept`),
                     () => carregar(),
                   )
@@ -245,8 +264,10 @@ export default function Amigos() {
               </Button>
               <Button
                 variant="secondary"
+                disabled={acaoEmVoo !== null}
                 onClick={() =>
                   executar(
+                    `recusar:${convite.id}`,
                     () => api.post(`/friends/requests/${convite.id}/decline`),
                     () => carregar(),
                   )
@@ -271,8 +292,10 @@ export default function Amigos() {
               <span style={mutedTextStyle}>aguardando resposta</span>
               <Button
                 variant="secondary"
+                disabled={acaoEmVoo !== null}
                 onClick={() =>
                   executar(
+                    `cancelar:${convite.id}`,
                     () => api.delete(`/friends/requests/${convite.id}`),
                     () => carregar(),
                   )
@@ -297,8 +320,10 @@ export default function Amigos() {
               {!amigo.sharesData && <span style={mutedTextStyle}>não compartilha dados</span>}
               <Button
                 variant="secondary"
+                disabled={acaoEmVoo !== null}
                 onClick={() =>
                   executar(
+                    `remover:${amigo.id}`,
                     () => api.delete(`/friends/${amigo.id}`),
                     () => carregar(),
                   )
