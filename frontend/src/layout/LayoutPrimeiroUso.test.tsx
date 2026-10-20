@@ -127,4 +127,27 @@ describe('Layout — primeiro uso (issue #215)', () => {
     // Já tem noite e meta: a sonda resolve `false` e tira a pessoa do fluxo.
     await screen.findByText('marcador hoje');
   });
+
+  it('falha na sonda não tira a pessoa de /onboarding (#292)', async () => {
+    // /me funciona, mas as duas chamadas da sonda falham: não dá para afirmar
+    // que o fluxo é dispensável, então não redireciona.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/me')) return jsonResponse(usuario);
+      return jsonResponse({ detail: 'indisponível' }, 503);
+    });
+
+    renderWithAuth(
+      <Routes>
+        <Route path="/hoje" element={<p>marcador hoje</p>} />
+        <Route path="*" element={<Layout />} />
+      </Routes>,
+      { user: usuario, route: '/onboarding' },
+    );
+
+    await waitFor(() => expect(screen.getByRole('banner')).toBeInTheDocument());
+    await new Promise((r) => {
+      setTimeout(r, 300);
+    });
+    expect(screen.queryByText('marcador hoje')).not.toBeInTheDocument();
+  });
 });

@@ -56,11 +56,12 @@ export default function Layout() {
   }
 
   // Quem não precisa mais do fluxo não fica preso em /onboarding — por exemplo,
-  // a conta trocou depois de um redirecionamento (review do PR #292).
+  // a conta trocou depois de um redirecionamento (review do PR #292). Só sai
+  // com resposta confirmada: falha de sonda não prova que o fluxo é dispensável.
   if (
     !loading &&
     user &&
-    !primeiroUso.verificando &&
+    primeiroUso.confirmado &&
     !primeiroUso.precisa &&
     location.pathname === '/onboarding'
   ) {

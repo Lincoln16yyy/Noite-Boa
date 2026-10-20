@@ -57,7 +57,9 @@ describe('usePrimeiroUso — troca de sessão', () => {
     await act(async () => {
       sondaA.responder(false);
     });
-    await waitFor(() => expect(result.current).toEqual({ verificando: false, precisa: true }));
+    await waitFor(() =>
+      expect(result.current).toEqual({ verificando: false, precisa: true, confirmado: true }),
+    );
 
     // B assume a sessão nesta aba. A sonda de B ainda está em voo: o estado de
     // A não pode decidir a rota nesse meio-tempo (o Layout redirecionaria B
@@ -67,16 +69,43 @@ describe('usePrimeiroUso — troca de sessão', () => {
     rerender({ sessao: 'jwt-B' });
 
     expect(result.current.precisa).toBe(false);
-
-    // A resposta atrasada de A (true) é descartada: a sessão já mudou.
-    await act(async () => {
-      sondaA.responder(false);
-    });
-    expect(result.current.precisa).toBe(false);
+    expect(result.current.confirmado).toBe(false);
 
     await act(async () => {
       sondaB.responder(true);
     });
-    await waitFor(() => expect(result.current).toEqual({ verificando: false, precisa: false }));
+    await waitFor(() =>
+      expect(result.current).toEqual({ verificando: false, precisa: false, confirmado: true }),
+    );
+  });
+
+  it('descarta a resposta da sonda anterior que chega atrasada (#292)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    const sondaA = sondaSeguravel({ comMeta: false }); // A fica pendente
+
+    const { result, rerender } = renderHook(({ sessao }) => usePrimeiroUso(true, sessao), {
+      wrapper,
+      initialProps: { sessao: 'jwt-A' },
+    });
+    expect(result.current.confirmado).toBe(false);
+
+    localStorage.setItem('token', 'jwt-B');
+    const sondaB = sondaSeguravel({ comMeta: true });
+    rerender({ sessao: 'jwt-B' });
+
+    // A responde atrasada dizendo "primeiro uso": a sessão já mudou, então o
+    // resultado não pode ligar o fluxo para B.
+    await act(async () => {
+      sondaA.responder(false);
+    });
+    expect(result.current.precisa).toBe(false);
+    expect(result.current.confirmado).toBe(false);
+
+    await act(async () => {
+      sondaB.responder(true);
+    });
+    await waitFor(() =>
+      expect(result.current).toEqual({ verificando: false, precisa: false, confirmado: true }),
+    );
   });
 });

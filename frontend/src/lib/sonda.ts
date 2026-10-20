@@ -11,15 +11,15 @@
  * desta janela), então comparar o token na leitura evita que a conta nova
  * herde a sondagem da anterior (#273, review do PR #292).
  */
-let sondagem: Promise<boolean> | null = null;
+let sondagem: Promise<boolean | null> | null = null;
 let tokenDaSondagem: string | null = null;
 
-export function sondagemAtual(): Promise<boolean> | null {
+export function sondagemAtual(): Promise<boolean | null> | null {
   if (tokenDaSondagem !== localStorage.getItem('token')) return null;
   return sondagem;
 }
 
-export function guardarSondagem(promessa: Promise<boolean>): void {
+export function guardarSondagem(promessa: Promise<boolean | null>): void {
   sondagem = promessa;
   tokenDaSondagem = localStorage.getItem('token');
 }

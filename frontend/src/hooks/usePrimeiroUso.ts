@@ -7,12 +7,18 @@ export interface PrimeiroUsoEstado {
   verificando: boolean;
   /** este aparelho está no primeiro uso */
   precisa: boolean;
+  /**
+   * a sonda respondeu (não falhou). Só uma resposta confirmada pode tirar
+   * alguém de /onboarding: falha de rede não é prova de que o fluxo não é
+   * necessário (review do PR #292).
+   */
+  confirmado: boolean;
 }
 
 function estadoInicial(): PrimeiroUsoEstado {
   return onboardingConcluido()
-    ? { verificando: false, precisa: false }
-    : { verificando: true, precisa: false };
+    ? { verificando: false, precisa: false, confirmado: true }
+    : { verificando: true, precisa: false, confirmado: false };
 }
 
 /**
@@ -48,13 +54,25 @@ export function usePrimeiroUso(sessaoAtiva: boolean, sessaoId: string | null): P
     // Sem sessão não há quem perguntar: em /login e /cadastro a sonda levaria
     // 401, e memoizar esse "não é primeiro uso" esconderia o fluxo de quem
     // acabou de criar a conta (pegado no teste ponta a ponta com a API real).
-    if (!sessaoAtiva || onboardingConcluido()) {
-      setEstado({ verificando: false, precisa: false });
+    // Também não é resposta confirmada: o Layout não pode tirar ninguém de
+    // /onboarding por causa da sessão que ainda está carregando (PR #292).
+    if (onboardingConcluido()) {
+      setEstado({ verificando: false, precisa: false, confirmado: true });
+      return;
+    }
+    if (!sessaoAtiva) {
+      setEstado({ verificando: false, precisa: false, confirmado: false });
       return;
     }
     let ativo = true;
-    void precisaDePrimeiroUso().then((precisa) => {
-      if (ativo) setEstado({ verificando: false, precisa });
+    void precisaDePrimeiroUso().then((resultado) => {
+      if (ativo) {
+        setEstado({
+          verificando: false,
+          precisa: resultado === true,
+          confirmado: resultado !== null,
+        });
+      }
     });
     return () => {
       ativo = false;

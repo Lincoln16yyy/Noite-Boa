@@ -48,20 +48,25 @@ async function sondar(): Promise<boolean> {
   return semNoite && semMeta;
 }
 
-export function precisaDePrimeiroUso(): Promise<boolean> {
+/**
+ * `true` = primeiro uso; `false` = não é; `null` = não deu para saber (falha
+ * de rede/API). Quem redireciona não pode tratar `null` como "não é": um erro
+ * momentâneo não confirma nada (review do PR #292).
+ */
+export function precisaDePrimeiroUso(): Promise<boolean | null> {
   if (onboardingConcluido()) return Promise.resolve(false);
   const cache = sondagemAtual();
   if (cache) return cache;
 
   const atual = sondar().catch(() => {
     // Falha NÃO memoiza: sem resposta não dá para saber se é primeiro uso, e
-    // prender esse "false" até o fim da sessão esconderia o fluxo de quem
+    // prender esse resultado até o fim da sessão esconderia o fluxo de quem
     // acabou de criar a conta — foi o que o teste ponta a ponta com a API
     // real pegou (a sonda rodava em /login, sem sessão, e levava 401).
     // Só descarta se esta ainda for a sonda corrente: uma sessão nova pode ter
     // começado enquanto esta estava em voo (review do PR #292).
     if (sondagemAtual() === atual) esquecerSondagem();
-    return false;
+    return null;
   });
   guardarSondagem(atual);
   return atual;

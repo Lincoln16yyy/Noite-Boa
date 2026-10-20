@@ -108,11 +108,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       const message = await readProblemMessage(response);
 
       // 401 com a mesma sessão que fez a requisição = token expirado/inválido:
-      // limpa e avisa o contexto. Se o token já mudou (outra conta logou
-      // enquanto esta requisição estava em voo), o 401 é da sessão antiga e não
-      // pode derrubar a nova (review do PR #292). Sem token no envio = falha de
+      // limpa e avisa o contexto. Também vale quando não há mais token algum
+      // (outra aba deslogou durante a requisição): a sessão desta janela
+      // acabou e ela não recebeu o evento da outra (review do PR #292). Se
+      // outra conta logou (token diferente, não nulo), o 401 é da sessão
+      // antiga e não pode derrubar a nova. Sem token no envio = falha de
       // autenticação (ex.: senha errada): só mostra o erro.
-      if (response.status === 401 && token && getToken() === token) {
+      const tokenAtual = getToken();
+      if (response.status === 401 && token && (tokenAtual === null || tokenAtual === token)) {
         clearSession();
         window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
         throw new Error('Sessão expirada. Faça login novamente.');

@@ -83,6 +83,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('noiteboa:session-change', handleSessionChange);
   }, [refreshUser]);
 
+  // Outra aba pode trocar ou remover o token (localStorage é compartilhado).
+  // O evento `storage` só chega nas OUTRAS abas — sem ele, esta ficaria com o
+  // usuário antigo enquanto a sonda e as requisições já usam a conta nova
+  // (review do PR #292).
+  useEffect(() => {
+    const handleStorage = (evento: StorageEvent) => {
+      if (evento.key !== 'token') return;
+      setSessao(getToken());
+      void refreshUser();
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [refreshUser]);
+
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.post<LoginResult>('/auth/login', { email, password });
     if (res?.accessToken) {

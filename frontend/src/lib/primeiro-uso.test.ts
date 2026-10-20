@@ -82,18 +82,18 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('erro de rede não empurra ninguém para o fluxo', async () => {
+  it('erro de rede não afirma nada: nem primeiro uso nem o contrário', async () => {
     const { precisaDePrimeiroUso } = await carregar();
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('rede fora'));
-    await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+    await expect(precisaDePrimeiroUso()).resolves.toBeNull();
   });
 
   it('a falha não memoiza: com a rede de volta a sonda tenta de novo', async () => {
     const { precisaDePrimeiroUso } = await carregar();
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('rede fora'));
-    await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+    await expect(precisaDePrimeiroUso()).resolves.toBeNull();
 
-    // Sempre memoizar o "false" da falha esconderia o fluxo de quem acabou de
+    // Sempre memoizar o resultado da falha esconderia o fluxo de quem acabou de
     // criar a conta (o 401 da sonda em /login, sem sessão, fazia exatamente
     // isso — pegado no E2E com a API real).
     instalarFetch({ comNoite: false, comMeta: false });
@@ -163,7 +163,7 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     await expect(precisaDePrimeiroUso()).resolves.toBe(true);
 
     rejeitarAntiga?.(new Error('rede fora')); // A falha atrasada
-    await expect(antiga).resolves.toBe(false);
+    await expect(antiga).resolves.toBeNull();
 
     // A sonda de B continua memoizada: nenhuma chamada nova.
     const chamadas = (globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length;

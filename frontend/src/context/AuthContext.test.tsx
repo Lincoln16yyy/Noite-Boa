@@ -49,7 +49,7 @@ describe('AuthProvider', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('null', { status: 200 }));
   });
 
-  it('logout encerra a sessão e descarta a sondagem do primeiro uso (#273)', async () => {
+  it('conta nova depois do logout é sondada de novo, sem herdar o resultado de A (#273)', async () => {
     localStorage.setItem('token', 'jwt-A');
     const { precisaDePrimeiroUso } = await import('../lib/primeiro-uso');
 
@@ -66,6 +66,9 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
 
     // Conta B já tem noite: se herdasse a sonda memoizada de A, receberia `true`.
+    // O reset explícito (`clearSession` → `esquecerSondagem`) tem teste próprio
+    // em `lib/primeiro-uso.test.ts`, com token nulo — caso em que o escopo por
+    // token não invalidaria a memória sozinho. Aqui se prova o fluxo completo.
     simularSonda({ comNoite: true, comMeta: true });
     await expect(precisaDePrimeiroUso()).resolves.toBe(false);
   });
@@ -142,6 +145,33 @@ describe('AuthProvider', () => {
 
     // Em vez de ficar com `loading` eterno, a janela refaz a consulta para a
     // sessão atual e mostra B.
+    expect(await screen.findByText('b@example.com')).toBeInTheDocument();
+  });
+
+  it('outra aba trocando o token atualiza sessão e usuário nesta aba (#292)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    let chamadasMe = 0;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/api/me')) {
+        chamadasMe += 1;
+        return new Response(JSON.stringify(chamadasMe === 1 ? usuarioA : usuarioB), { status: 200 });
+      }
+      return new Response('null', { status: 200 });
+    });
+
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+
+    // Em outra aba o token foi trocado: chega só o evento `storage`.
+    localStorage.setItem('token', 'jwt-B');
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: 'token', newValue: 'jwt-B' }));
+    });
+
     expect(await screen.findByText('b@example.com')).toBeInTheDocument();
   });
 });
