@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
@@ -55,6 +55,38 @@ describe('tela de Login', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Credenciais inválidas');
     expect(screen.getByPlaceholderText('E-mail')).toBeInTheDocument();
     expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('envia o login uma única vez em duplo clique (#274)', async () => {
+    let liberar: ((valor: { accessToken: string }) => void) | undefined;
+    const postSpy = vi.spyOn(api, 'post').mockImplementation(
+      () => new Promise((resolve) => { liberar = resolve; }),
+    );
+
+    render(<Login />, { wrapper: ({ children }) => (
+      <MemoryRouter initialEntries={['/login']}>
+        <AuthProvider>{children}</AuthProvider>
+      </MemoryRouter>
+    ) });
+
+    fireEvent.change(screen.getByPlaceholderText('E-mail'), {
+      target: { value: 'ana@exemplo.com' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Senha'), {
+      target: { value: 'senha123' },
+    });
+    const botao = screen.getByRole('button', { name: 'Entrar' });
+
+    fireEvent.click(botao);
+    fireEvent.click(botao);
+
+    expect(botao).toBeDisabled();
+    expect(postSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      liberar?.({ accessToken: 'jwt-123' });
+    });
+    await waitFor(() => expect(localStorage.getItem('token')).toBe('jwt-123'));
   });
 
   it('avisa que a conta foi criada quando vem do cadastro', () => {

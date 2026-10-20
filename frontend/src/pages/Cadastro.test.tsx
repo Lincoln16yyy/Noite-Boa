@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
@@ -80,6 +80,36 @@ describe('tela de Cadastro', () => {
       expect.stringContaining('/auth/register'),
       expect.anything(),
     );
+  });
+
+  it('envia o cadastro uma única vez em duplo clique (#274)', async () => {
+    let liberar: ((valor: Response) => void) | undefined;
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/me')) return new Response('null', { status: 200 });
+      return new Promise<Response>((resolve) => { liberar = resolve; });
+    });
+
+    renderCadastro();
+
+    fireEvent.change(screen.getByPlaceholderText('Nome'), { target: { value: 'Ana' } });
+    fireEvent.change(screen.getByPlaceholderText('E-mail'), {
+      target: { value: 'ana@exemplo.com' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Senha (mín. 8 caracteres)'), {
+      target: { value: 'senha1234' },
+    });
+    const botao = screen.getByRole('button', { name: 'Criar conta' });
+
+    fireEvent.click(botao);
+    fireEvent.click(botao);
+
+    expect(botao).toBeDisabled();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/auth/register'))).toHaveLength(1);
+
+    await act(async () => {
+      liberar?.(new Response(JSON.stringify({ id: '1' }), { status: 201 }));
+    });
+    expect(await screen.findByRole('heading', { name: 'Login' })).toBeInTheDocument();
   });
 
   it('exibe o link da política de privacidade', () => {

@@ -8,10 +8,14 @@ export default function Cadastro() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  // Requisição em andamento (#274): dois cliques seguidos criariam duas contas e
+  // consumiriam o limite por IP (5/hora) do cadastro.
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (saving) return;
     setError('');
     if (password.length < 8) {
       setError('A senha precisa de pelo menos 8 caracteres.');
@@ -21,12 +25,15 @@ export default function Cadastro() {
       setError('Informe um e-mail válido.');
       return;
     }
+    setSaving(true);
     try {
       await api.post('/auth/register', { displayName, email, password });
       navigate('/login', { state: { created: true } });
     } catch (err) {
       // O cliente de API sempre lança Error; o fallback cobre erros não padrão.
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -69,7 +76,12 @@ export default function Cadastro() {
             className="field"
           />
         </label>
-        <button type="submit" className="btn btn-primary" style={{ minHeight: '52px', fontSize: '1.06rem' }}>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={saving}
+          style={{ minHeight: '52px', fontSize: '1.06rem' }}
+        >
           Criar conta
         </button>
       </form>

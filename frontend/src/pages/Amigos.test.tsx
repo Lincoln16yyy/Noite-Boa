@@ -124,6 +124,35 @@ describe('tela de Amigos', () => {
     expect(JSON.parse(calls('POST', '/friends/requests')[0][1].body)).toEqual({ email: 'fabio@exemplo.com' });
   });
 
+  it('envia o convite uma única vez em duplo clique (#274)', async () => {
+    openScreen();
+    fireEvent.change(await screen.findByLabelText('E-mail do amigo'), { target: { value: 'fabio@exemplo.com' } });
+    const botao = screen.getByRole('button', { name: 'Enviar convite' });
+
+    // A resposta do POST fica pendente: a segunda requisição, se escapasse,
+    // aconteceria com a primeira ainda em voo.
+    const respostaPadrao = fetchMock.getMockImplementation();
+    let liberar: ((valor: Response) => void) | undefined;
+    fetchMock.mockImplementation((url: any, options: any = {}) => {
+      if (String(url).includes('/friends/requests') && (options.method ?? 'GET') === 'POST') {
+        return new Promise<Response>((resolve) => { liberar = resolve; });
+      }
+      return respostaPadrao(url, options);
+    });
+
+    fireEvent.click(botao);
+    fireEvent.click(botao);
+
+    expect(botao).toBeDisabled();
+    expect(calls('POST', '/friends/requests')).toHaveLength(1);
+
+    await act(async () => {
+      liberar?.(jsonResponse({ id: 'n1', status: 'pending', friend: null }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Enviar convite' })).not.toBeDisabled());
+  });
+
   it('aceita convite recebido', async () => {
     openScreen();
     fireEvent.click((await screen.findAllByText('Aceitar'))[0]);
