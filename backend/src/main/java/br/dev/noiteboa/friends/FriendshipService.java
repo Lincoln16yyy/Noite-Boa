@@ -8,15 +8,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -178,8 +177,11 @@ public class FriendshipService {
             .filter(User::isShareWithFriends)
             .forEach(participantes::add);
 
-        // uma data de referência por fuso, compartilhada por todos os participantes
-        Map<ZoneId, LocalDate> hojePorFuso = new HashMap<>();
+        // #275: um único instante de referência para a requisição (review do
+        // Sourcery no PR #290). Assim fusos equivalentes (ex.: America/Sao_Paulo
+        // e -03:00) chegam à mesma data e a virada de meia-noite não muda a
+        // janela no meio do cálculo.
+        Instant agora = Instant.now();
 
         List<RankingEntry> ranking = participantes.stream()
             .map(u -> {
@@ -188,10 +190,7 @@ public class FriendshipService {
                 // Uma janela de `days`×24h cobre pedaços de `days + 1` datas
                 // locais (a noite que começou antes do corte + a de hoje), então
                 // a contagem podia passar do total e o % passar de 100.
-                // A data de referência é única por fuso: se a requisição cruzar a
-                // meia-noite, todos os participantes do mesmo fuso são comparados
-                // na mesma janela (review do Sourcery no PR #290).
-                LocalDate hoje = hojePorFuso.computeIfAbsent(zone, LocalDate::now);
+                LocalDate hoje = LocalDate.ofInstant(agora, zone);
                 OffsetDateTime desde = hoje.minusDays(days - 1L).atStartOfDay(zone).toOffsetDateTime();
                 OffsetDateTime ate = hoje.plusDays(1).atStartOfDay(zone).toOffsetDateTime();
                 // noite = dia local (do início do sono) com pelo menos um registro
