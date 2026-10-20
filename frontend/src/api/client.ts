@@ -1,3 +1,5 @@
+import { esquecerSondagem } from '../lib/sonda';
+
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 /** Tempo padrão de timeout (ms) — pode ser alterado via `api.setTimeout(ms)` */
@@ -33,6 +35,10 @@ function getToken(): string | null {
 
 export function clearSession(): void {
   localStorage.removeItem('token');
+  // A sondagem do primeiro uso vale para a conta que estava logada. Toda saída
+  // de sessão passa por aqui (logout, exclusão da conta, 401), então a próxima
+  // conta desta aba é sondada de novo (#273).
+  esquecerSondagem();
 }
 
 /**
@@ -96,10 +102,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (!response.ok) {
       const message = await readProblemMessage(response);
 
-      // 401 com sessão ativa = token expirado/inválido: limpa e avisa o contexto.
-      // 401 sem sessão = falha de autenticação (ex.: senha errada): só mostra o erro.
-      const hadSession = Boolean(getToken());
-      if (response.status === 401 && hadSession) {
+      // 401 com a mesma sessão que fez a requisição = token expirado/inválido:
+      // limpa e avisa o contexto. Se o token já mudou (outra conta logou
+      // enquanto esta requisição estava em voo), o 401 é da sessão antiga e não
+      // pode derrubar a nova (review do PR #292). Sem token no envio = falha de
+      // autenticação (ex.: senha errada): só mostra o erro.
+      if (response.status === 401 && token && getToken() === token) {
         clearSession();
         window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
         throw new Error('Sessão expirada. Faça login novamente.');

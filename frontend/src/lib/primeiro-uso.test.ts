@@ -132,6 +132,45 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     expect((globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(4);
   });
 
+  it('clearSession descarta a sonda: toda saída de sessão passa por ela (#273)', async () => {
+    const { precisaDePrimeiroUso } = await carregar();
+    const { clearSession } = await import('../api/client');
+
+    instalarFetch({ comNoite: true, comMeta: true });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(false); // A já usa o app
+
+    clearSession(); // logout, exclusão de conta e 401 passam por aqui
+
+    instalarFetch({ comNoite: false, comMeta: false });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true); // B, recém-criada
+  });
+
+  it('sonda antiga que falha não apaga a sonda da sessão nova (#292)', async () => {
+    const { precisaDePrimeiroUso, esquecerSondagem } = await carregar();
+
+    // Conta A: as chamadas ficam pendentes até nós rejeitarmos.
+    let rejeitarAntiga: ((erro: unknown) => void) | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/sleep-logs')) {
+        return new Promise<Response>((_, reject) => { rejeitarAntiga = reject; });
+      }
+      return jsonResponse({ targetMinutes: 480, hasGoal: false });
+    });
+    const antiga = precisaDePrimeiroUso();
+
+    esquecerSondagem(); // logout enquanto a sonda de A está em voo
+    instalarFetch({ comNoite: false, comMeta: false }); // conta B
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true);
+
+    rejeitarAntiga?.(new Error('rede fora')); // A falha atrasada
+    await expect(antiga).resolves.toBe(false);
+
+    // A sonda de B continua memoizada: nenhuma chamada nova.
+    const chamadas = (globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length;
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true);
+    expect((globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(chamadas);
+  });
+
   it('ao concluir o fluxo a memoização é descartada', async () => {
     const { marcarOnboardingConcluido, precisaDePrimeiroUso } = await carregar();
     instalarFetch({ comNoite: false, comMeta: false });

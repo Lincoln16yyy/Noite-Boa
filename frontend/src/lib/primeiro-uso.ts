@@ -12,6 +12,8 @@ import type { Goal, SleepLogPage } from '../api/types';
  */
 export const CHAVE_ONBOARDING = 'noiteboa.onboarding-concluido';
 
+export { esquecerSondagem } from './sonda';
+
 export function onboardingConcluido(): boolean {
   return localStorage.getItem(CHAVE_ONBOARDING) === '1';
 }
@@ -31,9 +33,10 @@ export function onboardingConcluido(): boolean {
  * o app na primeira tela por causa de um timeout seria pior que a Hoje vazia.
  *
  * O resultado é memoizado por sessão, para as rotas não refazerem as duas
- * chamadas a cada navegação.
+ * chamadas a cada navegação. O estado da memória fica em `lib/sonda.ts`, que o
+ * cliente de API também usa para esquecê-la quando a sessão termina (#273).
  */
-let sondagem: Promise<boolean> | null = null;
+import { esquecerSondagem, guardarSondagem, sondagemAtual } from './sonda';
 
 async function sondar(): Promise<boolean> {
   const [logs, goal] = await Promise.all([
@@ -47,33 +50,24 @@ async function sondar(): Promise<boolean> {
 
 export function precisaDePrimeiroUso(): Promise<boolean> {
   if (onboardingConcluido()) return Promise.resolve(false);
-  if (!sondagem) {
-    sondagem = sondar().catch(() => {
-      // Falha NÃO memoiza: sem resposta não dá para saber se é primeiro uso, e
-      // prender esse "false" até o fim da sessão esconderia o fluxo de quem
-      // acabou de criar a conta — foi o que o teste ponta a ponta com a API
-      // real pegou (a sonda rodava em /login, sem sessão, e levava 401).
-      sondagem = null;
-      return false;
-    });
-  }
-  return sondagem;
+  const cache = sondagemAtual();
+  if (cache) return cache;
+
+  const atual = sondar().catch(() => {
+    // Falha NÃO memoiza: sem resposta não dá para saber se é primeiro uso, e
+    // prender esse "false" até o fim da sessão esconderia o fluxo de quem
+    // acabou de criar a conta — foi o que o teste ponta a ponta com a API
+    // real pegou (a sonda rodava em /login, sem sessão, e levava 401).
+    // Só descarta se esta ainda for a sonda corrente: uma sessão nova pode ter
+    // começado enquanto esta estava em voo (review do PR #292).
+    if (sondagemAtual() === atual) esquecerSondagem();
+    return false;
+  });
+  guardarSondagem(atual);
+  return atual;
 }
 
 export function marcarOnboardingConcluido(): void {
   localStorage.setItem(CHAVE_ONBOARDING, '1');
   esquecerSondagem(); // quem estava observando reavalia na próxima rota
-}
-
-/**
- * Descarta a memoização da sonda (#273). É chamada no logout: a sondagem vale
- * para a conta que estava logada, e a mesma aba pode receber outra conta em
- * seguida. Sem isso, a conta nova herda o "não é primeiro uso" da anterior e
- * pula o fluxo.
- *
- * O indicador do aparelho (localStorage) NÃO é apagado: ele continua sendo
- * preferência do aparelho, não da sessão.
- */
-export function esquecerSondagem(): void {
-  sondagem = null;
 }

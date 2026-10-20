@@ -27,6 +27,21 @@ describe('api client', () => {
     expect(localStorage.getItem('token')).toBeNull();
   });
 
+  it('401 de uma sessão antiga não derruba a sessão nova (#292)', async () => {
+    localStorage.setItem('token', 'token-A');
+    let responder: ((valor: Response) => void) | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () => new Promise<Response>((resolve) => { responder = resolve; }),
+    );
+
+    const requisicao = api.get('/sleep-logs');
+    localStorage.setItem('token', 'token-B'); // outra conta logou enquanto A estava em voo
+    responder?.(new Response('{}', { status: 401 }));
+
+    await expect(requisicao).rejects.toThrow('Erro 401');
+    expect(localStorage.getItem('token')).toBe('token-B');
+  });
+
   it('shows the API message on 401 when there is no session (failed login)', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ detail: 'Credenciais inválidas' }), { status: 401 }),
