@@ -140,8 +140,15 @@ describe('tela de Amigos', () => {
       return respostaPadrao(url, options);
     });
 
-    fireEvent.click(botao);
-    fireEvent.click(botao);
+    // dois cliques no mesmo batch do React: o estado ainda é o antigo,
+    // então só um cadeado por ref impede a segunda requisição
+    await act(async () => {
+      // dispatchEvent (em vez de fireEvent) não abre um act por clique: os dois
+      // handlers rodam antes do re-render, então o estado ainda é o antigo e só
+      // um cadeado por ref impede a segunda requisição (review do PR #291).
+      botao.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      botao.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
 
     expect(botao).toBeDisabled();
     expect(calls('POST', '/friends/requests')).toHaveLength(1);

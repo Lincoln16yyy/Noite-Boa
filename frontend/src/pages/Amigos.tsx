@@ -36,8 +36,10 @@ export default function Amigos() {
   const [erroDaCarga, setErroDaCarga] = useState('');
   const [success, setSuccess] = useState('');
   // Ação em andamento (#274): sem guarda, dois cliques repetem o convite ou o
-  // aceite/remoção. Enquanto uma ação roda, os botões de ação ficam desabilitados.
+  // aceite/remoção. O ref é o cadeado (estado é snapshot: dois handlers no mesmo
+  // batch veriam `acaoEmVoo = null`); o estado só controla o `disabled`.
   const [acaoEmVoo, setAcaoEmVoo] = useState<string | null>(null);
+  const emVooRef = useRef(false);
 
   // Requisição de ranking em andamento. TODA escrita do ranking passa por
   // `carregarRanking`: a requisição mais nova cancela a anterior, então uma
@@ -108,7 +110,8 @@ export default function Amigos() {
 
   async function enviarConvite(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (acaoEmVoo) return;
+    if (emVooRef.current) return;
+    emVooRef.current = true;
     setAcaoEmVoo('convidar');
     setError('');
     setSuccess('');
@@ -124,12 +127,14 @@ export default function Amigos() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      emVooRef.current = false;
       setAcaoEmVoo(null);
     }
   }
 
   async function executar(chave: string, acao: () => Promise<unknown>, aoPronto: () => Promise<unknown>) {
-    if (acaoEmVoo) return;
+    if (emVooRef.current) return;
+    emVooRef.current = true;
     setAcaoEmVoo(chave);
     setError('');
     try {
@@ -138,6 +143,7 @@ export default function Amigos() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      emVooRef.current = false;
       setAcaoEmVoo(null);
     }
   }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -9,14 +9,18 @@ export default function Login() {
   const [error, setError] = useState('');
   // Requisição em andamento (#274): sem isso, dois cliques seguidos disparam dois
   // logins e consomem o limite por IP (5/hora), podendo virar 429.
+  // O ref é o cadeado de verdade: estado é snapshot e dois handlers no mesmo
+  // batch veriam `saving = false` (review do Sourcery no PR #291).
   const [saving, setSaving] = useState(false);
+  const emVoo = useRef(false);
   const { login } = useAuth();
   const location = useLocation();
   const accountCreated = Boolean(location.state?.created);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (saving) return;
+    if (emVoo.current) return;
+    emVoo.current = true;
     setSaving(true);
     setError('');
     try {
@@ -25,6 +29,7 @@ export default function Login() {
       // O cliente de API sempre lança Error; o fallback cobre erros não padrão.
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      emVoo.current = false;
       setSaving(false);
     }
   }
