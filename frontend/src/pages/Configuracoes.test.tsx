@@ -3,7 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import Configuracoes from './Configuracoes';
 import { renderWithAuth } from '../test/test-utils';
+import { useAuth } from '../context/AuthContext';
 import { agendarLembrete, cancelarLembrete, lembreteAtivo, permissaoNotificacao, setLembreteAtivo } from '../lib/reminder';
+
+/** Mostra quem o contexto ainda considera logado. */
+function MostraUsuario() {
+  const { user } = useAuth();
+  return <p>{user?.email ?? 'sem usuário'}</p>;
+}
 
 vi.mock('../lib/reminder', () => ({
   agendarLembrete: vi.fn(() => true),
@@ -113,6 +120,34 @@ describe('tela de Configurações', () => {
     openScreen();
     fireEvent.click(await screen.findByRole('button', { name: 'Sair da conta' }));
 
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('sair da conta derruba o usuário do contexto, não só o token (#292)', async () => {
+    // /me só responde com Authorization, como no back-end real.
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      if (String(url).includes('/me')) {
+        return options.headers?.Authorization
+          ? jsonResponse(ME)
+          : jsonResponse({ detail: 'não autenticado' }, 401);
+      }
+      return jsonResponse(GOAL);
+    });
+
+    renderWithAuth(
+      <>
+        <Configuracoes />
+        <MostraUsuario />
+      </>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+
+    expect(await screen.findByText('ana@exemplo.com')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Sair da conta' }));
+
+    // Com só `clearSession` o contexto continuaria com o usuário e o Layout
+    // devolveria /login para /hoje: a pessoa saía do token, mas não do app.
+    expect(await screen.findByText('sem usuário')).toBeInTheDocument();
     expect(localStorage.getItem('token')).toBeNull();
   });
 

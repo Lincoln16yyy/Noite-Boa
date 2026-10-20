@@ -20,10 +20,11 @@ function estadoInicial(): PrimeiroUsoEstado {
  *
  * `sessaoAtiva` é o que autoriza a consulta: o primeiro uso é uma propriedade
  * da CONTA (sem noite e sem meta), então fora de uma sessão logada não há o
- * que perguntar. `sessaoId` identifica de quem é o resultado: quando a conta
- * muda, o que valia para a anterior não pode decidir a rota (review do PR
- * #292) — o Layout redirecionaria a conta nova para /onboarding usando o
- * `precisa` da que saiu.
+ * que perguntar. `sessaoId` (o token) identifica de quem é o resultado: quando
+ * a sessão muda, o que valia para a anterior não pode decidir a rota (review
+ * do PR #292) — o Layout redirecionaria a conta nova para /onboarding usando o
+ * `precisa` da que saiu. O token muda no login/logout antes de o `/me` trazer
+ * o usuário novo, então não há janela em que a sonda antiga ainda valha.
  *
  * O efeito depende do caminho da rota de propósito: quem conclui ou pula o
  * fluxo é levado para /hoje, o efeito roda de novo, encontra o indicador no

@@ -13,26 +13,30 @@ function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status });
 }
 
-/** Sonda com o /sleep-logs segurável: devolve o gatilho para responder depois. */
+/**
+ * Sonda com o /sleep-logs segurável. Cada instalação guarda os próprios
+ * resolvers para que uma resposta atrasada da sessão anterior possa ser
+ * disparada depois que a nova já começou.
+ */
 function sondaSeguravel({ comMeta }: { comMeta: boolean }) {
-  let responder: ((resposta: Response) => void) | undefined;
+  const pendentes: Array<(resposta: Response) => void> = [];
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
     const caminho = String(url);
     if (caminho.includes('/sleep-logs')) {
       return new Promise<Response>((resolve) => {
-        responder = resolve;
+        pendentes.push(resolve);
       });
     }
     return jsonResponse({ targetMinutes: 480, hasGoal: comMeta });
   });
   return {
     responder: (comNoite: boolean) => {
-      responder?.(jsonResponse({ content: comNoite ? [{ id: 'n1' }] : [] }));
+      pendentes.shift()?.(jsonResponse({ content: comNoite ? [{ id: 'n1' }] : [] }));
     },
   };
 }
 
-describe('usePrimeiroUso — troca de conta', () => {
+describe('usePrimeiroUso — troca de sessão', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
@@ -43,9 +47,9 @@ describe('usePrimeiroUso — troca de conta', () => {
     localStorage.setItem('token', 'jwt-A');
     const sondaA = sondaSeguravel({ comMeta: false });
 
-    const { result, rerender } = renderHook(({ id }) => usePrimeiroUso(true, id), {
+    const { result, rerender } = renderHook(({ sessao }) => usePrimeiroUso(true, sessao), {
       wrapper,
-      initialProps: { id: 'A' },
+      initialProps: { sessao: 'jwt-A' },
     });
 
     // Conta A é de primeiro uso: `precisa` fica true e o Layout a mandaria
@@ -55,13 +59,19 @@ describe('usePrimeiroUso — troca de conta', () => {
     });
     await waitFor(() => expect(result.current).toEqual({ verificando: false, precisa: true }));
 
-    // B assume a conta nesta aba. A sonda de B ainda está em voo: o estado de
+    // B assume a sessão nesta aba. A sonda de B ainda está em voo: o estado de
     // A não pode decidir a rota nesse meio-tempo (o Layout redirecionaria B
     // para /onboarding e a resposta false de B não a traria de volta).
     localStorage.setItem('token', 'jwt-B');
     const sondaB = sondaSeguravel({ comMeta: true });
-    rerender({ id: 'B' });
+    rerender({ sessao: 'jwt-B' });
 
+    expect(result.current.precisa).toBe(false);
+
+    // A resposta atrasada de A (true) é descartada: a sessão já mudou.
+    await act(async () => {
+      sondaA.responder(false);
+    });
     expect(result.current.precisa).toBe(false);
 
     await act(async () => {

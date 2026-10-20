@@ -12,6 +12,7 @@ import {
   suportaNotificacao,
 } from '../lib/reminder';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { fusoDoAparelho } from '../lib/fuso';
 import LoadingWarning from '../components/LoadingWarning';
 import { Chip } from '../components/ui';
@@ -27,6 +28,7 @@ const toTimeInput = (value?: string | null) => (value ? String(value).slice(0, 5
 export default function Configuracoes() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+  const { logout } = useAuth();
   const fusoAparelho = fusoDoAparelho();
   const [me, setMe] = useState<User | null>(null);
   const [hours, setHours] = useState('');
@@ -125,7 +127,10 @@ export default function Configuracoes() {
   }
 
   function handleLogout() {
-    clearSession();
+    // Pelo AuthContext: limpa o token E derruba o usuário do estado. Só com
+    // `clearSession` o Layout continuava vendo a sessão e devolvia /login para
+    // /hoje (review do PR #292).
+    logout();
     navigate('/login');
   }
 

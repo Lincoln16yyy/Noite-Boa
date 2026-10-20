@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { renderWithAuth } from '../test/test-utils';
 import Layout from './Layout';
+import { esquecerSondagem } from '../lib/sonda';
 import type { User } from '../api/types';
 
 /**
@@ -30,6 +31,9 @@ function jsonResponse(body: unknown, status = 200) {
 afterEach(() => {
   vi.restoreAllMocks();
   localStorage.clear();
+  // A sonda se prende ao token; os testes reutilizam 'mock-token', então a
+  // memória precisa ser descartada para não vazar de um caso para o outro.
+  esquecerSondagem();
 });
 
 /** Rota-marcador: prova o destino do redirecionamento sem sair do MemoryRouter. */
@@ -101,5 +105,26 @@ describe('Layout — primeiro uso (issue #215)', () => {
       return caminho.includes('/sleep-logs') || caminho.includes('/goal');
     });
     expect(sondadas).toHaveLength(0);
+  });
+
+  it('quem já não precisa do fluxo não fica preso em /onboarding (#292)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const caminho = String(url);
+      if (caminho.includes('/me')) return jsonResponse(usuario);
+      if (caminho.includes('/sleep-logs')) return jsonResponse({ content: [{ id: 'n1' }] });
+      return jsonResponse({ targetMinutes: 480, hasGoal: true });
+    });
+
+    // A rota /onboarding cai no Layout (como no app), sem marcador próprio.
+    renderWithAuth(
+      <Routes>
+        <Route path="/hoje" element={<p>marcador hoje</p>} />
+        <Route path="*" element={<Layout />} />
+      </Routes>,
+      { user: usuario, route: '/onboarding' },
+    );
+
+    // Já tem noite e meta: a sonda resolve `false` e tira a pessoa do fluxo.
+    await screen.findByText('marcador hoje');
   });
 });

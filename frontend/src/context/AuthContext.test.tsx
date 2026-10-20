@@ -109,4 +109,39 @@ describe('AuthProvider', () => {
     expect(screen.getByText('b@example.com')).toBeInTheDocument();
     expect(screen.queryByText('a@example.com')).not.toBeInTheDocument();
   });
+
+  it('token trocado durante o /me inicial refaz a consulta em vez de travar no esqueleto (#292)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    let responderA: ((resposta: Response) => void) | undefined;
+    let chamadasMe = 0;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/api/me')) {
+        chamadasMe += 1;
+        if (chamadasMe === 1) {
+          return new Promise<Response>((resolve) => {
+            responderA = resolve;
+          });
+        }
+        return new Response(JSON.stringify(usuarioB), { status: 200 });
+      }
+      return new Response('null', { status: 200 });
+    });
+
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+      </AuthProvider>,
+    );
+
+    // Outra aba troca de conta; esta janela não recebe o `session-change` da
+    // outra. O /me que estava em voo responde para a sessão antiga.
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      responderA?.(new Response(JSON.stringify(usuarioA), { status: 200 }));
+    });
+
+    // Em vez de ficar com `loading` eterno, a janela refaz a consulta para a
+    // sessão atual e mostra B.
+    expect(await screen.findByText('b@example.com')).toBeInTheDocument();
+  });
 });

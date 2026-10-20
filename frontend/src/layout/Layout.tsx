@@ -26,12 +26,15 @@ const AUTH_ROUTES: string[] = ['/login', '/cadastro'];
 const MENU_DESKTOP = [...NAV_PRINCIPAL, ...NAV_SECUNDARIA];
 
 export default function Layout() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, sessao } = useAuth();
   const location = useLocation();
   // Reativo a redimensionamento/rotação (media query do navegador), não um
   // `window.innerWidth` lido uma única vez no primeiro render.
   const isMobile = useMediaQuery(CONSULTA_CELULAR);
-  const primeiroUso = usePrimeiroUso(!loading && Boolean(user), user?.id ?? null);
+  // O token identifica a sessão: muda no login/logout antes de o /me trazer o
+  // usuário novo, então o primeiro uso não fica preso ao resultado da conta
+  // anterior (review do PR #292).
+  const primeiroUso = usePrimeiroUso(!loading && Boolean(user), sessao);
 
   // Redireciona rotas protegidas se não logado
   if (!loading && !user && PROTECTED_ROUTES.some((r) => location.pathname.startsWith(r))) {
@@ -50,6 +53,18 @@ export default function Layout() {
   // não há chamada extra nenhuma.
   if (!loading && user && primeiroUso.precisa && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
+  }
+
+  // Quem não precisa mais do fluxo não fica preso em /onboarding — por exemplo,
+  // a conta trocou depois de um redirecionamento (review do PR #292).
+  if (
+    !loading &&
+    user &&
+    !primeiroUso.verificando &&
+    !primeiroUso.precisa &&
+    location.pathname === '/onboarding'
+  ) {
+    return <Navigate to="/hoje" replace />;
   }
 
   // Mostra esqueleto enquanto carrega a sessão
