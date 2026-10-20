@@ -246,7 +246,8 @@ class FriendsRankingTest extends TesteComBanco {
         for (int k = 6; k >= 1; k--) {
             seedNight(ana, k); // 22h de today-6 até today-1
         }
-        seedNightAt(ana, 0, 7, 1);  // 7h de hoje, no passado
+        // só a noite das 20h dá a data de hoje: se o ranking ignorasse início
+        // no futuro, a contagem cairia para 6 e o teste falharia
         seedNightAt(ana, 0, 20, 1); // 20h de hoje: ainda no futuro, mas é a mesma data
 
         mockMvc.perform(get("/api/friends/ranking?days=7").header("Authorization", "Bearer " + anaToken))
