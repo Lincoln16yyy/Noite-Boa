@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import Configuracoes from './Configuracoes';
@@ -272,12 +272,13 @@ describe('tela de Configurações', () => {
   });
 
   it('exclusão da conta não derruba a sessão que entrou durante o pedido (#292)', async () => {
+    let responderDelete: ((resposta: Response) => void) | undefined;
     fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);
       if (path.includes('/me') && options.method === 'DELETE') {
-        // Outra aba entrou com outra conta enquanto o DELETE estava em voo.
-        localStorage.setItem('token', 'jwt-B');
-        return new Response(null, { status: 204 });
+        return new Promise<Response>((resolve) => {
+          responderDelete = resolve;
+        });
       }
       if (path.includes('/me')) return jsonResponse(ME);
       return jsonResponse(GOAL);
@@ -293,11 +294,46 @@ describe('tela de Configurações', () => {
       target: { value: 'EXCLUIR' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
-    await waitFor(() => expect(calls('DELETE', '/me').length).toBe(1));
 
+    // O DELETE está em voo; outra aba entra com a conta B.
+    await waitFor(() => expect(responderDelete).toBeDefined());
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      responderDelete?.(new Response(null, { status: 204 }));
+    });
+
+    // Espera o handler retomar (libera o botão) antes de conferir: a guarda
+    // roda depois do `await`, não no clique.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Excluir minha conta' })).toBeEnabled(),
+    );
     // A sessão nova continua de pé e não é levada para a página de exclusão.
     expect(localStorage.getItem('token')).toBe('jwt-B');
     expect(screen.queryByRole('heading', { name: 'Página inicial' })).not.toBeInTheDocument();
+  });
+
+  it('não envia a exclusão se a tela é de outra sessão (#292)', async () => {
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+    renderWithAuth(<Configuracoes />, { user: mockUser, route: '/configuracoes' });
+    fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), {
+      target: { value: 'EXCLUIR' },
+    });
+
+    // Outra aba trocou a conta e o evento `storage` ainda não chegou: o perfil
+    // na tela é de A, e o DELETE sairia como B.
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    expect(calls('DELETE', '/me').length).toBe(0);
+    expect(localStorage.getItem('token')).toBe('jwt-B');
   });
 
   it('mantém a sessão e mostra erro quando a exclusão falha no servidor', async () => {

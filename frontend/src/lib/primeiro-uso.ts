@@ -83,7 +83,10 @@ export function precisaDePrimeiroUso(): Promise<boolean | null> {
       esquecerSondagemSe(atual);
       return null;
     });
-  if (getToken() === tokenDaSonda) guardarSondagem(atual);
+  // A sonda fica guardada sob o token capturado acima. Se a sessão mudou no
+  // meio, o `.then` a descarta ao resolver; guardar sob o token atual poderia
+  // entregar o resultado de A para B (review do PR #292).
+  guardarSondagem(atual, tokenDaSonda);
   return atual;
 }
 

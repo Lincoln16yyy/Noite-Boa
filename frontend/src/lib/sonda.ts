@@ -19,9 +19,14 @@ export function sondagemAtual(): Promise<boolean | null> | null {
   return sondagem;
 }
 
-export function guardarSondagem(promessa: Promise<boolean | null>): void {
+/**
+ * Guarda a sonda sob o token `token` — o token capturado no INÍCIO da sonda,
+ * não o atual: reler o token aqui poderia gravar o resultado de A sob B se a
+ * sessão tivesse mudado no meio (review do PR #292).
+ */
+export function guardarSondagem(promessa: Promise<boolean | null>, token: string | null): void {
   sondagem = promessa;
-  tokenDaSondagem = localStorage.getItem('token');
+  tokenDaSondagem = token;
 }
 
 /** Esquece a sonda: a próxima conta desta aba é sondada de novo. */

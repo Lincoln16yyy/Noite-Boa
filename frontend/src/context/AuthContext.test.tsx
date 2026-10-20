@@ -237,6 +237,34 @@ describe('AuthProvider', () => {
     expect(screen.queryByText('carregando')).not.toBeInTheDocument();
   });
 
+  it('logout numa tela da conta antiga não derruba a conta que entrou em outra aba (#292)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    let chamadasMe = 0;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/api/me')) {
+        chamadasMe += 1;
+        return new Response(JSON.stringify(chamadasMe === 1 ? usuarioA : usuarioB), { status: 200 });
+      }
+      return new Response('null', { status: 200 });
+    });
+
+    render(
+      <AuthProvider>
+        <BotaoSair />
+        <MostraUsuario />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+
+    // Outra aba trocou a conta; o evento `storage` ainda não chegou aqui.
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+    // O clique era da sessão A: o token de B sobrevive e a tela passa a B.
+    expect(localStorage.getItem('token')).toBe('jwt-B');
+    expect(await screen.findByText('b@example.com')).toBeInTheDocument();
+  });
+
   it('resposta antiga de /me não derruba a consulta mais nova (#292)', async () => {
     localStorage.setItem('token', 'jwt-B');
     let rejeitarAntiga: ((erro: unknown) => void) | undefined;

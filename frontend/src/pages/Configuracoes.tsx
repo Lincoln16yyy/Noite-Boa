@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, clearSession, getToken } from '../api/client';
@@ -44,9 +44,14 @@ export default function Configuracoes() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const tokenDoPerfil = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
+    // Token que carregou este perfil: a exclusão só pode ser enviada por ele.
+    // Sem isso, uma tela da conta A ainda aberta podia excluir a conta B que
+    // entrou em outra aba (review do PR #292).
+    const tokenDoCarregamento = getToken();
     (async () => {
       try {
         const [meData, goalData] = await Promise.all([
@@ -54,6 +59,7 @@ export default function Configuracoes() {
           api.get<Goal>('/goal'),
         ]);
         if (!active) return;
+        tokenDoPerfil.current = tokenDoCarregamento;
         setMe(meData);
         setHours(String((goalData.targetMinutes ?? 0) / 60));
         setBedtime(toTimeInput(goalData.bedtime));
@@ -144,6 +150,13 @@ export default function Configuracoes() {
       return;
     }
 
+    // O DELETE usa o token atual do cliente. Se a sessão já não é a que
+    // carregou este perfil, a exclusão seria da outra conta (review do PR #292).
+    if (getToken() !== tokenDoPerfil.current) {
+      setDeleteError('A sessão mudou. Recarregue a página antes de excluir a conta.');
+      return;
+    }
+
     setDeleting(true);
     setError('');
     setSuccess('');
@@ -154,7 +167,10 @@ export default function Configuracoes() {
     const tokenDaExclusao = getToken();
     try {
       await api.delete('/me');
-      if (getToken() !== tokenDaExclusao) return;
+      if (getToken() !== tokenDaExclusao) {
+        setDeleting(false);
+        return;
+      }
       clearSession();
       // Avisa o AuthProvider para derrubar o usuário da sessão
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
