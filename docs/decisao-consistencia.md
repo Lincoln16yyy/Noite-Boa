@@ -37,6 +37,10 @@ A palavra "consistência" tinha dois significados no produto:
 
 - **Sem mudança de API nem de cálculo**: os campos JSON continuam `nights` e
   `consistencyPercent`; muda só apresentação, javadocs e documentação.
+  > Atualização (#275): a janela do ranking passou a ser contada em **dias
+  > locais** (hoje incluso) em vez de `days`×24h. A definição de "% dos dias" e
+  > o payload não mudaram; a mudança só impede que a contagem passe de `days`
+  > datas e o percentual de 100%.
 - O texto do toggle de compartilhamento muda de palavra, mas **não muda o que é
   compartilhado** (continua só contagem/percentual — desenho da #39 intacto).
 - `PLANO.md` (lista de features) passa a dizer "ranking de noites registradas".

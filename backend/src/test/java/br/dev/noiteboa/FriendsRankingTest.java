@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -87,10 +88,32 @@ class FriendsRankingTest extends TesteComBanco {
 
     /** Registra uma noite que "começa" k dias atrás, às 22h no fuso do usuário. */
     private void seedNight(User user, int daysAgo) {
+        seedNightAt(user, daysAgo, 22);
+    }
+
+    /** Registra uma noite que começa hoje, à `hora` local (tem que ser no passado). */
+    private void seedNightAt(User user, int daysAgo, int hora) {
+        seedNightAt(user, daysAgo, hora, 8);
+    }
+
+    private void seedNightAt(User user, int daysAgo, int hora, int duracaoHoras) {
         ZoneId zone = ZoneId.of(user.getTimezone());
-        OffsetDateTime start = OffsetDateTime.now(zone).withHour(22).withMinute(0).withSecond(0).withNano(0)
+        OffsetDateTime start = OffsetDateTime.now(zone).withHour(hora).withMinute(0).withSecond(0).withNano(0)
             .minusDays(daysAgo);
-        sleepLogRepository.save(new SleepLog(UUID.randomUUID(), user, start, start.plusHours(8), (short) 4, null));
+        sleepLogRepository.save(new SleepLog(UUID.randomUUID(), user, start, start.plusHours(duracaoHoras), (short) 4, null));
+    }
+
+    /**
+     * Fuso em que "agora" são `hora` horas (offset fixo válido). Fixar a hora
+     * local deixa o teste independente do relógio: o corte de N×24h cai sempre
+     * no mesmo horário do dia, longe dos horários usados nas noites semeadas.
+     */
+    private static ZoneId fusoComHoraLocal(int hora) {
+        int deslocamento = Math.floorMod(hora - ZonedDateTime.now(ZoneOffset.UTC).getHour(), 24);
+        if (deslocamento > 11) {
+            deslocamento -= 24;
+        }
+        return ZoneOffset.ofTotalSeconds(deslocamento * 3600);
     }
 
     @Test
@@ -136,6 +159,101 @@ class FriendsRankingTest extends TesteComBanco {
         // e-mails nunca circulam no ranking — só nome de exibição
         org.junit.jupiter.api.Assertions.assertFalse(body.contains("ana-rank@example.com"), "e-mail de Ana vazou");
         org.junit.jupiter.api.Assertions.assertFalse(body.contains("bruno-rank@example.com"), "e-mail de Bruno vazou");
+    }
+
+    /**
+     * Issue #275: a janela é contada em dias locais, não em N×24h. Uma janela de
+     * N×24h cobre um pedaço do dia N e outro do dia 0, então cabiam N+1 datas
+     * locais (8 noites em 7 dias = 114% "dos dias"). O fuso é escolhido para que
+     * "agora" sejam 15h locais: assim a noite de 7 dias atrás, às 22h, cai
+     * depois do corte de 7×24h e é a 8ª data — sem inventar noite no futuro.
+     */
+    @Test
+    void consistencyNeverPasses100WithLogsOnBothEdgesOfTheWindow() throws Exception {
+        String anaToken = loginToken("ana-borda@example.com", "Ana");
+        User ana = userRepository.findByEmailIgnoreCase("ana-borda@example.com").orElseThrow();
+        ana.updateTimezone(fusoComHoraLocal(15).getId());
+        userRepository.save(ana);
+
+        for (int k = 1; k <= 7; k++) {
+            seedNight(ana, k); // 22h de today-7 até today-1 (a última termina às 6h de hoje)
+        }
+        seedNightAt(ana, 0, 7, 1); // 7h-8h de hoje: a 8ª data local, já no passado
+
+        mockMvc.perform(get("/api/friends/ranking?days=7").header("Authorization", "Bearer " + anaToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ranking.length()").value(1))
+            .andExpect(jsonPath("$.ranking[0].isMe").value(true))
+            .andExpect(jsonPath("$.ranking[0].consistencyPercent").value(100))
+            .andExpect(jsonPath("$.ranking[0].nights").value(7));
+    }
+
+    /**
+     * Review do Sourcery no PR #290: só o limite inferior deixaria a noite de
+     * amanhã (início no futuro) entrar como uma data a mais e estourar 100%.
+     */
+    @Test
+    void nightStartingTomorrowDoesNotEnterTheWindow() throws Exception {
+        String anaToken = loginToken("ana-futuro@example.com", "Ana");
+        User ana = userRepository.findByEmailIgnoreCase("ana-futuro@example.com").orElseThrow();
+        ana.updateTimezone(fusoComHoraLocal(15).getId());
+        userRepository.save(ana);
+
+        for (int k = 6; k >= 1; k--) {
+            seedNight(ana, k); // 22h de today-6 até today-1; a de today-1 termina às 6h de hoje
+        }
+        seedNightAt(ana, 0, 7, 1);   // 7h de hoje: completa as 7 datas no passado
+        seedNightAt(ana, -1, 1, 1);  // 1h de amanhã: início no futuro, fora da janela
+
+        mockMvc.perform(get("/api/friends/ranking?days=7").header("Authorization", "Bearer " + anaToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ranking[0].nights").value(7))
+            .andExpect(jsonPath("$.ranking[0].consistencyPercent").value(100));
+    }
+
+    /**
+     * Review do Sourcery no PR #290: a noite que começa exatamente à meia-noite
+     * do primeiro dia da janela precisa contar (limite inferior inclusivo).
+     */
+    @Test
+    void nightExactlyAtWindowStartCounts() throws Exception {
+        String anaToken = loginToken("ana-meianoite@example.com", "Ana");
+        User ana = userRepository.findByEmailIgnoreCase("ana-meianoite@example.com").orElseThrow();
+        ana.updateTimezone(fusoComHoraLocal(15).getId());
+        userRepository.save(ana);
+
+        seedNightAt(ana, 6, 0, 1); // 00:00 de today-6 = início exato da janela de 7 dias
+
+        mockMvc.perform(get("/api/friends/ranking?days=7").header("Authorization", "Bearer " + anaToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ranking[0].nights").value(1))
+            .andExpect(jsonPath("$.ranking[0].consistencyPercent").value(14)); // 1/7
+    }
+
+    /**
+     * Review do Sourcery no PR #290: o `SleepService` aceita fim até 5 min no
+     * futuro (tolerância de relógio), então um registro pode começar daqui a
+     * pouco. No ranking ele é a mesma data local de hoje — não pode virar uma
+     * noite a mais.
+     */
+    @Test
+    void nightStartingLaterTodayStillCountsOnceForToday() throws Exception {
+        String anaToken = loginToken("ana-hoje@example.com", "Ana");
+        User ana = userRepository.findByEmailIgnoreCase("ana-hoje@example.com").orElseThrow();
+        ana.updateTimezone(fusoComHoraLocal(15).getId());
+        userRepository.save(ana);
+
+        for (int k = 6; k >= 1; k--) {
+            seedNight(ana, k); // 22h de today-6 até today-1
+        }
+        // só a noite das 20h dá a data de hoje: se o ranking ignorasse início
+        // no futuro, a contagem cairia para 6 e o teste falharia
+        seedNightAt(ana, 0, 20, 1); // 20h de hoje: ainda no futuro, mas é a mesma data
+
+        mockMvc.perform(get("/api/friends/ranking?days=7").header("Authorization", "Bearer " + anaToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ranking[0].nights").value(7))
+            .andExpect(jsonPath("$.ranking[0].consistencyPercent").value(100));
     }
 
     @Test

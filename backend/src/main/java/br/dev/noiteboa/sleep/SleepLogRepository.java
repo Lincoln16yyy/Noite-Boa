@@ -14,11 +14,20 @@ import java.util.UUID;
 public interface SleepLogRepository extends JpaRepository<SleepLog, UUID> {
 
     /**
-     * Janela para estatísticas/ranking (#98): só registros a partir de
-     * `since` (exclusive), em ordem decrescente do início do sono.
+     * Janela para estatísticas (#98): só registros a partir de `since`
+     * (exclusive), em ordem decrescente do início do sono.
      */
     java.util.List<SleepLog> findByUserIdAndSleepStartGreaterThanOrderBySleepStartDesc(
         UUID userId, OffsetDateTime since);
+
+    /**
+     * Janela do ranking em dias locais (#275): {@code from <= sleep_start < to},
+     * em ordem decrescente. Inferior inclusivo para a noite que começa
+     * exatamente à meia-noite do primeiro dia; superior exclusivo para a noite
+     * de amanhã não entrar (senão ainda caberia uma data a mais que `days`).
+     */
+    java.util.List<SleepLog> findByUserIdAndSleepStartGreaterThanEqualAndSleepStartLessThanOrderBySleepStartDesc(
+        UUID userId, OffsetDateTime from, OffsetDateTime to);
 
     /**
      * Histórico completo do usuário, do mais recente ao mais antigo — sem
