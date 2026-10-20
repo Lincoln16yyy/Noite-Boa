@@ -171,6 +171,19 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     expect((globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(chamadas);
   });
 
+  it('troca de conta em outra aba (token compartilhado) invalida a sonda (#292)', async () => {
+    const { precisaDePrimeiroUso } = await carregar();
+    localStorage.setItem('token', 'jwt-A');
+    instalarFetch({ comNoite: true, comMeta: true });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(false); // A já usa o app
+
+    // Outra aba troca de conta: o token (compartilhado) muda, mas o evento
+    // `session-change` não chega nesta janela.
+    localStorage.setItem('token', 'jwt-B');
+    instalarFetch({ comNoite: false, comMeta: false });
+    await expect(precisaDePrimeiroUso()).resolves.toBe(true); // B, recém-criada
+  });
+
   it('ao concluir o fluxo a memoização é descartada', async () => {
     const { marcarOnboardingConcluido, precisaDePrimeiroUso } = await carregar();
     instalarFetch({ comNoite: false, comMeta: false });

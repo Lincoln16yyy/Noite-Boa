@@ -31,7 +31,7 @@ export default function Layout() {
   // Reativo a redimensionamento/rotação (media query do navegador), não um
   // `window.innerWidth` lido uma única vez no primeiro render.
   const isMobile = useMediaQuery(CONSULTA_CELULAR);
-  const primeiroUso = usePrimeiroUso(!loading && Boolean(user));
+  const primeiroUso = usePrimeiroUso(!loading && Boolean(user), user?.id ?? null);
 
   // Redireciona rotas protegidas se não logado
   if (!loading && !user && PROTECTED_ROUTES.some((r) => location.pathname.startsWith(r))) {

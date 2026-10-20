@@ -29,7 +29,12 @@ export interface RequestOptions {
  */
 export type MetodoOptions = Omit<RequestOptions, 'method' | 'body'>;
 
-function getToken(): string | null {
+/**
+ * Token da sessão atual. Exportado para quem precisa saber se a sessão que
+ * iniciou uma requisição ainda é a mesma quando a resposta chega (review do
+ * PR #292).
+ */
+export function getToken(): string | null {
   return localStorage.getItem('token');
 }
 

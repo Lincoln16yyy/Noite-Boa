@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { api, clearSession } from '../api/client';
+import { api, clearSession, getToken } from '../api/client';
 import type { LoginResult, RegisterResult, User } from '../api/types';
 
 /** Valor do contexto de autenticação. */
@@ -34,13 +34,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshUser = useCallback(async () => {
+    // O /me vale para a sessão que o pediu. Se o token mudar até a resposta
+    // (outra conta logou), o resultado é de uma sessão que já saiu e não pode
+    // sobrescrever o usuário atual (review do PR #292).
+    const tokenDaRequisicao = getToken();
+    const mesmaSessao = () => montado.current && getToken() === tokenDaRequisicao;
     try {
       const me = await api.get<User>('/me');
-      if (montado.current) setUser(me);
+      if (mesmaSessao()) setUser(me);
     } catch {
-      if (montado.current) setUser(null);
+      if (mesmaSessao()) setUser(null);
     } finally {
-      if (montado.current) setLoading(false);
+      if (mesmaSessao()) setLoading(false);
     }
   }, []);
 

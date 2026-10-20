@@ -1,11 +1,34 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from './AuthContext';
+import type { User } from '../api/types';
 
 function BotaoSair() {
   const { logout } = useAuth();
   return <button onClick={logout}>Sair</button>;
 }
+
+/** Mostra o e-mail do usuário atual para provar qual sessão ficou no estado. */
+function MostraUsuario() {
+  const { user } = useAuth();
+  return <p>{user?.email ?? 'sem usuário'}</p>;
+}
+
+const usuarioA: User = {
+  id: 'a1',
+  email: 'a@example.com',
+  displayName: 'Ana',
+  timezone: 'America/Sao_Paulo',
+  shareWithFriends: true,
+};
+
+const usuarioB: User = {
+  id: 'b1',
+  email: 'b@example.com',
+  displayName: 'Bia',
+  timezone: 'America/Sao_Paulo',
+  shareWithFriends: true,
+};
 
 /** Respostas das duas chamadas da sonda do primeiro uso (mais o /me da sessão). */
 function simularSonda({ comNoite, comMeta }: { comNoite: boolean; comMeta: boolean }) {
@@ -45,5 +68,45 @@ describe('AuthProvider', () => {
     // Conta B já tem noite: se herdasse a sonda memoizada de A, receberia `true`.
     simularSonda({ comNoite: true, comMeta: true });
     await expect(precisaDePrimeiroUso()).resolves.toBe(false);
+  });
+
+  it('resposta atrasada do /me de uma conta não sobrescreve a outra (#292)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    let responderA: ((resposta: Response) => void) | undefined;
+    let chamadasMe = 0;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/api/me')) {
+        chamadasMe += 1;
+        if (chamadasMe === 1) {
+          // O /me da conta A fica em voo até resolvermos.
+          return new Promise<Response>((resolve) => {
+            responderA = resolve;
+          });
+        }
+        return new Response(JSON.stringify(usuarioB), { status: 200 });
+      }
+      return new Response('null', { status: 200 });
+    });
+
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+      </AuthProvider>,
+    );
+
+    // B assume a sessão enquanto o /me de A ainda está em voo.
+    localStorage.setItem('token', 'jwt-B');
+    act(() => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+    await screen.findByText('b@example.com');
+
+    // A resposta de A chega atrasada: é de uma sessão que já saiu.
+    await act(async () => {
+      responderA?.(new Response(JSON.stringify(usuarioA), { status: 200 }));
+    });
+
+    expect(screen.getByText('b@example.com')).toBeInTheDocument();
+    expect(screen.queryByText('a@example.com')).not.toBeInTheDocument();
   });
 });
