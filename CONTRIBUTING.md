@@ -51,7 +51,7 @@ cd backend && mvn -B verify        # compila + testes
 cd frontend && npm ci && npm run typecheck && npm run lint && npm test && npm run build
 ```
 
-A CI (`.github/workflows/ci.yml`) roda exatamente isso em todo PR. **Não desative nem apague testes para fazer o CI passar.**
+A CI (`.github/workflows/ci.yml`) repete essas verificações em todo PR e roda ainda um job **`e2e`** (`npm ci` + `npm run build` no front e o smoke do `tools/e2e` no navegador). **Não desative nem apague testes para fazer o CI passar.**
 
 ## 5. Pull Request
 

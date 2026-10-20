@@ -4,7 +4,7 @@ Teste rápido de integração no navegador (issue #159). Cobre os fluxos que já
 quebraram em produção sem os testes unitários pegarem:
 
 1. visitante vê **Entrar**;
-2. login correto leva a `/dashboard` (o teste **falha** se ficar em `/login`);
+2. login correto leva a `/hoje` (o teste **falha** se ficar em `/login`);
 3. recarregar mantém a sessão;
 4. registrar uma noite;
 5. sair volta ao estado de visitante;

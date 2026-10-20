@@ -142,7 +142,7 @@ Fluxo automático a cada push em `main`:
 4. **Smoke test** de produção — qualquer item vermelho falha o job:
    - `GET /actuator/health` → 200 e `"status":"UP"` (retenta até 5 min);
    - preflight CORS com `Origin` do front → `access-control-allow-origin` exato;
-   - front `/`, `/cadastro`, `/login`, `/dashboard` → 200 (guarda do rewrite SPA);
+   - front `/`, `/cadastro`, `/login`, `/hoje` → 200 (guarda do rewrite SPA);
    - bundle `/assets/index-*.js` contém `noiteboa-api.onrender.com/api`
      (guarda da `VITE_API_URL`).
 
