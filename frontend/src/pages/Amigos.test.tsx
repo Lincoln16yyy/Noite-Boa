@@ -402,4 +402,34 @@ describe('tela de Amigos', () => {
     expect(localStorage.getItem('token')).toBe('jwt-B');
   });
 
+  it('não comita a carga se outra conta assumiu no meio (#298)', async () => {
+    const liberarMe: Array<() => void> = [];
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      const method = options.method ?? 'GET';
+      if (path.includes('/api/me') && method === 'GET') {
+        await new Promise<void>((resolve) => {
+          liberarMe.push(resolve);
+        });
+        return jsonResponse({ ...ME, displayName: 'Conta B' });
+      }
+      if (path.includes('/api/me')) return jsonResponse(ME);
+      if (path.includes('/friends/ranking')) return jsonResponse({ days: 7, ranking: [] });
+      if (path.includes('/friends/requests')) return jsonResponse({ sent: [], received: [] });
+      return jsonResponse([]);
+    });
+
+    openScreen();
+    // Espera a carga começar (o /me da tela e o do AuthContext).
+    await waitFor(() => expect(liberarMe.length).toBeGreaterThan(0));
+    // Outra aba assumiu enquanto a carga estava em voo.
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      liberarMe.forEach((liberar) => liberar());
+    });
+
+    expect(await screen.findByText(/sessão mudou/i)).toBeInTheDocument();
+    expect(screen.queryByText('Conta B')).not.toBeInTheDocument();
+  });
+
 });

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { api, getToken } from '../api/client';
+import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import type { Friend, FriendRequests, RankingEntry, SendResult, User } from '../api/types';
 import LoadingWarning from '../components/LoadingWarning';
 import { Button, Chip, EmptyState, ErrorState, Field, Skeleton } from '../components/ui';
@@ -24,6 +25,9 @@ const mutedTextStyle = { color: 'var(--text-muted)', fontSize: '15px' };
  * e o ranking só mostra nº de noites e % dos dias — nunca horários ou durações.
  */
 export default function Amigos() {
+  // A tela representa a sessão do AuthContext (é ela que define o usuário
+  // mostrado); a carga só vale se o token ainda for esse (#298).
+  const { sessao } = useAuth();
   const [me, setMe] = useState<User | null>(null);
   const [amigos, setAmigos] = useState<Friend[]>([]);
   const [convites, setConvites] = useState<FriendRequests>({ sent: [], received: [] });
@@ -81,19 +85,23 @@ export default function Amigos() {
     // uma ação que ainda não foi aplicada. Se a carga falhar de novo, o catch
     // repõe o alerta, então o botão de retry não some.
     setErroDaCarga('');
-    const tokenDoCarregamento = getToken();
+    const sessaoDoCarregamento = sessao;
     try {
       const [meData, amigosData, convitesData] = await Promise.all([
         api.get<User>('/me'),
         api.get<Friend[]>('/friends'),
         api.get<FriendRequests>('/friends/requests'),
       ]);
+      // Outra conta assumiu no meio: estes dados podem ser dela, mas a tela
+      // continua sendo a desta sessão. Não comita nem rebinda o token (#298).
+      if (!sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
+        setErroDaCarga(MSG_SESSAO_MUDOU);
+        return;
+      }
       setMe(meData);
       setAmigos(amigosData);
       setConvites(convitesData);
-      // Só amarra a tela à sessão se ela ainda for a mesma: com outra conta no
-      // meio do caminho, a próxima ação precisa recusar (não escrever em B).
-      if (getToken() === tokenDoCarregamento) tokenDaTela.current = tokenDoCarregamento;
+      tokenDaTela.current = sessaoDoCarregamento;
       await carregarRanking(periodoAtual.current);
     } catch (err: unknown) {
       setErroDaCarga(err instanceof Error ? err.message : String(err));

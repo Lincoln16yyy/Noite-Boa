@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ChangeEvent, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { api, getToken } from '../api/client';
+import { api } from '../api/client';
 import type { Goal, SleepLog as SleepLogApi, SleepLogPage } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -153,7 +153,9 @@ function paraTela(log: SleepLogApi): SleepLog {
 }
 
 export default function Historico() {
-  const { user } = useAuth();
+  // `sessao` (e não só o token) define o usuário/fuso com que a tela é
+  // renderizada: os dados e as mutações precisam ser da mesma sessão (#298).
+  const { user, sessao } = useAuth();
   const fuso = user?.timezone; // fonte única: fuso do perfil (issue #102)
   const [page, setPage] = useState<number>(0);
   const [logs, setLogs] = useState<SleepLog[]>([]);
@@ -180,9 +182,15 @@ export default function Historico() {
   const load = useCallback(async (p: number) => {
     setLoading(true);
     setError('');
-    const tokenDoCarregamento = getToken();
+    const sessaoDoCarregamento = sessao;
     try {
       const data = await api.get<SleepLogPage>(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`);
+      // Se outra conta assumiu no meio da carga, os registros são dela mas o
+      // fuso na tela ainda é o da sessão anterior: não comita (#298).
+      if (!sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
+        setError(MSG_SESSAO_MUDOU);
+        return;
+      }
       const content = (data.content ?? []).map(paraTela);
       if (content.length === 0 && p > 0) {
         setPage(p - 1); // página ficou vazia após excluir: volta uma
@@ -191,16 +199,14 @@ export default function Historico() {
       setLogs(content);
       setTotalPages(data.totalPages ?? 0);
       setTotalElements(data.totalElements ?? 0);
-      // A tela representa a sessão que respondeu; se outra conta já assumiu,
-      // as ações seguintes recusam em vez de escrever nela (#298).
-      if (getToken() === tokenDoCarregamento) tokenDaTela.current = tokenDoCarregamento;
+      tokenDaTela.current = sessaoDoCarregamento;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sessao]);
 
   // Meta para a barra de duração contra a meta (default 8h sem o /goal).
   useEffect(() => {

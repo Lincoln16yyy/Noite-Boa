@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Historico from './Historico';
 import { renderWithAuth } from '../test/test-utils';
@@ -232,6 +232,32 @@ describe('tela de Histórico', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
     expect(fetchMock.mock.calls.some(([, o]: any) => o?.method === 'DELETE')).toBe(false);
     expect(localStorage.getItem('token')).toBe('jwt-B');
+  });
+
+  it('não comita registros se outra conta assumiu no meio da carga (#298)', async () => {
+    let liberarLogs: (() => void) | undefined;
+    fetchMock.mockImplementation(async (url: any) => {
+      const path = String(url);
+      if (path.includes('/sleep-logs')) {
+        await new Promise<void>((resolve) => {
+          liberarLogs = resolve;
+        });
+        return jsonResponse(pageResponse([baseLog]));
+      }
+      if (path.includes('/me')) return jsonResponse(mockUser);
+      return jsonResponse({ targetMinutes: 480 });
+    });
+
+    openScreen();
+    await waitFor(() => expect(liberarLogs).toBeDefined());
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      liberarLogs?.();
+    });
+
+    expect(await screen.findByText(/sessão mudou/i)).toBeInTheDocument();
+    // Os registros carregados por B não aparecem com o fuso da sessão A.
+    expect(screen.queryByText('Boa')).not.toBeInTheDocument();
   });
 
 });
