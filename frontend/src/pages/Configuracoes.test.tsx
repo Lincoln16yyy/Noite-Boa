@@ -382,4 +382,18 @@ describe('tela de Configurações', () => {
     expect(screen.queryByRole('button', { name: /Usar o fuso do aparelho/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Este aparelho está em/)).not.toBeInTheDocument();
   });
+  it('não salva metas/fuso se a tela é de outra sessão (#298)', async () => {
+    openScreen();
+    await screen.findByDisplayValue('8');
+
+    // Outra aba trocou a conta; o evento `storage` ainda não chegou.
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    expect(calls('PUT', '/goal').length).toBe(0);
+    expect(calls('PUT', '/me').length).toBe(0);
+    expect(localStorage.getItem('token')).toBe('jwt-B');
+  });
+
 });

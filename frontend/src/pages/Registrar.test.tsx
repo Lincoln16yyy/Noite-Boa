@@ -225,4 +225,17 @@ describe('tela de Registrar sono', () => {
     // A sessão permanece e o botão volta a ficar habilitado para tentar de novo
     expect(screen.getByRole('button', { name: 'Salvar registro' })).toBeEnabled();
   });
+  it('não salva o registro se a tela é de outra sessão (#298)', async () => {
+    openScreen();
+    await screen.findByLabelText('Dormiu às');
+    fireEvent.click(screen.getByLabelText('Boa (4)'));
+
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar registro' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    expect(posts).toHaveLength(0);
+    expect(localStorage.getItem('token')).toBe('jwt-B');
+  });
+
 });

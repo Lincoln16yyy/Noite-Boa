@@ -20,6 +20,12 @@ export interface RequestOptions {
   body?: string;
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  /**
+   * Token explícito da requisição. Sem ele, usa o token atual do `localStorage`.
+   * Permite que uma tela carregada pela conta A escreva com o token de A mesmo
+   * que outra aba já tenha trocado para B (#298).
+   */
+  token?: string;
 }
 
 /**
@@ -84,8 +90,11 @@ function isNetworkError(error: unknown): boolean {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  // Token explícito (tela carregada por outra conta) ou o da sessão atual.
+  // O campo não pode ir para o `fetch`: ele não conhece `token` (#298).
+  const { token: tokenExplicito, ...opcoesFetch } = options;
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...options.headers };
-  const token = getToken();
+  const token = tokenExplicito !== undefined ? tokenExplicito : getToken();
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
@@ -111,7 +120,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   try {
     const response = await fetch(`${BASE_URL}${path}`, {
-      ...options,
+      ...opcoesFetch,
       headers,
       signal: controller.signal,
     });

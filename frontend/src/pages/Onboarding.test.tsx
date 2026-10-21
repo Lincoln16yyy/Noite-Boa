@@ -146,4 +146,15 @@ describe('primeiro uso em 3 passos', () => {
     fireEvent.change(horas, { target: { value: '12' } });
     expect(screen.getByText('12h')).toBeInTheDocument();
   });
+  it('não salva a meta se a tela é de outra sessão (#298)', async () => {
+    abrir();
+    localStorage.setItem('token', 'jwt-B');
+
+    fireEvent.click(screen.getByRole('button', { name: /^avançar$/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    expect(puts()).toHaveLength(0);
+    expect(screen.getByRole('heading', { level: 1, name: /quanto você quer dormir/i })).toBeInTheDocument();
+  });
+
 });

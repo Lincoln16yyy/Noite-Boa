@@ -222,4 +222,16 @@ describe('tela de Histórico', () => {
       expect(body.sleepStart).toBe('2026-10-07T21:00:00.000Z');
     });
   });
+  it('não exclui registro se a tela é de outra sessão (#298)', async () => {
+    openScreen();
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir' }));
+
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(screen.getByRole('button', { name: 'Sim, excluir' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    expect(fetchMock.mock.calls.some(([, o]: any) => o?.method === 'DELETE')).toBe(false);
+    expect(localStorage.getItem('token')).toBe('jwt-B');
+  });
+
 });

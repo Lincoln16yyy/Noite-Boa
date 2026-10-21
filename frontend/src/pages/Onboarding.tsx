@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
+import { api, getToken } from '../api/client';
 import type { Goal, GoalInput } from '../api/types';
+import { MSG_SESSAO_MUDOU, sessaoDaTelaAindaVale } from '../lib/sessao-da-tela';
 import { marcarOnboardingConcluido } from '../lib/primeiro-uso';
 import { Button, Card, Field, ProgressBar } from '../components/ui';
 
@@ -71,6 +72,9 @@ export default function Onboarding() {
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
   const tituloRef = useRef<HTMLHeadingElement>(null);
+  // Sessão que abriu o primeiro uso: o /goal escolhido aqui não pode cair na
+  // conta que entrou em outra aba (#298).
+  const tokenDaTela = useRef<string | null>(getToken());
 
   // Foco no título do passo a cada avanço (acessibilidade, issue #215).
   useEffect(() => {
@@ -84,9 +88,14 @@ export default function Onboarding() {
 
   /** Envia o que foi escolhido até aqui. `false` = mantém no passo com o erro. */
   async function salvar(envio: Partial<GoalInput>): Promise<boolean> {
+    const token = tokenDaTela.current;
+    if (!sessaoDaTelaAindaVale(token)) {
+      setErro(MSG_SESSAO_MUDOU);
+      return false;
+    }
     setSalvando(true);
     try {
-      await api.put<Goal>('/goal', envio);
+      await api.put<Goal>('/goal', envio, { token });
       return true;
     } catch (err: unknown) {
       setErro(err instanceof Error ? err.message : String(err));

@@ -390,4 +390,16 @@ describe('tela de Amigos', () => {
     expect(await screen.findByText(/Não confirmamos se o e-mail tem conta/)).toBeInTheDocument();
     expect(screen.getByText(/Seus horários e registros nunca aparecem no ranking/)).toBeInTheDocument();
   });
+  it('não aceita convite se a tela é de outra sessão (#298)', async () => {
+    openScreen();
+    const aceitar = await screen.findByRole('button', { name: 'Aceitar' });
+
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(aceitar);
+
+    expect(await screen.findByText(/sessão mudou/i)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([, o]: any) => o?.method === 'POST').length).toBe(0);
+    expect(localStorage.getItem('token')).toBe('jwt-B');
+  });
+
 });

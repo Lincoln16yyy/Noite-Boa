@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ChangeEvent, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api/client';
+import { api, getToken } from '../api/client';
 import type { Goal, SleepLog as SleepLogApi, SleepLogPage } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -15,6 +15,7 @@ import {
 import { isoDateNoFuso } from '../lib/fuso';
 import { agruparPorSemana, rotuloNoite } from '../lib/historico';
 import { normalizarMeta } from '../lib/hoje';
+import { MSG_SESSAO_MUDOU, sessaoDaTelaAindaVale } from '../lib/sessao-da-tela';
 import LoadingWarning from '../components/LoadingWarning';
 import QualitySelector from '../components/QualitySelector';
 import { Button, Card, EmptyState, ErrorState, Field, IconButton, ProgressBar, Skeleton } from '../components/ui';
@@ -172,10 +173,14 @@ export default function Historico() {
   const [savingEdit, setSavingEdit] = useState<boolean>(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
+  // Token que trouxe estes registros: editar/excluir uma noite de A não pode
+  // acabar alterando a conta B que entrou em outra aba (#298).
+  const tokenDaTela = useRef<string | null>(null);
 
   const load = useCallback(async (p: number) => {
     setLoading(true);
     setError('');
+    const tokenDoCarregamento = getToken();
     try {
       const data = await api.get<SleepLogPage>(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`);
       const content = (data.content ?? []).map(paraTela);
@@ -186,6 +191,9 @@ export default function Historico() {
       setLogs(content);
       setTotalPages(data.totalPages ?? 0);
       setTotalElements(data.totalElements ?? 0);
+      // A tela representa a sessão que respondeu; se outra conta já assumiu,
+      // as ações seguintes recusam em vez de escrever nela (#298).
+      if (getToken() === tokenDoCarregamento) tokenDaTela.current = tokenDoCarregamento;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
@@ -229,9 +237,14 @@ export default function Historico() {
       setEditError(problem);
       return;
     }
+    const token = tokenDaTela.current;
+    if (!sessaoDaTelaAindaVale(token)) {
+      setEditError(MSG_SESSAO_MUDOU);
+      return;
+    }
     setSavingEdit(true);
     try {
-      await api.put(`/sleep-logs/${editingId}`, toApiPayload(edit, fuso));
+      await api.put(`/sleep-logs/${editingId}`, toApiPayload(edit, fuso), { token });
       setEditingId(null);
       await load(page);
     } catch (err: unknown) {
@@ -243,10 +256,15 @@ export default function Historico() {
   }
 
   async function remove(id: string) {
+    const token = tokenDaTela.current;
+    if (!sessaoDaTelaAindaVale(token)) {
+      setError(MSG_SESSAO_MUDOU);
+      return;
+    }
     setDeleting(true);
     setError('');
     try {
-      await api.delete(`/sleep-logs/${id}`);
+      await api.delete(`/sleep-logs/${id}`, { token });
       setConfirmId(null);
       await load(page);
     } catch (err: unknown) {

@@ -14,6 +14,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { fusoDoAparelho } from '../lib/fuso';
+import { MSG_SESSAO_MUDOU, sessaoDaTelaAindaVale } from '../lib/sessao-da-tela';
 import LoadingWarning from '../components/LoadingWarning';
 import { Chip } from '../components/ui';
 
@@ -87,17 +88,25 @@ export default function Configuracoes() {
       return;
     }
 
+    // O formulário mostra a conta que o carregou: se o token já é de outra,
+    // salvar aplicaria as escolhas de A na conta B (#298).
+    const tokenDaTela = tokenDoPerfil.current;
+    if (!sessaoDaTelaAindaVale(tokenDaTela)) {
+      setError(MSG_SESSAO_MUDOU);
+      return;
+    }
+
     setSaving(true);
     try {
       let updatedMe = me;
       if (me && timezone !== me.timezone) {
-        updatedMe = await api.put<User>('/me', { timezone });
+        updatedMe = await api.put<User>('/me', { timezone }, { token: tokenDaTela });
       }
       await api.put('/goal', {
         targetMinutes: minutes,
         bedtime: bedtime || null,
         wakeTime: wakeTime || null,
-      });
+      }, { token: tokenDaTela });
       setMe(updatedMe);
       setSuccess('Preferências salvas.');
 
@@ -119,9 +128,14 @@ export default function Configuracoes() {
   async function atualizarFusoDoAparelho() {
     setError('');
     setSuccess('');
+    const tokenDaTela = tokenDoPerfil.current;
+    if (!sessaoDaTelaAindaVale(tokenDaTela)) {
+      setError(MSG_SESSAO_MUDOU);
+      return;
+    }
     setSaving(true);
     try {
-      const updatedMe = await api.put<User>('/me', { timezone: fusoAparelho });
+      const updatedMe = await api.put<User>('/me', { timezone: fusoAparelho }, { token: tokenDaTela });
       setMe(updatedMe);
       setTimezone(updatedMe.timezone ?? 'America/Sao_Paulo');
       setSuccess('Fuso horário atualizado para o do aparelho.');
@@ -152,7 +166,8 @@ export default function Configuracoes() {
 
     // O DELETE usa o token atual do cliente. Se a sessão já não é a que
     // carregou este perfil, a exclusão seria da outra conta (review do PR #292).
-    if (getToken() !== tokenDoPerfil.current) {
+    const tokenDaTela = tokenDoPerfil.current;
+    if (!sessaoDaTelaAindaVale(tokenDaTela)) {
       setDeleteError('A sessão mudou. Recarregue a página antes de excluir a conta.');
       return;
     }
@@ -164,9 +179,9 @@ export default function Configuracoes() {
     // Sessão que pediu a exclusão: se outra aba entrar com outra conta enquanto
     // o DELETE está em voo, a sessão nova não pode ser derrubada nem levada
     // para /?deleted=true (review do PR #292).
-    const tokenDaExclusao = getToken();
+    const tokenDaExclusao = tokenDaTela;
     try {
-      await api.delete('/me');
+      await api.delete('/me', { token: tokenDaExclusao });
       if (getToken() !== tokenDaExclusao) {
         setDeleting(false);
         return;

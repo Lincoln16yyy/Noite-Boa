@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { api } from '../api/client';
+import { api, getToken } from '../api/client';
 import type { Goal, SleepLog, SleepLogPage } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -16,6 +16,7 @@ import {
 } from '../lib/sleep';
 import { isoDateNoFuso } from '../lib/fuso';
 import { normalizarMeta } from '../lib/hoje';
+import { MSG_SESSAO_MUDOU, sessaoDaTelaAindaVale } from '../lib/sessao-da-tela';
 import LoadingWarning from '../components/LoadingWarning';
 import QualitySelector from '../components/QualitySelector';
 import { Button, Card } from '../components/ui';
@@ -129,6 +130,9 @@ export default function Registrar() {
   const [recent, setRecent] = useState<SleepLog[]>([]);
   const [recentLoaded, setRecentLoaded] = useState<boolean>(false);
   const digitouRef = useRef(false); // não repor o digitado quando o fuso do perfil chegar (#102)
+  // Sessão que abriu a tela: o formulário pode ter sido preenchido na conta A
+  // e não pode ser salvo na B que entrou em outra aba (#298).
+  const tokenDaTela = useRef<string | null>(getToken());
 
   const applyDefaults = useCallback(() => {
     const defaults = smartDefaults(new Date(), fuso);
@@ -180,10 +184,15 @@ export default function Registrar() {
       setError(problem);
       return;
     }
+    const token = tokenDaTela.current;
+    if (!sessaoDaTelaAindaVale(token)) {
+      setError(MSG_SESSAO_MUDOU);
+      return;
+    }
 
     setSaving(true);
     try {
-      const created = await api.post<SleepLog>('/sleep-logs', toApiPayload(form, fuso));
+      const created = await api.post<SleepLog>('/sleep-logs', toApiPayload(form, fuso), { token });
       setSuccess(`Noite registrada: ${formatDuration(created.sleepStart ?? '', created.sleepEnd ?? '')} de sono.`);
       applyDefaults();
       setQuality(0);
