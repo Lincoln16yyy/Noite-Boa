@@ -10,8 +10,14 @@ export const MSG_SESSAO_MUDOU =
  * tela ainda mostra os dados de A, mas a requisição sairia como B (#298).
  *
  * O predicate estreita o token para `string`: depois da checagem, quem chama
- * pode passar o valor como token explícito da mutação.
+ * pode passar o valor como token explícito da mutação. `sessaoAtual` é a
+ * sessão do `AuthContext` (o que a tela está representando).
  */
-export function sessaoDaTelaAindaVale(tokenDaTela: string | null): tokenDaTela is string {
-  return tokenDaTela !== null && getToken() === tokenDaTela;
+export function sessaoDaTelaAindaVale(
+  tokenDaTela: string | null,
+  sessaoAtual: string | null,
+): tokenDaTela is string {
+  // O `localStorage` sozinho não basta: outra aba pode ir de A para B e voltar
+  // a A antes do evento `storage` chegar, e a tela ainda representar B (#298).
+  return tokenDaTela !== null && sessaoAtual === tokenDaTela && getToken() === tokenDaTela;
 }

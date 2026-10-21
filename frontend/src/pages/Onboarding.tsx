@@ -67,6 +67,9 @@ const tituloStyle = {
 export default function Onboarding() {
   const navigate = useNavigate();
   const { sessao } = useAuth();
+  // Sessão atual do contexto para as checagens espalhadas por callbacks.
+  const sessaoAtual = useRef(sessao);
+  sessaoAtual.current = sessao;
   const [passo, setPasso] = useState(1);
   const [horas, setHoras] = useState(HORAS_PADRAO);
   const [dormir, setDormir] = useState('');
@@ -77,6 +80,17 @@ export default function Onboarding() {
   // Sessão que abriu o primeiro uso: o que foi escolhido para A não pode ser
   // gravado em B se o contexto trocar de conta com a tela montada (#298).
   const tokenDaTela = useRef<string | null>(sessao);
+  // Troca de sessão: o primeiro uso recomeça do zero para a conta nova, sem
+  // horas/horários escolhidos para a anterior (#298).
+  useEffect(() => {
+    setPasso(1);
+    setHoras(HORAS_PADRAO);
+    setDormir('');
+    setAcordar('');
+    setErro('');
+    // Só a troca de sessão deve reiniciar o fluxo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessao]);
 
   // Foco no título do passo a cada avanço (acessibilidade, issue #215).
   useEffect(() => {
@@ -86,7 +100,7 @@ export default function Onboarding() {
   function concluir() {
     // O marcador é do aparelho: uma tela da conta antiga não pode "concluir"
     // o primeiro uso da conta que entrou depois (#298).
-    if (!sessaoDaTelaAindaVale(tokenDaTela.current)) {
+    if (!sessaoDaTelaAindaVale(tokenDaTela.current, sessaoAtual.current)) {
       setErro(MSG_SESSAO_MUDOU);
       return;
     }
@@ -97,7 +111,7 @@ export default function Onboarding() {
   /** Envia o que foi escolhido até aqui. `false` = mantém no passo com o erro. */
   async function salvar(envio: Partial<GoalInput>): Promise<boolean> {
     const token = tokenDaTela.current;
-    if (!sessaoDaTelaAindaVale(token)) {
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
       setErro(MSG_SESSAO_MUDOU);
       return false;
     }
@@ -106,13 +120,16 @@ export default function Onboarding() {
       await api.put<Goal>('/goal', envio, { token });
       // A sessão trocou com o pedido em voo: o /goal é de A, não avance a
       // tela da conta nova (#298).
-      if (!sessaoDaTelaAindaVale(token)) {
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
         setErro(MSG_SESSAO_MUDOU);
         return false;
       }
       return true;
     } catch (err: unknown) {
-      setErro(err instanceof Error ? err.message : String(err));
+      // Erro de um PUT da conta anterior não aparece na tela da nova (#298).
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
+        setErro(err instanceof Error ? err.message : String(err));
+      }
       return false;
     } finally {
       setSalvando(false);

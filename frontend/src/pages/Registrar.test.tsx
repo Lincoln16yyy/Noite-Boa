@@ -238,20 +238,22 @@ describe('tela de Registrar sono', () => {
     expect(localStorage.getItem('token')).toBe('jwt-B');
   });
 
-  it('não salva o formulário da sessão anterior depois da troca (#298)', async () => {
+  it('limpa o formulário da sessão anterior depois da troca (#298)', async () => {
     openScreen();
     await screen.findByLabelText('Dormiu às');
     fireEvent.click(screen.getByLabelText('Boa (4)'));
+    fireEvent.change(screen.getByPlaceholderText('Ex.: acordei só uma vez'), {
+      target: { value: 'nota digitada na conta A' },
+    });
 
-    // O contexto processou a troca: a tela continua com o que foi digitado
-    // para a conta anterior.
     localStorage.setItem('token', 'jwt-B');
     await act(async () => {
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar registro' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    // O que foi digitado para A não fica pronto para ser salvo em B.
+    await waitFor(() => expect(screen.getByLabelText('Boa (4)')).not.toBeChecked());
+    expect(screen.getByPlaceholderText('Ex.: acordei só uma vez')).toHaveValue('');
     expect(posts).toHaveLength(0);
   });
 

@@ -28,6 +28,9 @@ export default function Amigos() {
   // A tela representa a sessão do AuthContext (é ela que define o usuário
   // mostrado); a carga só vale se o token ainda for esse (#298).
   const { sessao } = useAuth();
+  // Sessão atual do contexto para as checagens espalhadas por callbacks.
+  const sessaoAtual = useRef(sessao);
+  sessaoAtual.current = sessao;
   const [me, setMe] = useState<User | null>(null);
   const [amigos, setAmigos] = useState<Friend[]>([]);
   const [convites, setConvites] = useState<FriendRequests>({ sent: [], received: [] });
@@ -45,6 +48,9 @@ export default function Amigos() {
   // batch veriam `acaoEmVoo = null`); o estado só controla o `disabled`.
   const [acaoEmVoo, setAcaoEmVoo] = useState<string | null>(null);
   const emVooRef = useRef(false);
+  // Identidade da ação em voo: o `finally` de uma ação da conta antiga não
+  // pode destravar a ação da conta nova (#298).
+  const acaoId = useRef(0);
   // Token que carregou estes dados: as ações (convite, aceite, remoção,
   // compartilhamento) só podem escrever na mesma conta (#298).
   const tokenDaTela = useRef<string | null>(null);
@@ -75,7 +81,7 @@ export default function Amigos() {
       );
       if (controller.signal.aborted) return; // resposta de requisição cancelada: ignora
       // Ranking de outra sessão não entra nesta tela (#298).
-      if (!sessaoDaTelaAindaVale(sessaoDaRequisicao)) return;
+      if (!sessaoDaTelaAindaVale(sessaoDaRequisicao, sessaoAtual.current)) return;
       setRanking(resultado.ranking);
     } catch (err: unknown) {
       // O cliente converte abort em erro genérico, então checar o signal (e não
@@ -104,7 +110,7 @@ export default function Amigos() {
       if (idDaCarga !== cargaId.current) return; // outra carga tomou o lugar
       // Outra conta assumiu no meio: estes dados podem ser dela, mas a tela
       // continua sendo a desta sessão. Não comita nem rebinda o token (#298).
-      if (!sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
+      if (!sessaoDaTelaAindaVale(sessaoDoCarregamento, sessaoAtual.current)) {
         setErroDaCarga(MSG_SESSAO_MUDOU);
         return;
       }
@@ -116,7 +122,7 @@ export default function Amigos() {
     } catch (err: unknown) {
       // Falha de uma carga que já não é desta sessão não pode pintar a tela
       // da conta atual (#298).
-      if (idDaCarga === cargaId.current && sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
+      if (idDaCarga === cargaId.current && sessaoDaTelaAindaVale(sessaoDoCarregamento, sessaoAtual.current)) {
         setErroDaCarga(err instanceof Error ? err.message : String(err));
       }
     } finally {
@@ -138,6 +144,7 @@ export default function Amigos() {
     setEmail('');
     setSuccess('');
     // A ação em voo era da conta anterior: destrava a tela para a nova.
+    acaoId.current += 1;
     emVooRef.current = false;
     setAcaoEmVoo(null);
     void carregar(true);
@@ -149,17 +156,17 @@ export default function Amigos() {
     const compartilhar = e.target.checked;
     setError('');
     const token = tokenDaTela.current;
-    if (!sessaoDaTelaAindaVale(token)) {
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
       setError(MSG_SESSAO_MUDOU);
       return;
     }
     try {
       const atualizado = await api.put<User>('/me', { shareWithFriends: compartilhar }, { token });
       // A sessão trocou com o pedido em voo: o resultado é de A, não desta tela.
-      if (!sessaoDaTelaAindaVale(token)) return;
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) return;
       setMe(atualizado);
     } catch (err: unknown) {
-      if (sessaoDaTelaAindaVale(token)) setError(err instanceof Error ? err.message : String(err));
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -167,17 +174,18 @@ export default function Amigos() {
     e.preventDefault();
     if (emVooRef.current) return;
     const token = tokenDaTela.current;
-    if (!sessaoDaTelaAindaVale(token)) {
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
       setError(MSG_SESSAO_MUDOU);
       return;
     }
+    const idDaAcao = ++acaoId.current;
     emVooRef.current = true;
     setAcaoEmVoo('convidar');
     setError('');
     setSuccess('');
     try {
       const resultado = await api.post<SendResult>('/friends/requests', { email }, { token });
-      if (!sessaoDaTelaAindaVale(token)) return;
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) return;
       setEmail('');
       setSuccess(
         resultado.status === 'accepted'
@@ -186,10 +194,12 @@ export default function Amigos() {
       );
       await carregar();
     } catch (err: unknown) {
-      if (sessaoDaTelaAindaVale(token)) setError(err instanceof Error ? err.message : String(err));
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) setError(err instanceof Error ? err.message : String(err));
     } finally {
-      emVooRef.current = false;
-      setAcaoEmVoo(null);
+      if (idDaAcao === acaoId.current) {
+        emVooRef.current = false;
+        setAcaoEmVoo(null);
+      }
     }
   }
 
@@ -200,21 +210,26 @@ export default function Amigos() {
   ) {
     if (emVooRef.current) return;
     const token = tokenDaTela.current;
-    if (!sessaoDaTelaAindaVale(token)) {
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
       setError(MSG_SESSAO_MUDOU);
       return;
     }
+    const idDaAcao = ++acaoId.current;
     emVooRef.current = true;
     setAcaoEmVoo(chave);
     setError('');
     try {
       await mutacao(token);
+      // A ação foi de A: não recarregue (nem ocupe o loading) da tela de B.
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) return;
       await aoPronto();
     } catch (err: unknown) {
-      if (sessaoDaTelaAindaVale(token)) setError(err instanceof Error ? err.message : String(err));
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) setError(err instanceof Error ? err.message : String(err));
     } finally {
-      emVooRef.current = false;
-      setAcaoEmVoo(null);
+      if (idDaAcao === acaoId.current) {
+        emVooRef.current = false;
+        setAcaoEmVoo(null);
+      }
     }
   }
 
@@ -225,7 +240,7 @@ export default function Amigos() {
     try {
       await carregarRanking(novosDias);
     } catch (err: unknown) {
-      if (sessaoDaTelaAindaVale(sessaoDaTroca)) {
+      if (sessaoDaTelaAindaVale(sessaoDaTroca, sessaoAtual.current)) {
         setError(err instanceof Error ? err.message : String(err));
       }
     }

@@ -385,6 +385,8 @@ describe('tela de Configurações', () => {
   it('não salva metas/fuso se a tela é de outra sessão (#298)', async () => {
     openScreen();
     await screen.findByDisplayValue('8');
+    // Fuso diferente do carregado: o caminho do `PUT /me` seria exercitado.
+    fireEvent.change(screen.getByLabelText('Fuso horário'), { target: { value: 'Europe/Lisbon' } });
 
     // Outra aba trocou a conta; o evento `storage` ainda não chegou.
     localStorage.setItem('token', 'jwt-B');
@@ -467,6 +469,24 @@ describe('tela de Configurações', () => {
     // O "EXCLUIR" digitado para A não vale para a conta que acabou de entrar.
     // (O campo some no "Carregando…" e volta vazio com o perfil novo.)
     expect(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR')).toHaveValue('');
+  });
+
+  it('não mantém as preferências da sessão anterior se a nova carga falha (#298)', async () => {
+    openScreen();
+    await screen.findByDisplayValue('8');
+
+    fetchMock.mockImplementation(async (url: any) => {
+      if (String(url).includes('/me')) return jsonResponse(ME);
+      return jsonResponse({ detail: 'Erro interno.' }, 500);
+    });
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Erro interno.');
+    // A meta de 8h de A não fica pronta para ser salva em B.
+    expect(screen.queryByDisplayValue('8')).not.toBeInTheDocument();
   });
 
 });

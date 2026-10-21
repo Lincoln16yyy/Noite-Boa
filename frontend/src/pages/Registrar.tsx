@@ -118,6 +118,9 @@ function dataVisivel(valor: string): string {
 
 export default function Registrar() {
   const { user, sessao } = useAuth();
+  // Sessão atual do contexto para as checagens espalhadas por callbacks.
+  const sessaoAtual = useRef(sessao);
+  sessaoAtual.current = sessao;
   const fuso = user?.timezone; // fonte única: fuso do perfil (issue #102)
   const [sleepStart, setSleepStart] = useState<string>('');
   const [sleepEnd, setSleepEnd] = useState<string>('');
@@ -147,12 +150,14 @@ export default function Registrar() {
         token: sessaoDaLeitura ?? undefined,
       });
       // Resposta de outra conta não entra nesta tela (#298).
-      if (!sessaoDaTelaAindaVale(sessaoDaLeitura)) return;
+      if (!sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) return;
       setRecent(page.content ?? []);
     } catch {
-      if (sessaoDaTelaAindaVale(sessaoDaLeitura)) setRecent([]);
+      if (sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) setRecent([]);
     } finally {
-      setRecentLoaded(true);
+      // Só a leitura da sessão atual encerra o "carregando" dos últimos
+      // registros; a antiga não pode liberar o estado vazio da nova (#298).
+      if (sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) setRecentLoaded(true);
     }
   }, [sessao]);
 
@@ -162,10 +167,10 @@ export default function Registrar() {
     api
       .get<Goal>('/goal', { token: sessaoDaLeitura ?? undefined })
       .then((goal) => {
-        if (sessaoDaTelaAindaVale(sessaoDaLeitura)) setMetaMinutos(normalizarMeta(goal).minutos);
+        if (sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) setMetaMinutos(normalizarMeta(goal).minutos);
       })
       .catch(() => {
-        if (sessaoDaTelaAindaVale(sessaoDaLeitura)) setMetaMinutos(META_PADRAO);
+        if (sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) setMetaMinutos(META_PADRAO);
       });
   }, [sessao]);
 
@@ -179,8 +184,14 @@ export default function Registrar() {
   // anterior; volta aos padrões da nova (#298).
   useEffect(() => {
     digitouRef.current = false;
+    setSleepStart('');
+    setSleepEnd('');
+    setQuality(0);
+    setNotes('');
     applyDefaults();
     setRecent([]);
+    setRecentLoaded(false);
+    setMetaMinutos(META_PADRAO);
     setSuccess('');
     setError('');
     // Só a troca de sessão deve resetar o formulário.
@@ -207,7 +218,7 @@ export default function Registrar() {
       return;
     }
     const token = tokenDaTela.current;
-    if (!sessaoDaTelaAindaVale(token)) {
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
       setError(MSG_SESSAO_MUDOU);
       return;
     }
@@ -216,14 +227,14 @@ export default function Registrar() {
     try {
       const created = await api.post<SleepLog>('/sleep-logs', toApiPayload(form, fuso), { token });
       // A sessão trocou com o pedido em voo: o registro é de A, não desta tela.
-      if (!sessaoDaTelaAindaVale(token)) return;
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) return;
       setSuccess(`Noite registrada: ${formatDuration(created.sleepStart ?? '', created.sleepEnd ?? '')} de sono.`);
       applyDefaults();
       setQuality(0);
       setNotes('');
       await loadRecent();
     } catch (err: unknown) {
-      if (sessaoDaTelaAindaVale(token)) {
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
         const message = err instanceof Error ? err.message : String(err);
         setError(message);
       }

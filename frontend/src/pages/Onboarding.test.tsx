@@ -171,4 +171,20 @@ describe('primeiro uso em 3 passos', () => {
     expect(screen.queryByText('chegou na Hoje')).not.toBeInTheDocument();
   });
 
+  it('reinicia o primeiro uso quando a sessão muda (#298)', async () => {
+    abrir();
+    const horas = screen.getByRole('slider', { name: /meta de horas por noite/i });
+    fireEvent.change(horas, { target: { value: '10' } });
+    expect(horas).toHaveValue('10');
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    // Nada do que foi escolhido para A fica pronto para a conta nova.
+    expect(await screen.findByRole('slider', { name: /meta de horas por noite/i })).toHaveValue('8');
+    expect(screen.getByRole('heading', { level: 1, name: /quanto você quer dormir/i })).toBeInTheDocument();
+  });
+
 });

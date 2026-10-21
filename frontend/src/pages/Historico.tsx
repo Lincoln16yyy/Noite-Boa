@@ -156,6 +156,9 @@ export default function Historico() {
   // `sessao` (e não só o token) define o usuário/fuso com que a tela é
   // renderizada: os dados e as mutações precisam ser da mesma sessão (#298).
   const { user, sessao } = useAuth();
+  // Sessão atual do contexto para as checagens espalhadas por callbacks.
+  const sessaoAtual = useRef(sessao);
+  sessaoAtual.current = sessao;
   const fuso = user?.timezone; // fonte única: fuso do perfil (issue #102)
   const [page, setPage] = useState<number>(0);
   const [logs, setLogs] = useState<SleepLog[]>([]);
@@ -194,7 +197,7 @@ export default function Historico() {
       if (idDaCarga !== cargaId.current) return; // outra carga tomou o lugar
       // Se outra conta assumiu no meio da carga, os registros são dela mas o
       // fuso na tela ainda é o da sessão anterior: não comita (#298).
-      if (!sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
+      if (!sessaoDaTelaAindaVale(sessaoDoCarregamento, sessaoAtual.current)) {
         setError(MSG_SESSAO_MUDOU);
         return;
       }
@@ -209,7 +212,7 @@ export default function Historico() {
       tokenDaTela.current = sessaoDoCarregamento;
     } catch (err: unknown) {
       // Carga de uma sessão que já saiu não pode pintar o erro na tela atual (#298).
-      if (idDaCarga === cargaId.current && sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
+      if (idDaCarga === cargaId.current && sessaoDaTelaAindaVale(sessaoDoCarregamento, sessaoAtual.current)) {
         const message = err instanceof Error ? err.message : String(err);
         setError(message);
       }
@@ -225,10 +228,10 @@ export default function Historico() {
     api
       .get<Goal>('/goal', { token: sessaoDaLeitura ?? undefined })
       .then((goal) => {
-        if (sessaoDaTelaAindaVale(sessaoDaLeitura)) setMetaMinutos(normalizarMeta(goal).minutos);
+        if (sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) setMetaMinutos(normalizarMeta(goal).minutos);
       })
       .catch(() => {
-        if (sessaoDaTelaAindaVale(sessaoDaLeitura)) setMetaMinutos(480);
+        if (sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) setMetaMinutos(480);
       });
   }, [sessao]);
 
@@ -246,6 +249,7 @@ export default function Historico() {
     setConfirmId(null);
     setEditError('');
     setError('');
+    setMetaMinutos(480);
     // Só a troca de sessão deve limpar a tela.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessao]);
@@ -274,18 +278,18 @@ export default function Historico() {
       return;
     }
     const token = tokenDaTela.current;
-    if (!sessaoDaTelaAindaVale(token)) {
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
       setEditError(MSG_SESSAO_MUDOU);
       return;
     }
     setSavingEdit(true);
     try {
       await api.put(`/sleep-logs/${editingId}`, toApiPayload(edit, fuso), { token });
-      if (!sessaoDaTelaAindaVale(token)) return;
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) return;
       setEditingId(null);
       await load(page);
     } catch (err: unknown) {
-      if (sessaoDaTelaAindaVale(token)) {
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
         const message = err instanceof Error ? err.message : String(err);
         setEditError(message);
       }
@@ -296,7 +300,7 @@ export default function Historico() {
 
   async function remove(id: string) {
     const token = tokenDaTela.current;
-    if (!sessaoDaTelaAindaVale(token)) {
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
       setError(MSG_SESSAO_MUDOU);
       return;
     }
@@ -304,11 +308,11 @@ export default function Historico() {
     setError('');
     try {
       await api.delete(`/sleep-logs/${id}`, { token });
-      if (!sessaoDaTelaAindaVale(token)) return;
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) return;
       setConfirmId(null);
       await load(page);
     } catch (err: unknown) {
-      if (sessaoDaTelaAindaVale(token)) {
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
         const message = err instanceof Error ? err.message : String(err);
         setError(message);
       }

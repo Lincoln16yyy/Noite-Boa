@@ -477,4 +477,25 @@ describe('tela de Amigos', () => {
     expect(await screen.findByPlaceholderText('amigo@exemplo.com')).toHaveValue('');
   });
 
+  it('não mantém os amigos da sessão anterior quando a nova carga falha (#298)', async () => {
+    openScreen();
+    await screen.findByRole('checkbox', { name: /compartilhar minhas noites/i });
+
+    fetchMock.mockImplementation(async (url: any) => {
+      const path = String(url);
+      if (path.includes('/api/me')) return jsonResponse(ME);
+      if (path.includes('/friends')) return jsonResponse({ detail: 'Erro interno.' }, 500);
+      return jsonResponse([]);
+    });
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    expect(await screen.findByText(/Erro interno/)).toBeInTheDocument();
+    // A lista de A não fica na tela de B só porque a carga de B falhou.
+    expect(screen.queryAllByText('Bruno')).toHaveLength(0);
+  });
+
 });
