@@ -104,6 +104,12 @@ export default function Onboarding() {
     setSalvando(true);
     try {
       await api.put<Goal>('/goal', envio, { token });
+      // A sessão trocou com o pedido em voo: o /goal é de A, não avance a
+      // tela da conta nova (#298).
+      if (!sessaoDaTelaAindaVale(token)) {
+        setErro(MSG_SESSAO_MUDOU);
+        return false;
+      }
       return true;
     } catch (err: unknown) {
       setErro(err instanceof Error ? err.message : String(err));

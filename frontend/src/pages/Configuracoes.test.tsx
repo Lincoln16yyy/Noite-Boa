@@ -397,16 +397,29 @@ describe('tela de Configurações', () => {
   });
 
   it('não comita o perfil se outra conta assumiu durante a carga (#298)', async () => {
+    let chamadasMe = 0;
     const liberar: Array<() => void> = [];
     fetchMock.mockImplementation(async (url: any) => {
+      const path = String(url);
+      if (path.includes('/me')) {
+        chamadasMe += 1;
+        // A 1ª é a carga da tela; a 2ª é o /me do AuthContext, que resolve
+        // antes para não disparar sozinho a troca de sessão.
+        if (chamadasMe === 1) {
+          await new Promise<void>((resolve) => {
+            liberar.push(resolve);
+          });
+        }
+        return jsonResponse(ME);
+      }
       await new Promise<void>((resolve) => {
         liberar.push(resolve);
       });
-      return String(url).includes('/goal') ? jsonResponse(GOAL) : jsonResponse(ME);
+      return jsonResponse(GOAL);
     });
 
     openScreen();
-    await waitFor(() => expect(liberar.length).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(chamadasMe).toBeGreaterThanOrEqual(2));
     localStorage.setItem('token', 'jwt-B');
     await act(async () => {
       liberar.forEach((fn) => fn());
@@ -438,6 +451,22 @@ describe('tela de Configurações', () => {
     const alerta = await screen.findByRole('alert');
     expect(alerta).toHaveTextContent(/fuso horário foi atualizado/i);
     expect(alerta).toHaveTextContent('Erro interno.');
+  });
+
+  it('limpa a confirmação de exclusão quando a sessão muda (#298)', async () => {
+    openScreen();
+    await screen.findByDisplayValue('8');
+    const campo = screen.getByPlaceholderText('seu@email.com ou EXCLUIR');
+    fireEvent.change(campo, { target: { value: 'EXCLUIR' } });
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    // O "EXCLUIR" digitado para A não vale para a conta que acabou de entrar.
+    // (O campo some no "Carregando…" e volta vazio com o perfil novo.)
+    expect(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR')).toHaveValue('');
   });
 
 });

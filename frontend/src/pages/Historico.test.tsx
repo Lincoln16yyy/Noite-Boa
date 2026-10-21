@@ -260,4 +260,25 @@ describe('tela de Histórico', () => {
     expect(screen.queryByText('Boa')).not.toBeInTheDocument();
   });
 
+  it('não mantém os registros da sessão anterior quando a nova carga falha (#298)', async () => {
+    openScreen();
+    expect(await screen.findByText('8h')).toBeInTheDocument();
+
+    fetchMock.mockImplementation(async (url: any) => {
+      const path = String(url);
+      if (path.includes('/me')) return jsonResponse(mockUser);
+      if (path.includes('/sleep-logs')) return jsonResponse({ detail: 'Erro interno.' }, 500);
+      return jsonResponse({ targetMinutes: 480 });
+    });
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    expect(await screen.findByText(/Erro interno/)).toBeInTheDocument();
+    // A noite de A não continua na tela de B só porque a carga de B falhou.
+    expect(screen.queryByText('8h')).not.toBeInTheDocument();
+  });
+
 });

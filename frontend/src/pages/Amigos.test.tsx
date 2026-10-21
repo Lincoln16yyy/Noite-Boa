@@ -462,4 +462,19 @@ describe('tela de Amigos', () => {
     expect(screen.queryAllByText('Bruno')).toHaveLength(0);
   });
 
+  it('limpa o rascunho de convite quando a sessão muda (#298)', async () => {
+    openScreen();
+    const campo = await screen.findByPlaceholderText('amigo@exemplo.com');
+    fireEvent.change(campo, { target: { value: 'rascunho@exemplo.com' } });
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    // O convite pensado para A não fica pronto para ser enviado como B.
+    // (O campo some no "Carregando…" e volta vazio com a conta nova.)
+    expect(await screen.findByPlaceholderText('amigo@exemplo.com')).toHaveValue('');
+  });
+
 });

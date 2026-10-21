@@ -255,4 +255,33 @@ describe('tela de Registrar sono', () => {
     expect(posts).toHaveLength(0);
   });
 
+  it('não mostra o sucesso de um registro que voltou depois da troca (#298)', async () => {
+    let liberarPost: (() => void) | undefined;
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      if (String(url).includes('/me')) return jsonResponse(mockUser);
+      if (options.method === 'POST') {
+        await new Promise<void>((resolve) => {
+          liberarPost = resolve;
+        });
+        return jsonResponse({ id: 'novo-id' }, 201);
+      }
+      return jsonResponse({ content: [], totalElements: 0 });
+    });
+
+    openScreen();
+    await screen.findByLabelText('Dormiu às');
+    fireEvent.click(screen.getByLabelText('Boa (4)'));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar registro' }));
+    await waitFor(() => expect(liberarPost).toBeDefined());
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+      liberarPost?.();
+    });
+
+    // O registro foi criado em A; a esta tela (agora de B) não cabe dizer que foi.
+    expect(screen.queryByText(/Noite registrada/)).not.toBeInTheDocument();
+  });
+
 });

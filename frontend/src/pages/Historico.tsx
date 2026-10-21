@@ -178,8 +178,12 @@ export default function Historico() {
   // Token que trouxe estes registros: editar/excluir uma noite de A não pode
   // acabar alterando a conta B que entrou em outra aba (#298).
   const tokenDaTela = useRef<string | null>(null);
+  // Carga mais recente: uma resposta antiga não encerra o "Carregando…" da
+  // que está em voo (#298).
+  const cargaId = useRef(0);
 
   const load = useCallback(async (p: number) => {
+    const idDaCarga = ++cargaId.current;
     setLoading(true);
     setError('');
     const sessaoDoCarregamento = sessao;
@@ -187,6 +191,7 @@ export default function Historico() {
       const data = await api.get<SleepLogPage>(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`, {
         token: sessaoDoCarregamento ?? undefined,
       });
+      if (idDaCarga !== cargaId.current) return; // outra carga tomou o lugar
       // Se outra conta assumiu no meio da carga, os registros são dela mas o
       // fuso na tela ainda é o da sessão anterior: não comita (#298).
       if (!sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
@@ -204,12 +209,13 @@ export default function Historico() {
       tokenDaTela.current = sessaoDoCarregamento;
     } catch (err: unknown) {
       // Carga de uma sessão que já saiu não pode pintar o erro na tela atual (#298).
-      if (sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
+      if (idDaCarga === cargaId.current && sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
         const message = err instanceof Error ? err.message : String(err);
         setError(message);
       }
     } finally {
-      setLoading(false);
+      // Só a carga mais recente encerra o "Carregando…" (#298).
+      if (idDaCarga === cargaId.current) setLoading(false);
     }
   }, [sessao]);
 
@@ -229,6 +235,20 @@ export default function Historico() {
   useEffect(() => {
     load(page);
   }, [page, load]);
+
+  // Nova sessão: os registros/edição da anterior não ficam na tela enquanto
+  // a conta atual carrega (#298).
+  useEffect(() => {
+    setLogs([]);
+    setTotalPages(0);
+    setTotalElements(0);
+    setEditingId(null);
+    setConfirmId(null);
+    setEditError('');
+    setError('');
+    // Só a troca de sessão deve limpar a tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessao]);
 
   const hojeIso = isoDateNoFuso(new Date(), fuso ?? 'America/Sao_Paulo');
   const grupos = agruparPorSemana(logs, hojeIso, fuso ?? 'America/Sao_Paulo');
@@ -261,11 +281,14 @@ export default function Historico() {
     setSavingEdit(true);
     try {
       await api.put(`/sleep-logs/${editingId}`, toApiPayload(edit, fuso), { token });
+      if (!sessaoDaTelaAindaVale(token)) return;
       setEditingId(null);
       await load(page);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      setEditError(message);
+      if (sessaoDaTelaAindaVale(token)) {
+        const message = err instanceof Error ? err.message : String(err);
+        setEditError(message);
+      }
     } finally {
       setSavingEdit(false);
     }
@@ -281,11 +304,14 @@ export default function Historico() {
     setError('');
     try {
       await api.delete(`/sleep-logs/${id}`, { token });
+      if (!sessaoDaTelaAindaVale(token)) return;
       setConfirmId(null);
       await load(page);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
+      if (sessaoDaTelaAindaVale(token)) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+      }
     } finally {
       setDeleting(false);
     }

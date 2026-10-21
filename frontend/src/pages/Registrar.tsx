@@ -175,6 +175,18 @@ export default function Registrar() {
     if (!digitouRef.current) applyDefaults();
   }, [applyDefaults]);
 
+  // Troca de sessão: o formulário e os últimos registros eram da conta
+  // anterior; volta aos padrões da nova (#298).
+  useEffect(() => {
+    digitouRef.current = false;
+    applyDefaults();
+    setRecent([]);
+    setSuccess('');
+    setError('');
+    // Só a troca de sessão deve resetar o formulário.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessao]);
+
   useEffect(() => {
     loadRecent();
   }, [loadRecent]);
@@ -203,14 +215,18 @@ export default function Registrar() {
     setSaving(true);
     try {
       const created = await api.post<SleepLog>('/sleep-logs', toApiPayload(form, fuso), { token });
+      // A sessão trocou com o pedido em voo: o registro é de A, não desta tela.
+      if (!sessaoDaTelaAindaVale(token)) return;
       setSuccess(`Noite registrada: ${formatDuration(created.sleepStart ?? '', created.sleepEnd ?? '')} de sono.`);
       applyDefaults();
       setQuality(0);
       setNotes('');
       await loadRecent();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
+      if (sessaoDaTelaAindaVale(token)) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+      }
     } finally {
       setSaving(false);
     }
