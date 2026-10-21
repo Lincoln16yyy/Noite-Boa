@@ -108,14 +108,28 @@ export default function Amigos() {
       tokenDaTela.current = sessaoDoCarregamento;
       await carregarRanking(periodoAtual.current);
     } catch (err: unknown) {
-      setErroDaCarga(err instanceof Error ? err.message : String(err));
+      // Falha de uma carga que já não é desta sessão não pode pintar a tela
+      // da conta atual (#298).
+      if (sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
+        setErroDaCarga(err instanceof Error ? err.message : String(err));
+      }
     }
   }
 
   useEffect(() => {
+    // Troca de sessão com a tela montada: some com os dados da conta anterior
+    // e busca os da nova (#298).
+    setLoading(true);
+    setMe(null);
+    setAmigos([]);
+    setConvites({ sent: [], received: [] });
+    setRanking([]);
+    setError('');
+    setErroDaCarga('');
     carregar().finally(() => setLoading(false));
+    // `carregar` já lê o estado da renderização atual; só a sessão dispara.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sessao]);
 
   async function alternarCompartilhar(e: ChangeEvent<HTMLInputElement>) {
     const compartilhar = e.target.checked;
@@ -190,10 +204,13 @@ export default function Amigos() {
   async function trocarPeriodo(novosDias: number) {
     periodoAtual.current = novosDias;
     setDias(novosDias);
+    const sessaoDaTroca = sessao;
     try {
       await carregarRanking(novosDias);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (sessaoDaTelaAindaVale(sessaoDaTroca)) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     }
   }
 

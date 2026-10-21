@@ -130,6 +130,9 @@ export default function Registrar() {
   const [recent, setRecent] = useState<SleepLog[]>([]);
   const [recentLoaded, setRecentLoaded] = useState<boolean>(false);
   const digitouRef = useRef(false); // não repor o digitado quando o fuso do perfil chegar (#102)
+  // Sessão que abriu o formulário: se o contexto trocar de conta com a tela
+  // montada, o que foi digitado para A não pode ser salvo em B (#298).
+  const tokenDaTela = useRef<string | null>(sessao);
 
   const applyDefaults = useCallback(() => {
     const defaults = smartDefaults(new Date(), fuso);
@@ -147,7 +150,7 @@ export default function Registrar() {
       if (!sessaoDaTelaAindaVale(sessaoDaLeitura)) return;
       setRecent(page.content ?? []);
     } catch {
-      setRecent([]);
+      if (sessaoDaTelaAindaVale(sessaoDaLeitura)) setRecent([]);
     } finally {
       setRecentLoaded(true);
     }
@@ -161,7 +164,9 @@ export default function Registrar() {
       .then((goal) => {
         if (sessaoDaTelaAindaVale(sessaoDaLeitura)) setMetaMinutos(normalizarMeta(goal).minutos);
       })
-      .catch(() => setMetaMinutos(META_PADRAO));
+      .catch(() => {
+        if (sessaoDaTelaAindaVale(sessaoDaLeitura)) setMetaMinutos(META_PADRAO);
+      });
   }, [sessao]);
 
   // Padrões com o fuso do perfil assim que ele chegar (o /me é assíncrono);
@@ -189,7 +194,7 @@ export default function Registrar() {
       setError(problem);
       return;
     }
-    const token = sessao;
+    const token = tokenDaTela.current;
     if (!sessaoDaTelaAindaVale(token)) {
       setError(MSG_SESSAO_MUDOU);
       return;

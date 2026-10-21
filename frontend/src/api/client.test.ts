@@ -37,9 +37,21 @@ describe('api client', () => {
   it('401 do token explícito de uma sessão antiga não derruba a nova (#298)', async () => {
     localStorage.setItem('token', 'token-B');
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
+    const mudancas: string[] = [];
+    const ouvinte = () => {
+      mudancas.push('session-change');
+    };
+    window.addEventListener('noiteboa:session-change', ouvinte);
 
-    await expect(api.put('/goal', {}, { token: 'token-A' })).rejects.toThrow('Erro 401');
+    try {
+      await expect(api.put('/goal', {}, { token: 'token-A' })).rejects.toThrow('Erro 401');
+    } finally {
+      window.removeEventListener('noiteboa:session-change', ouvinte);
+    }
+
     expect(localStorage.getItem('token')).toBe('token-B');
+    // Sem evento, o AuthContext desta aba não derruba o usuário da conta nova.
+    expect(mudancas).toHaveLength(0);
   });
 
   it('clears session on 401', async () => {

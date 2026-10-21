@@ -417,4 +417,27 @@ describe('tela de Configurações', () => {
     expect(screen.queryByDisplayValue('8')).not.toBeInTheDocument();
   });
 
+  it('avisa quando o fuso salvou e a meta falhou (#298)', async () => {
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'PUT') {
+        return jsonResponse({ ...ME, ...JSON.parse(options.body as any) });
+      }
+      if (path.includes('/goal') && options.method === 'PUT') {
+        return jsonResponse({ detail: 'Erro interno.' }, 500);
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+
+    openScreen();
+    await screen.findByDisplayValue('8');
+    fireEvent.change(screen.getByLabelText('Fuso horário'), { target: { value: 'Europe/Lisbon' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+
+    const alerta = await screen.findByRole('alert');
+    expect(alerta).toHaveTextContent(/fuso horário foi atualizado/i);
+    expect(alerta).toHaveTextContent('Erro interno.');
+  });
+
 });

@@ -102,8 +102,10 @@ export default function Configuracoes() {
     }
 
     setSaving(true);
+    // O `/me` pode ter sido salvo antes de o `/goal` falhar: o catch precisa
+    // saber o que já mudou para não dizer que nada foi salvo (#298).
+    let updatedMe = me;
     try {
-      let updatedMe = me;
       if (me && timezone !== me.timezone) {
         updatedMe = await api.put<User>('/me', { timezone }, { token: tokenDaTela });
       }
@@ -123,7 +125,14 @@ export default function Configuracoes() {
         else cancelarLembrete();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      if (updatedMe !== me) {
+        // Fuso salvo, meta não: reflete a metade que valeu e avisa a outra.
+        setMe(updatedMe);
+        setError(`O fuso horário foi atualizado, mas as preferências não foram salvas. ${message}`);
+      } else {
+        setError(message);
+      }
     } finally {
       setSaving(false);
     }

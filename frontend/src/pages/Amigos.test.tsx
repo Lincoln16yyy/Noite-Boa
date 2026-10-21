@@ -403,14 +403,20 @@ describe('tela de Amigos', () => {
   });
 
   it('não comita a carga se outra conta assumiu no meio (#298)', async () => {
-    const liberarMe: Array<() => void> = [];
+    let chamadasMe = 0;
+    let liberarPrimeira: (() => void) | undefined;
     fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);
       const method = options.method ?? 'GET';
       if (path.includes('/api/me') && method === 'GET') {
-        await new Promise<void>((resolve) => {
-          liberarMe.push(resolve);
-        });
+        chamadasMe += 1;
+        // A 1ª é a carga da tela; a 2ª é o /me do AuthContext, que resolve
+        // antes para não disparar sozinho a troca de sessão.
+        if (chamadasMe === 1) {
+          await new Promise<void>((resolve) => {
+            liberarPrimeira = resolve;
+          });
+        }
         return jsonResponse({ ...ME, shareWithFriends: true });
       }
       if (path.includes('/api/me')) return jsonResponse(ME);
@@ -420,17 +426,40 @@ describe('tela de Amigos', () => {
     });
 
     openScreen();
-    // Espera a carga começar (o /me da tela e o do AuthContext).
-    await waitFor(() => expect(liberarMe.length).toBeGreaterThan(0));
-    // Outra aba assumiu enquanto a carga estava em voo.
+    await waitFor(() => expect(chamadasMe).toBeGreaterThanOrEqual(2));
+    // Outra aba assumiu enquanto a carga da tela estava em voo.
     localStorage.setItem('token', 'jwt-B');
     await act(async () => {
-      liberarMe.forEach((liberar) => liberar());
+      liberarPrimeira?.();
     });
 
     expect(await screen.findByText(/sessão mudou/i)).toBeInTheDocument();
     // Se a resposta de B fosse comitada, o compartilhamento apareceria ligado.
     expect(screen.getByRole('checkbox', { name: /compartilhar minhas noites/i })).not.toBeChecked();
+  });
+
+  it('recarrega e limpa os dados quando a sessão muda (#298)', async () => {
+    openScreen();
+    await screen.findByRole('checkbox', { name: /compartilhar minhas noites/i });
+
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      const method = options.method ?? 'GET';
+      if (path.includes('/api/me') && method === 'PUT') return jsonResponse(ME);
+      if (path.includes('/api/me')) return jsonResponse(ME);
+      if (path.includes('/friends/ranking')) return jsonResponse({ days: 7, ranking: [] });
+      if (path.includes('/friends/requests')) return jsonResponse({ sent: [], received: [] });
+      return jsonResponse([]);
+    });
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    // A conta nova não vê os amigos/ranking da anterior enquanto recarrega.
+    expect(await screen.findByText('Você ainda não tem amigos aceitos.')).toBeInTheDocument();
+    expect(screen.queryAllByText('Bruno')).toHaveLength(0);
   });
 
 });

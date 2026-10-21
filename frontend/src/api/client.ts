@@ -15,8 +15,9 @@ export interface ProblemDetail {
 }
 
 /**
- * Opções de uma requisição. Tudo é repassado ao `fetch`, exceto `token`: ele é
- * consumido pelo cliente para montar o `Authorization` (#298).
+ * Opções de uma requisição. O cliente as consome e transforma: `headers` é
+ * mesclado com os padrões, `signal` é combinado com o timeout interno e
+ * `token` vira o `Authorization` (não vai para o `fetch`) (#298).
  */
 export interface RequestOptions {
   method?: string;

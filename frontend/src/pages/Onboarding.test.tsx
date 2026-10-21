@@ -1,4 +1,4 @@
-import { fireEvent, renderWithAuth, screen, waitFor } from '../test/test-utils';
+import { act, fireEvent, renderWithAuth, screen, waitFor } from '../test/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
@@ -155,6 +155,20 @@ describe('primeiro uso em 3 passos', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
     expect(puts()).toHaveLength(0);
     expect(screen.getByRole('heading', { level: 1, name: /quanto você quer dormir/i })).toBeInTheDocument();
+  });
+
+  it('não conclui o primeiro uso de uma sessão que já saiu (#298)', async () => {
+    abrir();
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /agora não/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    expect(localStorage.getItem('noiteboa.onboarding-concluido')).toBeNull();
+    expect(screen.queryByText('chegou na Hoje')).not.toBeInTheDocument();
   });
 
 });

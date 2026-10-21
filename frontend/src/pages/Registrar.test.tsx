@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Registrar from './Registrar';
@@ -236,6 +236,23 @@ describe('tela de Registrar sono', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
     expect(posts).toHaveLength(0);
     expect(localStorage.getItem('token')).toBe('jwt-B');
+  });
+
+  it('não salva o formulário da sessão anterior depois da troca (#298)', async () => {
+    openScreen();
+    await screen.findByLabelText('Dormiu às');
+    fireEvent.click(screen.getByLabelText('Boa (4)'));
+
+    // O contexto processou a troca: a tela continua com o que foi digitado
+    // para a conta anterior.
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar registro' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    expect(posts).toHaveLength(0);
   });
 
 });

@@ -203,8 +203,11 @@ export default function Historico() {
       setTotalElements(data.totalElements ?? 0);
       tokenDaTela.current = sessaoDoCarregamento;
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
+      // Carga de uma sessão que já saiu não pode pintar o erro na tela atual (#298).
+      if (sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -218,7 +221,9 @@ export default function Historico() {
       .then((goal) => {
         if (sessaoDaTelaAindaVale(sessaoDaLeitura)) setMetaMinutos(normalizarMeta(goal).minutos);
       })
-      .catch(() => setMetaMinutos(480));
+      .catch(() => {
+        if (sessaoDaTelaAindaVale(sessaoDaLeitura)) setMetaMinutos(480);
+      });
   }, [sessao]);
 
   useEffect(() => {

@@ -74,6 +74,9 @@ export default function Onboarding() {
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
   const tituloRef = useRef<HTMLHeadingElement>(null);
+  // Sessão que abriu o primeiro uso: o que foi escolhido para A não pode ser
+  // gravado em B se o contexto trocar de conta com a tela montada (#298).
+  const tokenDaTela = useRef<string | null>(sessao);
 
   // Foco no título do passo a cada avanço (acessibilidade, issue #215).
   useEffect(() => {
@@ -81,13 +84,19 @@ export default function Onboarding() {
   }, [passo]);
 
   function concluir() {
+    // O marcador é do aparelho: uma tela da conta antiga não pode "concluir"
+    // o primeiro uso da conta que entrou depois (#298).
+    if (!sessaoDaTelaAindaVale(tokenDaTela.current)) {
+      setErro(MSG_SESSAO_MUDOU);
+      return;
+    }
     marcarOnboardingConcluido();
     navigate('/hoje', { replace: true });
   }
 
   /** Envia o que foi escolhido até aqui. `false` = mantém no passo com o erro. */
   async function salvar(envio: Partial<GoalInput>): Promise<boolean> {
-    const token = sessao;
+    const token = tokenDaTela.current;
     if (!sessaoDaTelaAindaVale(token)) {
       setErro(MSG_SESSAO_MUDOU);
       return false;
