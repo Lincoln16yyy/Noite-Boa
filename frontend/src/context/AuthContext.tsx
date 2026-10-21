@@ -71,14 +71,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (atual()) {
         setUser(me);
         setErroSessao(null);
+        // A resposta é da sessão `tokenDaRequisicao`: se outra aba trocou o
+        // token e esta ainda não processou o `storage`, o retry carrega a
+        // conta nova — a identidade da tela precisa acompanhar (#294).
+        setSessao(tokenDaRequisicao);
       }
     } catch {
       if (atual()) {
         setUser(null);
-        // Token ainda presente: a sessão não acabou, o `/me` é que não veio
-        // (rede/5xx). Não pode virar logout (#294).
+        // Token ainda presente: a sessão não acabou, o `/me` é que não veio.
+        // Não pode virar logout (#294). A mensagem é neutra de propósito: o
+        // mesmo caminho cobre rede, 5xx e resposta inválida — prometer "é a
+        // conexão" mentiria nos outros casos.
         if (getToken() !== null) {
-          setErroSessao('Não foi possível carregar sua sessão. Verifique a conexão e tente de novo.');
+          setErroSessao('Não foi possível carregar sua sessão. Tente de novo.');
         }
       }
     } finally {

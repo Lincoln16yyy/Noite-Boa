@@ -57,9 +57,16 @@ export default function Layout() {
           }}
         >
           <p role="alert" style={{ color: 'var(--color-lavanda)', margin: 0 }}>{erroSessao}</p>
-          <button type="button" className="btn btn-primary" onClick={() => void tentarNovamente()}>
-            Tentar de novo
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button type="button" className="btn btn-primary" onClick={() => void tentarNovamente()}>
+              Tentar de novo
+            </button>
+            {/* Sem o layout normal não haveria como sair: a sessão pode estar
+                quebrada de um jeito que só um novo login resolve (#294). */}
+            <button type="button" className="btn btn-ghost" onClick={logout}>
+              Sair
+            </button>
+          </div>
         </main>
       </div>
     );

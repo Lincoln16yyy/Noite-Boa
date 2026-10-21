@@ -271,6 +271,11 @@ describe('Layout — falha de sessão (#294)', () => {
     expect(screen.queryByText('marcador login')).not.toBeInTheDocument();
     expect(localStorage.getItem('token')).toBe('mock-token');
     expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument();
+
+    // Sem o layout normal, ainda dá para sair e trocar de conta.
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
+    expect(await screen.findByText('marcador login')).toBeInTheDocument();
   });
 
   it('401 no /me limpa a sessão e manda para /login, sem tela de erro', async () => {

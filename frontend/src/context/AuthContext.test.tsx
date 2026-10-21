@@ -356,6 +356,37 @@ describe('AuthProvider', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('retry que carrega outra conta atualiza a identidade da sessão (#294)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    let chamadasMe = 0;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/api/me')) {
+        chamadasMe += 1;
+        if (chamadasMe === 1) throw new TypeError('Failed to fetch');
+        return new Response(JSON.stringify(usuarioB), { status: 200 });
+      }
+      return new Response('null', { status: 200 });
+    });
+
+    render(
+      <AuthProvider>
+        <TelaComErro />
+        <BotaoSair />
+      </AuthProvider>,
+    );
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    // Outra aba trocou para B; o `storage` ainda não chegou nesta.
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByText('b@example.com')).toBeInTheDocument();
+
+    // A identidade da tela acompanhou B: o primeiro clique em Sair derruba o
+    // token (sem isso, `logout` acharia que a sessão ainda é A e só recarregaria).
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
   it('resposta antiga de /me não derruba a consulta mais nova (#292)', async () => {
     localStorage.setItem('token', 'jwt-B');
     let rejeitarAntiga: ((erro: unknown) => void) | undefined;
