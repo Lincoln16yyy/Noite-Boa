@@ -1,4 +1,4 @@
-import { fireEvent, renderWithAuth, screen, waitFor } from '../test/test-utils';
+import { act, fireEvent, renderWithAuth, screen, waitFor } from '../test/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
@@ -146,4 +146,45 @@ describe('primeiro uso em 3 passos', () => {
     fireEvent.change(horas, { target: { value: '12' } });
     expect(screen.getByText('12h')).toBeInTheDocument();
   });
+  it('não salva a meta se a tela é de outra sessão (#298)', async () => {
+    abrir();
+    localStorage.setItem('token', 'jwt-B');
+
+    fireEvent.click(screen.getByRole('button', { name: /^avançar$/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    expect(puts()).toHaveLength(0);
+    expect(screen.getByRole('heading', { level: 1, name: /quanto você quer dormir/i })).toBeInTheDocument();
+  });
+
+  it('não conclui o primeiro uso de uma sessão que já saiu (#298)', async () => {
+    abrir();
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /agora não/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    expect(localStorage.getItem('noiteboa.onboarding-concluido')).toBeNull();
+    expect(screen.queryByText('chegou na Hoje')).not.toBeInTheDocument();
+  });
+
+  it('reinicia o primeiro uso quando a sessão muda (#298)', async () => {
+    abrir();
+    const horas = screen.getByRole('slider', { name: /meta de horas por noite/i });
+    fireEvent.change(horas, { target: { value: '10' } });
+    expect(horas).toHaveValue('10');
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    // Nada do que foi escolhido para A fica pronto para a conta nova.
+    expect(await screen.findByRole('slider', { name: /meta de horas por noite/i })).toHaveValue('8');
+    expect(screen.getByRole('heading', { level: 1, name: /quanto você quer dormir/i })).toBeInTheDocument();
+  });
+
 });

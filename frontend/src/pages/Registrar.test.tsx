@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Registrar from './Registrar';
@@ -225,4 +225,65 @@ describe('tela de Registrar sono', () => {
     // A sessão permanece e o botão volta a ficar habilitado para tentar de novo
     expect(screen.getByRole('button', { name: 'Salvar registro' })).toBeEnabled();
   });
+  it('não salva o registro se a tela é de outra sessão (#298)', async () => {
+    openScreen();
+    await screen.findByLabelText('Dormiu às');
+    fireEvent.click(screen.getByLabelText('Boa (4)'));
+
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar registro' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    expect(posts).toHaveLength(0);
+    expect(localStorage.getItem('token')).toBe('jwt-B');
+  });
+
+  it('limpa o formulário da sessão anterior depois da troca (#298)', async () => {
+    openScreen();
+    await screen.findByLabelText('Dormiu às');
+    fireEvent.click(screen.getByLabelText('Boa (4)'));
+    fireEvent.change(screen.getByPlaceholderText('Ex.: acordei só uma vez'), {
+      target: { value: 'nota digitada na conta A' },
+    });
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    // O que foi digitado para A não fica pronto para ser salvo em B.
+    await waitFor(() => expect(screen.getByLabelText('Boa (4)')).not.toBeChecked());
+    expect(screen.getByPlaceholderText('Ex.: acordei só uma vez')).toHaveValue('');
+    expect(posts).toHaveLength(0);
+  });
+
+  it('não mostra o sucesso de um registro que voltou depois da troca (#298)', async () => {
+    let liberarPost: (() => void) | undefined;
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      if (String(url).includes('/me')) return jsonResponse(mockUser);
+      if (options.method === 'POST') {
+        await new Promise<void>((resolve) => {
+          liberarPost = resolve;
+        });
+        return jsonResponse({ id: 'novo-id' }, 201);
+      }
+      return jsonResponse({ content: [], totalElements: 0 });
+    });
+
+    openScreen();
+    await screen.findByLabelText('Dormiu às');
+    fireEvent.click(screen.getByLabelText('Boa (4)'));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar registro' }));
+    await waitFor(() => expect(liberarPost).toBeDefined());
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+      liberarPost?.();
+    });
+
+    // O registro foi criado em A; a esta tela (agora de B) não cabe dizer que foi.
+    expect(screen.queryByText(/Noite registrada/)).not.toBeInTheDocument();
+  });
+
 });

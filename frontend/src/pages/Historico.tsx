@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ChangeEvent, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
@@ -15,6 +15,7 @@ import {
 import { isoDateNoFuso } from '../lib/fuso';
 import { agruparPorSemana, rotuloNoite } from '../lib/historico';
 import { normalizarMeta } from '../lib/hoje';
+import { MSG_SESSAO_MUDOU, sessaoDaTelaAindaVale } from '../lib/sessao-da-tela';
 import LoadingWarning from '../components/LoadingWarning';
 import QualitySelector from '../components/QualitySelector';
 import { Button, Card, EmptyState, ErrorState, Field, IconButton, ProgressBar, Skeleton } from '../components/ui';
@@ -152,7 +153,12 @@ function paraTela(log: SleepLogApi): SleepLog {
 }
 
 export default function Historico() {
-  const { user } = useAuth();
+  // `sessao` (e não só o token) define o usuário/fuso com que a tela é
+  // renderizada: os dados e as mutações precisam ser da mesma sessão (#298).
+  const { user, sessao } = useAuth();
+  // Sessão atual do contexto para as checagens espalhadas por callbacks.
+  const sessaoAtual = useRef(sessao);
+  sessaoAtual.current = sessao;
   const fuso = user?.timezone; // fonte única: fuso do perfil (issue #102)
   const [page, setPage] = useState<number>(0);
   const [logs, setLogs] = useState<SleepLog[]>([]);
@@ -172,12 +178,29 @@ export default function Historico() {
   const [savingEdit, setSavingEdit] = useState<boolean>(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
+  // Token que trouxe estes registros: editar/excluir uma noite de A não pode
+  // acabar alterando a conta B que entrou em outra aba (#298).
+  const tokenDaTela = useRef<string | null>(null);
+  // Carga mais recente: uma resposta antiga não encerra o "Carregando…" da
+  // que está em voo (#298).
+  const cargaId = useRef(0);
 
   const load = useCallback(async (p: number) => {
+    const idDaCarga = ++cargaId.current;
     setLoading(true);
     setError('');
+    const sessaoDoCarregamento = sessao;
     try {
-      const data = await api.get<SleepLogPage>(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`);
+      const data = await api.get<SleepLogPage>(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`, {
+        token: sessaoDoCarregamento ?? undefined,
+      });
+      if (idDaCarga !== cargaId.current) return; // outra carga tomou o lugar
+      // Se outra conta assumiu no meio da carga, os registros são dela mas o
+      // fuso na tela ainda é o da sessão anterior: não comita (#298).
+      if (!sessaoDaTelaAindaVale(sessaoDoCarregamento, sessaoAtual.current)) {
+        setError(MSG_SESSAO_MUDOU);
+        return;
+      }
       const content = (data.content ?? []).map(paraTela);
       if (content.length === 0 && p > 0) {
         setPage(p - 1); // página ficou vazia após excluir: volta uma
@@ -186,25 +209,50 @@ export default function Historico() {
       setLogs(content);
       setTotalPages(data.totalPages ?? 0);
       setTotalElements(data.totalElements ?? 0);
+      tokenDaTela.current = sessaoDoCarregamento;
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
+      // Carga de uma sessão que já saiu não pode pintar o erro na tela atual (#298).
+      if (idDaCarga === cargaId.current && sessaoDaTelaAindaVale(sessaoDoCarregamento, sessaoAtual.current)) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+      }
     } finally {
-      setLoading(false);
+      // Só a carga mais recente encerra o "Carregando…" (#298).
+      if (idDaCarga === cargaId.current) setLoading(false);
     }
-  }, []);
+  }, [sessao]);
 
   // Meta para a barra de duração contra a meta (default 8h sem o /goal).
   useEffect(() => {
+    const sessaoDaLeitura = sessao;
     api
-      .get<Goal>('/goal')
-      .then((goal) => setMetaMinutos(normalizarMeta(goal).minutos))
-      .catch(() => setMetaMinutos(480));
-  }, []);
+      .get<Goal>('/goal', { token: sessaoDaLeitura ?? undefined })
+      .then((goal) => {
+        if (sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) setMetaMinutos(normalizarMeta(goal).minutos);
+      })
+      .catch(() => {
+        if (sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) setMetaMinutos(480);
+      });
+  }, [sessao]);
 
   useEffect(() => {
     load(page);
   }, [page, load]);
+
+  // Nova sessão: os registros/edição da anterior não ficam na tela enquanto
+  // a conta atual carrega (#298).
+  useEffect(() => {
+    setLogs([]);
+    setTotalPages(0);
+    setTotalElements(0);
+    setEditingId(null);
+    setConfirmId(null);
+    setEditError('');
+    setError('');
+    setMetaMinutos(480);
+    // Só a troca de sessão deve limpar a tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessao]);
 
   const hojeIso = isoDateNoFuso(new Date(), fuso ?? 'America/Sao_Paulo');
   const grupos = agruparPorSemana(logs, hojeIso, fuso ?? 'America/Sao_Paulo');
@@ -229,29 +277,45 @@ export default function Historico() {
       setEditError(problem);
       return;
     }
+    const token = tokenDaTela.current;
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
+      setEditError(MSG_SESSAO_MUDOU);
+      return;
+    }
     setSavingEdit(true);
     try {
-      await api.put(`/sleep-logs/${editingId}`, toApiPayload(edit, fuso));
+      await api.put(`/sleep-logs/${editingId}`, toApiPayload(edit, fuso), { token });
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) return;
       setEditingId(null);
       await load(page);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      setEditError(message);
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
+        const message = err instanceof Error ? err.message : String(err);
+        setEditError(message);
+      }
     } finally {
       setSavingEdit(false);
     }
   }
 
   async function remove(id: string) {
+    const token = tokenDaTela.current;
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
+      setError(MSG_SESSAO_MUDOU);
+      return;
+    }
     setDeleting(true);
     setError('');
     try {
-      await api.delete(`/sleep-logs/${id}`);
+      await api.delete(`/sleep-logs/${id}`, { token });
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) return;
       setConfirmId(null);
       await load(page);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+      }
     } finally {
       setDeleting(false);
     }

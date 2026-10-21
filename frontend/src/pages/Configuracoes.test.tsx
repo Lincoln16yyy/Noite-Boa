@@ -382,4 +382,111 @@ describe('tela de Configurações', () => {
     expect(screen.queryByRole('button', { name: /Usar o fuso do aparelho/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Este aparelho está em/)).not.toBeInTheDocument();
   });
+  it('não salva metas/fuso se a tela é de outra sessão (#298)', async () => {
+    openScreen();
+    await screen.findByDisplayValue('8');
+    // Fuso diferente do carregado: o caminho do `PUT /me` seria exercitado.
+    fireEvent.change(screen.getByLabelText('Fuso horário'), { target: { value: 'Europe/Lisbon' } });
+
+    // Outra aba trocou a conta; o evento `storage` ainda não chegou.
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    expect(calls('PUT', '/goal').length).toBe(0);
+    expect(calls('PUT', '/me').length).toBe(0);
+    expect(localStorage.getItem('token')).toBe('jwt-B');
+  });
+
+  it('não comita o perfil se outra conta assumiu durante a carga (#298)', async () => {
+    let chamadasMe = 0;
+    const liberar: Array<() => void> = [];
+    fetchMock.mockImplementation(async (url: any) => {
+      const path = String(url);
+      if (path.includes('/me')) {
+        chamadasMe += 1;
+        // A 1ª é a carga da tela; a 2ª é o /me do AuthContext, que resolve
+        // antes para não disparar sozinho a troca de sessão.
+        if (chamadasMe === 1) {
+          await new Promise<void>((resolve) => {
+            liberar.push(resolve);
+          });
+        }
+        return jsonResponse(ME);
+      }
+      await new Promise<void>((resolve) => {
+        liberar.push(resolve);
+      });
+      return jsonResponse(GOAL);
+    });
+
+    openScreen();
+    await waitFor(() => expect(chamadasMe).toBeGreaterThanOrEqual(2));
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      liberar.forEach((fn) => fn());
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    // Se o perfil de B fosse comitado, a meta (8h) apareceria preenchida.
+    expect(screen.queryByDisplayValue('8')).not.toBeInTheDocument();
+  });
+
+  it('avisa quando o fuso salvou e a meta falhou (#298)', async () => {
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'PUT') {
+        return jsonResponse({ ...ME, ...JSON.parse(options.body as any) });
+      }
+      if (path.includes('/goal') && options.method === 'PUT') {
+        return jsonResponse({ detail: 'Erro interno.' }, 500);
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+
+    openScreen();
+    await screen.findByDisplayValue('8');
+    fireEvent.change(screen.getByLabelText('Fuso horário'), { target: { value: 'Europe/Lisbon' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+
+    const alerta = await screen.findByRole('alert');
+    expect(alerta).toHaveTextContent(/fuso horário foi atualizado/i);
+    expect(alerta).toHaveTextContent('Erro interno.');
+  });
+
+  it('limpa a confirmação de exclusão quando a sessão muda (#298)', async () => {
+    openScreen();
+    await screen.findByDisplayValue('8');
+    const campo = screen.getByPlaceholderText('seu@email.com ou EXCLUIR');
+    fireEvent.change(campo, { target: { value: 'EXCLUIR' } });
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    // O "EXCLUIR" digitado para A não vale para a conta que acabou de entrar.
+    // (O campo some no "Carregando…" e volta vazio com o perfil novo.)
+    expect(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR')).toHaveValue('');
+  });
+
+  it('não mantém as preferências da sessão anterior se a nova carga falha (#298)', async () => {
+    openScreen();
+    await screen.findByDisplayValue('8');
+
+    fetchMock.mockImplementation(async (url: any) => {
+      if (String(url).includes('/me')) return jsonResponse(ME);
+      return jsonResponse({ detail: 'Erro interno.' }, 500);
+    });
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Erro interno.');
+    // A meta de 8h de A não fica pronta para ser salva em B.
+    expect(screen.queryByDisplayValue('8')).not.toBeInTheDocument();
+  });
+
 });

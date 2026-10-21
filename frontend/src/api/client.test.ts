@@ -20,6 +20,40 @@ describe('api client', () => {
     );
   });
 
+  it('usa o token explícito sem mandá-lo ao fetch (#298)', async () => {
+    localStorage.setItem('token', 'token-B');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+
+    await api.put('/goal', { targetMinutes: 480 }, { token: 'token-A' });
+
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((options.headers as Record<string, string>).Authorization).toBe('Bearer token-A');
+    expect(options).not.toHaveProperty('token');
+    expect(localStorage.getItem('token')).toBe('token-B');
+  });
+
+  it('401 do token explícito de uma sessão antiga não derruba a nova (#298)', async () => {
+    localStorage.setItem('token', 'token-B');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
+    const mudancas: string[] = [];
+    const ouvinte = () => {
+      mudancas.push('session-change');
+    };
+    window.addEventListener('noiteboa:session-change', ouvinte);
+
+    try {
+      await expect(api.put('/goal', {}, { token: 'token-A' })).rejects.toThrow('Erro 401');
+    } finally {
+      window.removeEventListener('noiteboa:session-change', ouvinte);
+    }
+
+    expect(localStorage.getItem('token')).toBe('token-B');
+    // Sem evento, o AuthContext desta aba não derruba o usuário da conta nova.
+    expect(mudancas).toHaveLength(0);
+  });
+
   it('clears session on 401', async () => {
     localStorage.setItem('token', 'abc');
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));

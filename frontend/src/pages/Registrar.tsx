@@ -16,6 +16,7 @@ import {
 } from '../lib/sleep';
 import { isoDateNoFuso } from '../lib/fuso';
 import { normalizarMeta } from '../lib/hoje';
+import { MSG_SESSAO_MUDOU, sessaoDaTelaAindaVale } from '../lib/sessao-da-tela';
 import LoadingWarning from '../components/LoadingWarning';
 import QualitySelector from '../components/QualitySelector';
 import { Button, Card } from '../components/ui';
@@ -116,7 +117,10 @@ function dataVisivel(valor: string): string {
 }
 
 export default function Registrar() {
-  const { user } = useAuth();
+  const { user, sessao } = useAuth();
+  // Sessão atual do contexto para as checagens espalhadas por callbacks.
+  const sessaoAtual = useRef(sessao);
+  sessaoAtual.current = sessao;
   const fuso = user?.timezone; // fonte única: fuso do perfil (issue #102)
   const [sleepStart, setSleepStart] = useState<string>('');
   const [sleepEnd, setSleepEnd] = useState<string>('');
@@ -129,6 +133,9 @@ export default function Registrar() {
   const [recent, setRecent] = useState<SleepLog[]>([]);
   const [recentLoaded, setRecentLoaded] = useState<boolean>(false);
   const digitouRef = useRef(false); // não repor o digitado quando o fuso do perfil chegar (#102)
+  // Sessão que abriu o formulário: se o contexto trocar de conta com a tela
+  // montada, o que foi digitado para A não pode ser salvo em B (#298).
+  const tokenDaTela = useRef<string | null>(sessao);
 
   const applyDefaults = useCallback(() => {
     const defaults = smartDefaults(new Date(), fuso);
@@ -137,29 +144,59 @@ export default function Registrar() {
   }, [fuso]);
 
   const loadRecent = useCallback(async () => {
+    const sessaoDaLeitura = sessao;
     try {
-      const page = await api.get<SleepLogPage>('/sleep-logs?page=0&size=5');
+      const page = await api.get<SleepLogPage>('/sleep-logs?page=0&size=5', {
+        token: sessaoDaLeitura ?? undefined,
+      });
+      // Resposta de outra conta não entra nesta tela (#298).
+      if (!sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) return;
       setRecent(page.content ?? []);
     } catch {
-      setRecent([]);
+      if (sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) setRecent([]);
     } finally {
-      setRecentLoaded(true);
+      // Só a leitura da sessão atual encerra o "carregando" dos últimos
+      // registros; a antiga não pode liberar o estado vazio da nova (#298).
+      if (sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) setRecentLoaded(true);
     }
-  }, []);
+  }, [sessao]);
 
   // Meta para a porcentagem da duração ao vivo (default 8h sem o /goal).
   useEffect(() => {
+    const sessaoDaLeitura = sessao;
     api
-      .get<Goal>('/goal')
-      .then((goal) => setMetaMinutos(normalizarMeta(goal).minutos))
-      .catch(() => setMetaMinutos(META_PADRAO));
-  }, []);
+      .get<Goal>('/goal', { token: sessaoDaLeitura ?? undefined })
+      .then((goal) => {
+        if (sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) setMetaMinutos(normalizarMeta(goal).minutos);
+      })
+      .catch(() => {
+        if (sessaoDaTelaAindaVale(sessaoDaLeitura, sessaoAtual.current)) setMetaMinutos(META_PADRAO);
+      });
+  }, [sessao]);
 
   // Padrões com o fuso do perfil assim que ele chegar (o /me é assíncrono);
   // quem já digitou um horário não tem o campo reposto no meio da edição.
   useEffect(() => {
     if (!digitouRef.current) applyDefaults();
   }, [applyDefaults]);
+
+  // Troca de sessão: o formulário e os últimos registros eram da conta
+  // anterior; volta aos padrões da nova (#298).
+  useEffect(() => {
+    digitouRef.current = false;
+    setSleepStart('');
+    setSleepEnd('');
+    setQuality(0);
+    setNotes('');
+    applyDefaults();
+    setRecent([]);
+    setRecentLoaded(false);
+    setMetaMinutos(META_PADRAO);
+    setSuccess('');
+    setError('');
+    // Só a troca de sessão deve resetar o formulário.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessao]);
 
   useEffect(() => {
     loadRecent();
@@ -180,18 +217,27 @@ export default function Registrar() {
       setError(problem);
       return;
     }
+    const token = tokenDaTela.current;
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
+      setError(MSG_SESSAO_MUDOU);
+      return;
+    }
 
     setSaving(true);
     try {
-      const created = await api.post<SleepLog>('/sleep-logs', toApiPayload(form, fuso));
+      const created = await api.post<SleepLog>('/sleep-logs', toApiPayload(form, fuso), { token });
+      // A sessão trocou com o pedido em voo: o registro é de A, não desta tela.
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) return;
       setSuccess(`Noite registrada: ${formatDuration(created.sleepStart ?? '', created.sleepEnd ?? '')} de sono.`);
       applyDefaults();
       setQuality(0);
       setNotes('');
       await loadRecent();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+      }
     } finally {
       setSaving(false);
     }

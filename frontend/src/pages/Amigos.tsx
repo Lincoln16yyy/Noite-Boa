@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import type { Friend, FriendRequests, RankingEntry, SendResult, User } from '../api/types';
 import LoadingWarning from '../components/LoadingWarning';
 import { Button, Chip, EmptyState, ErrorState, Field, Skeleton } from '../components/ui';
+import { MSG_SESSAO_MUDOU, sessaoDaTelaAindaVale } from '../lib/sessao-da-tela';
 
 const cardStyle = {
   background: 'var(--card-bg)',
@@ -23,6 +25,12 @@ const mutedTextStyle = { color: 'var(--text-muted)', fontSize: '15px' };
  * e o ranking só mostra nº de noites e % dos dias — nunca horários ou durações.
  */
 export default function Amigos() {
+  // A tela representa a sessão do AuthContext (é ela que define o usuário
+  // mostrado); a carga só vale se o token ainda for esse (#298).
+  const { sessao } = useAuth();
+  // Sessão atual do contexto para as checagens espalhadas por callbacks.
+  const sessaoAtual = useRef(sessao);
+  sessaoAtual.current = sessao;
   const [me, setMe] = useState<User | null>(null);
   const [amigos, setAmigos] = useState<Friend[]>([]);
   const [convites, setConvites] = useState<FriendRequests>({ sent: [], received: [] });
@@ -40,6 +48,15 @@ export default function Amigos() {
   // batch veriam `acaoEmVoo = null`); o estado só controla o `disabled`.
   const [acaoEmVoo, setAcaoEmVoo] = useState<string | null>(null);
   const emVooRef = useRef(false);
+  // Identidade da ação em voo: o `finally` de uma ação da conta antiga não
+  // pode destravar a ação da conta nova (#298).
+  const acaoId = useRef(0);
+  // Token que carregou estes dados: as ações (convite, aceite, remoção,
+  // compartilhamento) só podem escrever na mesma conta (#298).
+  const tokenDaTela = useRef<string | null>(null);
+  // Carga mais recente: uma resposta antiga (troca de sessão, retry, ação)
+  // não pode encerrar o "Carregando…" da que está em voo (#298).
+  const cargaId = useRef(0);
 
   // Requisição de ranking em andamento. TODA escrita do ranking passa por
   // `carregarRanking`: a requisição mais nova cancela a anterior, então uma
@@ -56,12 +73,15 @@ export default function Amigos() {
     rankingRequest.current?.abort();
     const controller = new AbortController();
     rankingRequest.current = controller;
+    const sessaoDaRequisicao = sessao;
     try {
       const resultado = await api.get<{ ranking: RankingEntry[] }>(
         `/friends/ranking?days=${periodo}`,
-        { signal: controller.signal },
+        { signal: controller.signal, token: sessaoDaRequisicao ?? undefined },
       );
       if (controller.signal.aborted) return; // resposta de requisição cancelada: ignora
+      // Ranking de outra sessão não entra nesta tela (#298).
+      if (!sessaoDaTelaAindaVale(sessaoDaRequisicao, sessaoAtual.current)) return;
       setRanking(resultado.ranking);
     } catch (err: unknown) {
       // O cliente converte abort em erro genérico, então checar o signal (e não
@@ -71,52 +91,101 @@ export default function Amigos() {
     }
   }
 
-  async function carregar() {
+  async function carregar(mostrarLoading = false) {
     // Limpa só o erro da CARGA: um retry bem-sucedido precisa sumir com o alerta
     // (#267), mas erros de ação têm ciclo próprio — apagá-los aqui esconderia
     // uma ação que ainda não foi aplicada. Se a carga falhar de novo, o catch
     // repõe o alerta, então o botão de retry não some.
+    const idDaCarga = ++cargaId.current;
+    if (mostrarLoading) setLoading(true);
     setErroDaCarga('');
+    const sessaoDoCarregamento = sessao;
+    const opcoes = { token: sessaoDoCarregamento ?? undefined };
     try {
       const [meData, amigosData, convitesData] = await Promise.all([
-        api.get<User>('/me'),
-        api.get<Friend[]>('/friends'),
-        api.get<FriendRequests>('/friends/requests'),
+        api.get<User>('/me', opcoes),
+        api.get<Friend[]>('/friends', opcoes),
+        api.get<FriendRequests>('/friends/requests', opcoes),
       ]);
+      if (idDaCarga !== cargaId.current) return; // outra carga tomou o lugar
+      // Outra conta assumiu no meio: estes dados podem ser dela, mas a tela
+      // continua sendo a desta sessão. Não comita nem rebinda o token (#298).
+      if (!sessaoDaTelaAindaVale(sessaoDoCarregamento, sessaoAtual.current)) {
+        setErroDaCarga(MSG_SESSAO_MUDOU);
+        return;
+      }
       setMe(meData);
       setAmigos(amigosData);
       setConvites(convitesData);
+      tokenDaTela.current = sessaoDoCarregamento;
       await carregarRanking(periodoAtual.current);
     } catch (err: unknown) {
-      setErroDaCarga(err instanceof Error ? err.message : String(err));
+      // Falha de uma carga que já não é desta sessão não pode pintar a tela
+      // da conta atual (#298).
+      if (idDaCarga === cargaId.current && sessaoDaTelaAindaVale(sessaoDoCarregamento, sessaoAtual.current)) {
+        setErroDaCarga(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      // Só a carga mais recente encerra o "Carregando…" (#298).
+      if (idDaCarga === cargaId.current && mostrarLoading) setLoading(false);
     }
   }
 
   useEffect(() => {
-    carregar().finally(() => setLoading(false));
+    // Troca de sessão com a tela montada: some com os dados da conta anterior
+    // e busca os da nova (#298).
+    setLoading(true);
+    setMe(null);
+    setAmigos([]);
+    setConvites({ sent: [], received: [] });
+    setRanking([]);
+    setError('');
+    setErroDaCarga('');
+    setEmail('');
+    setSuccess('');
+    // A ação em voo era da conta anterior: destrava a tela para a nova.
+    acaoId.current += 1;
+    emVooRef.current = false;
+    setAcaoEmVoo(null);
+    void carregar(true);
+    // `carregar` já lê o estado da renderização atual; só a sessão dispara.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sessao]);
 
   async function alternarCompartilhar(e: ChangeEvent<HTMLInputElement>) {
     const compartilhar = e.target.checked;
     setError('');
+    const token = tokenDaTela.current;
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
+      setError(MSG_SESSAO_MUDOU);
+      return;
+    }
     try {
-      const atualizado = await api.put<User>('/me', { shareWithFriends: compartilhar });
+      const atualizado = await api.put<User>('/me', { shareWithFriends: compartilhar }, { token });
+      // A sessão trocou com o pedido em voo: o resultado é de A, não desta tela.
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) return;
       setMe(atualizado);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) setError(err instanceof Error ? err.message : String(err));
     }
   }
 
   async function enviarConvite(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (emVooRef.current) return;
+    const token = tokenDaTela.current;
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
+      setError(MSG_SESSAO_MUDOU);
+      return;
+    }
+    const idDaAcao = ++acaoId.current;
     emVooRef.current = true;
     setAcaoEmVoo('convidar');
     setError('');
     setSuccess('');
     try {
-      const resultado = await api.post<SendResult>('/friends/requests', { email });
+      const resultado = await api.post<SendResult>('/friends/requests', { email }, { token });
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) return;
       setEmail('');
       setSuccess(
         resultado.status === 'accepted'
@@ -125,36 +194,55 @@ export default function Amigos() {
       );
       await carregar();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) setError(err instanceof Error ? err.message : String(err));
     } finally {
-      emVooRef.current = false;
-      setAcaoEmVoo(null);
+      if (idDaAcao === acaoId.current) {
+        emVooRef.current = false;
+        setAcaoEmVoo(null);
+      }
     }
   }
 
-  async function executar(chave: string, acao: () => Promise<unknown>, aoPronto: () => Promise<unknown>) {
+  async function executar(
+    chave: string,
+    mutacao: (token: string) => Promise<unknown>,
+    aoPronto: () => Promise<unknown>,
+  ) {
     if (emVooRef.current) return;
+    const token = tokenDaTela.current;
+    if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) {
+      setError(MSG_SESSAO_MUDOU);
+      return;
+    }
+    const idDaAcao = ++acaoId.current;
     emVooRef.current = true;
     setAcaoEmVoo(chave);
     setError('');
     try {
-      await acao();
+      await mutacao(token);
+      // A ação foi de A: não recarregue (nem ocupe o loading) da tela de B.
+      if (!sessaoDaTelaAindaVale(token, sessaoAtual.current)) return;
       await aoPronto();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (sessaoDaTelaAindaVale(token, sessaoAtual.current)) setError(err instanceof Error ? err.message : String(err));
     } finally {
-      emVooRef.current = false;
-      setAcaoEmVoo(null);
+      if (idDaAcao === acaoId.current) {
+        emVooRef.current = false;
+        setAcaoEmVoo(null);
+      }
     }
   }
 
   async function trocarPeriodo(novosDias: number) {
     periodoAtual.current = novosDias;
     setDias(novosDias);
+    const sessaoDaTroca = sessao;
     try {
       await carregarRanking(novosDias);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (sessaoDaTelaAindaVale(sessaoDaTroca, sessaoAtual.current)) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     }
   }
 
@@ -255,7 +343,7 @@ export default function Amigos() {
                 onClick={() =>
                   executar(
                     `aceitar:${convite.id}`,
-                    () => api.post(`/friends/requests/${convite.id}/accept`),
+                    (token) => api.post(`/friends/requests/${convite.id}/accept`, undefined, { token }),
                     () => carregar(),
                   )
                 }
@@ -268,7 +356,7 @@ export default function Amigos() {
                 onClick={() =>
                   executar(
                     `recusar:${convite.id}`,
-                    () => api.post(`/friends/requests/${convite.id}/decline`),
+                    (token) => api.post(`/friends/requests/${convite.id}/decline`, undefined, { token }),
                     () => carregar(),
                   )
                 }
@@ -296,7 +384,7 @@ export default function Amigos() {
                 onClick={() =>
                   executar(
                     `cancelar:${convite.id}`,
-                    () => api.delete(`/friends/requests/${convite.id}`),
+                    (token) => api.delete(`/friends/requests/${convite.id}`, { token }),
                     () => carregar(),
                   )
                 }
@@ -324,7 +412,7 @@ export default function Amigos() {
                 onClick={() =>
                   executar(
                     `remover:${amigo.id}`,
-                    () => api.delete(`/friends/${amigo.id}`),
+                    (token) => api.delete(`/friends/${amigo.id}`, { token }),
                     () => carregar(),
                   )
                 }

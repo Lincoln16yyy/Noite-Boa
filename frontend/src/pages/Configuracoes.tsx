@@ -14,6 +14,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { fusoDoAparelho } from '../lib/fuso';
+import { MSG_SESSAO_MUDOU, sessaoDaTelaAindaVale } from '../lib/sessao-da-tela';
 import LoadingWarning from '../components/LoadingWarning';
 import { Chip } from '../components/ui';
 
@@ -28,7 +29,10 @@ const toTimeInput = (value?: string | null) => (value ? String(value).slice(0, 5
 export default function Configuracoes() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
-  const { logout } = useAuth();
+  const { logout, sessao } = useAuth();
+  // Sessão atual do contexto para as checagens espalhadas por callbacks.
+  const sessaoAtual = useRef(sessao);
+  sessaoAtual.current = sessao;
   const fusoAparelho = fusoDoAparelho();
   const [me, setMe] = useState<User | null>(null);
   const [hours, setHours] = useState('');
@@ -48,33 +52,55 @@ export default function Configuracoes() {
 
   useEffect(() => {
     let active = true;
-    // Token que carregou este perfil: a exclusão só pode ser enviada por ele.
-    // Sem isso, uma tela da conta A ainda aberta podia excluir a conta B que
-    // entrou em outra aba (review do PR #292).
-    const tokenDoCarregamento = getToken();
+    // Sessão que carregou este perfil: as leituras e todas as mutações só
+    // podem ser dela. Sem isso, uma tela da conta A ainda aberta podia salvar
+    // ou excluir a conta B que entrou em outra aba (#292, #298).
+    const sessaoDoCarregamento = sessao;
+    // Nova sessão: esconde o perfil da anterior e zera a confirmação de
+    // exclusão (o "EXCLUIR" digitado para A não vale para B) (#298).
+    setLoading(true);
+    setMe(null);
+    // Campos do perfil anterior não ficam visíveis nem prontos para salvar (#298).
+    setHours('');
+    setBedtime('');
+    setWakeTime('');
+    setTimezone('');
+    setError('');
+    setSuccess('');
+    setDeleteConfirm('');
+    setDeleteError('');
     (async () => {
       try {
         const [meData, goalData] = await Promise.all([
-          api.get<User>('/me'),
-          api.get<Goal>('/goal'),
+          api.get<User>('/me', { token: sessaoDoCarregamento ?? undefined }),
+          api.get<Goal>('/goal', { token: sessaoDoCarregamento ?? undefined }),
         ]);
         if (!active) return;
-        tokenDoPerfil.current = tokenDoCarregamento;
+        // Outra conta assumiu durante a carga: os dados são dela, não desta tela.
+        if (!sessaoDaTelaAindaVale(sessaoDoCarregamento, sessaoAtual.current)) {
+          setError(MSG_SESSAO_MUDOU);
+          return;
+        }
+        tokenDoPerfil.current = sessaoDoCarregamento;
         setMe(meData);
         setHours(String((goalData.targetMinutes ?? 0) / 60));
         setBedtime(toTimeInput(goalData.bedtime));
         setWakeTime(toTimeInput(goalData.wakeTime));
         setTimezone(meData.timezone || 'America/Sao_Paulo');
       } catch (err: unknown) {
-        if (active) setError(err instanceof Error ? err.message : String(err));
+        if (active && sessaoDaTelaAindaVale(sessaoDoCarregamento, sessaoAtual.current)) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       } finally {
+        // O `active` já garante que só a carga desta sessão encerra o
+        // "Carregando…": a troca de sessão limpa o efeito anterior (#298).
         if (active) setLoading(false);
       }
     })();
     return () => {
       active = false;
     };
-  }, []);
+  }, [sessao]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -87,17 +113,29 @@ export default function Configuracoes() {
       return;
     }
 
+    // O formulário mostra a conta que o carregou: se o token já é de outra,
+    // salvar aplicaria as escolhas de A na conta B (#298).
+    const tokenDaTela = tokenDoPerfil.current;
+    if (!sessaoDaTelaAindaVale(tokenDaTela, sessaoAtual.current)) {
+      setError(MSG_SESSAO_MUDOU);
+      return;
+    }
+
     setSaving(true);
+    // O `/me` pode ter sido salvo antes de o `/goal` falhar: o catch precisa
+    // saber o que já mudou para não dizer que nada foi salvo (#298).
+    let updatedMe = me;
     try {
-      let updatedMe = me;
       if (me && timezone !== me.timezone) {
-        updatedMe = await api.put<User>('/me', { timezone });
+        updatedMe = await api.put<User>('/me', { timezone }, { token: tokenDaTela });
       }
       await api.put('/goal', {
         targetMinutes: minutes,
         bedtime: bedtime || null,
         wakeTime: wakeTime || null,
-      });
+      }, { token: tokenDaTela });
+      // A sessão trocou com o pedido em voo: o resultado é de A, não desta tela.
+      if (!sessaoDaTelaAindaVale(tokenDaTela, sessaoAtual.current)) return;
       setMe(updatedMe);
       setSuccess('Preferências salvas.');
 
@@ -109,7 +147,15 @@ export default function Configuracoes() {
         else cancelarLembrete();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (!sessaoDaTelaAindaVale(tokenDaTela, sessaoAtual.current)) return;
+      const message = err instanceof Error ? err.message : String(err);
+      if (updatedMe !== me) {
+        // Fuso salvo, meta não: reflete a metade que valeu e avisa a outra.
+        setMe(updatedMe);
+        setError(`O fuso horário foi atualizado, mas as preferências não foram salvas. ${message}`);
+      } else {
+        setError(message);
+      }
     } finally {
       setSaving(false);
     }
@@ -119,14 +165,20 @@ export default function Configuracoes() {
   async function atualizarFusoDoAparelho() {
     setError('');
     setSuccess('');
+    const tokenDaTela = tokenDoPerfil.current;
+    if (!sessaoDaTelaAindaVale(tokenDaTela, sessaoAtual.current)) {
+      setError(MSG_SESSAO_MUDOU);
+      return;
+    }
     setSaving(true);
     try {
-      const updatedMe = await api.put<User>('/me', { timezone: fusoAparelho });
+      const updatedMe = await api.put<User>('/me', { timezone: fusoAparelho }, { token: tokenDaTela });
+      if (!sessaoDaTelaAindaVale(tokenDaTela, sessaoAtual.current)) return;
       setMe(updatedMe);
       setTimezone(updatedMe.timezone ?? 'America/Sao_Paulo');
       setSuccess('Fuso horário atualizado para o do aparelho.');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (sessaoDaTelaAindaVale(tokenDaTela, sessaoAtual.current)) setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
@@ -152,7 +204,8 @@ export default function Configuracoes() {
 
     // O DELETE usa o token atual do cliente. Se a sessão já não é a que
     // carregou este perfil, a exclusão seria da outra conta (review do PR #292).
-    if (getToken() !== tokenDoPerfil.current) {
+    const tokenDaTela = tokenDoPerfil.current;
+    if (!sessaoDaTelaAindaVale(tokenDaTela, sessaoAtual.current)) {
       setDeleteError('A sessão mudou. Recarregue a página antes de excluir a conta.');
       return;
     }
@@ -164,9 +217,9 @@ export default function Configuracoes() {
     // Sessão que pediu a exclusão: se outra aba entrar com outra conta enquanto
     // o DELETE está em voo, a sessão nova não pode ser derrubada nem levada
     // para /?deleted=true (review do PR #292).
-    const tokenDaExclusao = getToken();
+    const tokenDaExclusao = tokenDaTela;
     try {
-      await api.delete('/me');
+      await api.delete('/me', { token: tokenDaExclusao });
       if (getToken() !== tokenDaExclusao) {
         setDeleting(false);
         return;
@@ -176,7 +229,9 @@ export default function Configuracoes() {
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       navigate('/?deleted=true');
     } catch (err: unknown) {
-      setDeleteError(err instanceof Error ? err.message : String(err));
+      if (sessaoDaTelaAindaVale(tokenDaExclusao, sessaoAtual.current)) {
+        setDeleteError(err instanceof Error ? err.message : String(err));
+      }
       setDeleting(false);
     }
   }

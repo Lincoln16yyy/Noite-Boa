@@ -390,4 +390,112 @@ describe('tela de Amigos', () => {
     expect(await screen.findByText(/Não confirmamos se o e-mail tem conta/)).toBeInTheDocument();
     expect(screen.getByText(/Seus horários e registros nunca aparecem no ranking/)).toBeInTheDocument();
   });
+  it('não aceita convite se a tela é de outra sessão (#298)', async () => {
+    openScreen();
+    const aceitar = await screen.findByRole('button', { name: 'Aceitar' });
+
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(aceitar);
+
+    expect(await screen.findByText(/sessão mudou/i)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([, o]: any) => o?.method === 'POST').length).toBe(0);
+    expect(localStorage.getItem('token')).toBe('jwt-B');
+  });
+
+  it('não comita a carga se outra conta assumiu no meio (#298)', async () => {
+    let chamadasMe = 0;
+    let liberarPrimeira: (() => void) | undefined;
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      const method = options.method ?? 'GET';
+      if (path.includes('/api/me') && method === 'GET') {
+        chamadasMe += 1;
+        // A 1ª é a carga da tela; a 2ª é o /me do AuthContext, que resolve
+        // antes para não disparar sozinho a troca de sessão.
+        if (chamadasMe === 1) {
+          await new Promise<void>((resolve) => {
+            liberarPrimeira = resolve;
+          });
+        }
+        return jsonResponse({ ...ME, shareWithFriends: true });
+      }
+      if (path.includes('/api/me')) return jsonResponse(ME);
+      if (path.includes('/friends/ranking')) return jsonResponse({ days: 7, ranking: [] });
+      if (path.includes('/friends/requests')) return jsonResponse({ sent: [], received: [] });
+      return jsonResponse([]);
+    });
+
+    openScreen();
+    await waitFor(() => expect(chamadasMe).toBeGreaterThanOrEqual(2));
+    // Outra aba assumiu enquanto a carga da tela estava em voo.
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      liberarPrimeira?.();
+    });
+
+    expect(await screen.findByText(/sessão mudou/i)).toBeInTheDocument();
+    // Se a resposta de B fosse comitada, o compartilhamento apareceria ligado.
+    expect(screen.getByRole('checkbox', { name: /compartilhar minhas noites/i })).not.toBeChecked();
+  });
+
+  it('recarrega e limpa os dados quando a sessão muda (#298)', async () => {
+    openScreen();
+    await screen.findByRole('checkbox', { name: /compartilhar minhas noites/i });
+
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      const method = options.method ?? 'GET';
+      if (path.includes('/api/me') && method === 'PUT') return jsonResponse(ME);
+      if (path.includes('/api/me')) return jsonResponse(ME);
+      if (path.includes('/friends/ranking')) return jsonResponse({ days: 7, ranking: [] });
+      if (path.includes('/friends/requests')) return jsonResponse({ sent: [], received: [] });
+      return jsonResponse([]);
+    });
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    // A conta nova não vê os amigos/ranking da anterior enquanto recarrega.
+    expect(await screen.findByText('Você ainda não tem amigos aceitos.')).toBeInTheDocument();
+    expect(screen.queryAllByText('Bruno')).toHaveLength(0);
+  });
+
+  it('limpa o rascunho de convite quando a sessão muda (#298)', async () => {
+    openScreen();
+    const campo = await screen.findByPlaceholderText('amigo@exemplo.com');
+    fireEvent.change(campo, { target: { value: 'rascunho@exemplo.com' } });
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    // O convite pensado para A não fica pronto para ser enviado como B.
+    // (O campo some no "Carregando…" e volta vazio com a conta nova.)
+    expect(await screen.findByPlaceholderText('amigo@exemplo.com')).toHaveValue('');
+  });
+
+  it('não mantém os amigos da sessão anterior quando a nova carga falha (#298)', async () => {
+    openScreen();
+    await screen.findByRole('checkbox', { name: /compartilhar minhas noites/i });
+
+    fetchMock.mockImplementation(async (url: any) => {
+      const path = String(url);
+      if (path.includes('/api/me')) return jsonResponse(ME);
+      if (path.includes('/friends')) return jsonResponse({ detail: 'Erro interno.' }, 500);
+      return jsonResponse([]);
+    });
+
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    });
+
+    expect(await screen.findByText(/Erro interno/)).toBeInTheDocument();
+    // A lista de A não fica na tela de B só porque a carga de B falhou.
+    expect(screen.queryAllByText('Bruno')).toHaveLength(0);
+  });
+
 });
