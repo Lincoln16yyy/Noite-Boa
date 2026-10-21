@@ -38,8 +38,8 @@ export default function Layout() {
 
   const rotaProtegida = PROTECTED_ROUTES.some((r) => location.pathname.startsWith(r));
 
-  // Falha de rede/5xx no /me com token presente não é logout: avisa e deixa
-  // tentar de novo, em vez de mandar para /login (#294).
+  // Falha no /me com token presente não é logout: avisa e deixa tentar de
+  // novo, em vez de mandar para /login (#294).
   if (!loading && !user && erroSessao && rotaProtegida) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>

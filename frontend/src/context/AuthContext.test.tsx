@@ -333,6 +333,7 @@ describe('AuthProvider', () => {
   });
 
   it('falha de rede no /me mantém o token e o retry entra na conta (#294)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     localStorage.setItem('token', 'jwt-A');
     let falhar = true;
     vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
@@ -357,6 +358,7 @@ describe('AuthProvider', () => {
   });
 
   it('retry que carrega outra conta atualiza a identidade da sessão (#294)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     localStorage.setItem('token', 'jwt-A');
     let chamadasMe = 0;
     vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
@@ -385,6 +387,41 @@ describe('AuthProvider', () => {
     // token (sem isso, `logout` acharia que a sessão ainda é A e só recarregaria).
     fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
     expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('retry que falha também atualiza a identidade da sessão (#294)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    render(
+      <AuthProvider>
+        <TelaComErro />
+        <BotaoSair />
+      </AuthProvider>,
+    );
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    // Outra aba trocou para B; o `storage` ainda não chegou e o retry falha.
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    // Mesmo falhando, a tela agora representa B: o primeiro Sair derruba o token.
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('/me sem corpo (204) não vira logout: aviso e token preservado (#294)', async () => {
+    const erroLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockResolvedValue(new Response(null, { status: 204 }));
+
+    render(<AuthProvider><TelaComErro /></AuthProvider>);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível carregar/i);
+    expect(localStorage.getItem('token')).toBe('jwt-A');
+    expect(erroLog).toHaveBeenCalled();
   });
 
   it('resposta antiga de /me não derruba a consulta mais nova (#292)', async () => {

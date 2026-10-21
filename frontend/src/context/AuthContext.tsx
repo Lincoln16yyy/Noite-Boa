@@ -14,8 +14,9 @@ export interface AuthContextValue {
    */
   sessao: string | null;
   /**
-   * Mensagem quando o `/me` falhou por rede/5xx com o token ainda presente
-   * (não é logout). O `Layout` mostra um aviso com "Tentar de novo" (#294).
+   * Mensagem quando o `/me` falhou com o token ainda presente — qualquer
+   * falha que não seja sessão encerrada (rede, 5xx, resposta inválida). O
+   * `Layout` mostra um aviso com "Tentar de novo" (#294).
    */
   erroSessao: string | null;
   login: (email: string, password: string) => Promise<LoginResult>;
@@ -68,6 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       montado.current && geracao.current === minhaGeracao && getToken() === tokenDaRequisicao;
     try {
       const me = await api.get<User>('/me');
+      // 204/JSON `null` não é usuário: sem esta checagem o `Layout` trataria
+      // como deslogado e mandaria para /login com o token ainda presente (#294).
+      if (!me || typeof me !== 'object' || typeof me.id !== 'string') {
+        throw new Error('Resposta inválida do /me');
+      }
       if (atual()) {
         setUser(me);
         setErroSessao(null);
@@ -76,14 +82,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // conta nova — a identidade da tela precisa acompanhar (#294).
         setSessao(tokenDaRequisicao);
       }
-    } catch {
+    } catch (erro) {
       if (atual()) {
         setUser(null);
+        // A consulta foi feita com `tokenDaRequisicao`: se outra aba trocou o
+        // token e esta tela ainda não processou o `storage`, a identidade
+        // precisa acompanhar para o primeiro Sair derrubar o token certo (#294).
+        setSessao(tokenDaRequisicao);
         // Token ainda presente: a sessão não acabou, o `/me` é que não veio.
         // Não pode virar logout (#294). A mensagem é neutra de propósito: o
         // mesmo caminho cobre rede, 5xx e resposta inválida — prometer "é a
         // conexão" mentiria nos outros casos.
         if (getToken() !== null) {
+          // Operadores precisam distinguir 5xx persistente de rede nos
+          // relatos; o usuário continua vendo só a mensagem genérica.
+          console.error('[auth] falha ao carregar /me', erro);
           setErroSessao('Não foi possível carregar sua sessão. Tente de novo.');
         }
       }
