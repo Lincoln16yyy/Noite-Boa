@@ -253,3 +253,40 @@ describe('Layout — desktop v2 (issue #217)', () => {
     expect(screen.queryByRole('button', { name: 'Mais opções' })).not.toBeInTheDocument();
   });
 });
+
+describe('Layout — falha de sessão (#294)', () => {
+  it('não manda para /login quando o /me falha e o token continua', async () => {
+    instalarMatchMedia(false);
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+
+    renderWithAuth(
+      <Routes>
+        <Route path="/login" element={<p>marcador login</p>} />
+        <Route path="*" element={<Layout />} />
+      </Routes>,
+      { user: usuario, route: '/hoje' },
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível carregar/i);
+    expect(screen.queryByText('marcador login')).not.toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBe('mock-token');
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument();
+  });
+
+  it('401 no /me limpa a sessão e manda para /login, sem tela de erro', async () => {
+    instalarMatchMedia(false);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
+
+    renderWithAuth(
+      <Routes>
+        <Route path="/login" element={<p>marcador login</p>} />
+        <Route path="*" element={<Layout />} />
+      </Routes>,
+      { user: usuario, route: '/hoje' },
+    );
+
+    expect(await screen.findByText('marcador login')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+});

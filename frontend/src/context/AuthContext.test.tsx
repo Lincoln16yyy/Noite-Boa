@@ -15,6 +15,21 @@ function MostraUsuario() {
   return <p>{user?.email ?? 'sem usuário'}</p>;
 }
 
+/** Tela mínima com o aviso de erro de sessão e o botão de retry (#294). */
+function TelaComErro() {
+  const { user, loading, erroSessao, tentarNovamente } = useAuth();
+  if (loading) return <p>carregando</p>;
+  if (erroSessao) {
+    return (
+      <>
+        <p role="alert">{erroSessao}</p>
+        <button type="button" onClick={() => void tentarNovamente()}>Tentar de novo</button>
+      </>
+    );
+  }
+  return <p>{user?.email ?? 'sem usuário'}</p>;
+}
+
 /** Imita a guarda do `Layout`: sem usuário (e sem carregar), manda para o login. */
 function RotaProtegida() {
   const { user, loading } = useAuth();
@@ -315,6 +330,30 @@ describe('AuthProvider', () => {
       responderB?.(new Response(JSON.stringify(usuarioB), { status: 200 }));
     });
     expect(await screen.findByText('b@example.com')).toBeInTheDocument();
+  });
+
+  it('falha de rede no /me mantém o token e o retry entra na conta (#294)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    let falhar = true;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/api/me')) {
+        if (falhar) throw new TypeError('Failed to fetch');
+        return new Response(JSON.stringify(usuarioA), { status: 200 });
+      }
+      return new Response('null', { status: 200 });
+    });
+
+    render(<AuthProvider><TelaComErro /></AuthProvider>);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível carregar/i);
+    // Falha de rede não é logout: o token (e a sessão) continuam.
+    expect(localStorage.getItem('token')).toBe('jwt-A');
+
+    falhar = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('resposta antiga de /me não derruba a consulta mais nova (#292)', async () => {

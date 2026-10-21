@@ -26,7 +26,7 @@ const AUTH_ROUTES: string[] = ['/login', '/cadastro'];
 const MENU_DESKTOP = [...NAV_PRINCIPAL, ...NAV_SECUNDARIA];
 
 export default function Layout() {
-  const { user, loading, logout, sessao } = useAuth();
+  const { user, loading, logout, sessao, erroSessao, tentarNovamente } = useAuth();
   const location = useLocation();
   // Reativo a redimensionamento/rotação (media query do navegador), não um
   // `window.innerWidth` lido uma única vez no primeiro render.
@@ -36,8 +36,37 @@ export default function Layout() {
   // anterior (review do PR #292).
   const primeiroUso = usePrimeiroUso(!loading && Boolean(user), sessao);
 
+  const rotaProtegida = PROTECTED_ROUTES.some((r) => location.pathname.startsWith(r));
+
+  // Falha de rede/5xx no /me com token presente não é logout: avisa e deixa
+  // tentar de novo, em vez de mandar para /login (#294).
+  if (!loading && !user && erroSessao && rotaProtegida) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
+        <NightBackground />
+        <main
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '1rem',
+            padding: '1.5rem',
+            textAlign: 'center',
+          }}
+        >
+          <p role="alert" style={{ color: 'var(--color-lavanda)', margin: 0 }}>{erroSessao}</p>
+          <button type="button" className="btn btn-primary" onClick={() => void tentarNovamente()}>
+            Tentar de novo
+          </button>
+        </main>
+      </div>
+    );
+  }
+
   // Redireciona rotas protegidas se não logado
-  if (!loading && !user && PROTECTED_ROUTES.some((r) => location.pathname.startsWith(r))) {
+  if (!loading && !user && rotaProtegida) {
     return <Navigate to="/login" replace />;
   }
 

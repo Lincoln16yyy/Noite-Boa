@@ -13,10 +13,17 @@ export interface AuthContextValue {
    * PR #292).
    */
   sessao: string | null;
+  /**
+   * Mensagem quando o `/me` falhou por rede/5xx com o token ainda presente
+   * (não é logout). O `Layout` mostra um aviso com "Tentar de novo" (#294).
+   */
+  erroSessao: string | null;
   login: (email: string, password: string) => Promise<LoginResult>;
   register: (displayName: string, email: string, password: string) => Promise<RegisterResult>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  /** Reconsulta o `/me` depois de uma falha de sessão, com o `loading` ligado. */
+  tentarNovamente: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -32,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // parte troca a sessão; as rotas que dependem da conta (primeiro uso, por
   // exemplo) precisam de um valor que mude junto.
   const [sessao, setSessao] = useState<string | null>(getToken);
+  const [erroSessao, setErroSessao] = useState<string | null>(null);
   // Evita setState após o desmonte (o /me pendente pode responder tarde e o
   // jsdom já ter sido desmontado nos testes — "window is not defined").
   const montado = useRef(true);
@@ -54,13 +62,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // recente pode escrever no estado (review do PR #292).
     const minhaGeracao = ++geracao.current;
     const tokenDaRequisicao = getToken();
+    // Nova tentativa: some com o aviso anterior; se falhar de novo, ele volta.
+    if (tokenDaRequisicao !== null) setErroSessao(null);
     const atual = () =>
       montado.current && geracao.current === minhaGeracao && getToken() === tokenDaRequisicao;
     try {
       const me = await api.get<User>('/me');
-      if (atual()) setUser(me);
+      if (atual()) {
+        setUser(me);
+        setErroSessao(null);
+      }
     } catch {
-      if (atual()) setUser(null);
+      if (atual()) {
+        setUser(null);
+        // Token ainda presente: a sessão não acabou, o `/me` é que não veio
+        // (rede/5xx). Não pode virar logout (#294).
+        if (getToken() !== null) {
+          setErroSessao('Não foi possível carregar sua sessão. Verifique a conexão e tente de novo.');
+        }
+      }
     } finally {
       if (montado.current && geracao.current === minhaGeracao) {
         if (getToken() === tokenDaRequisicao) {
@@ -91,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       if (!token) {
         // Sessão encerrada (logout/401): não há o que consultar sem token.
+        setErroSessao(null);
         setLoading(false);
         return;
       }
@@ -115,6 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // não podem continuar mostrando (nem salvar) dados da sessão que saiu.
       setUser(null);
       if (!token) {
+        setErroSessao(null);
         setLoading(false);
         return;
       }
@@ -143,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     const token = getToken();
+    setErroSessao(null);
     // Esta tela representa a sessão `sessao`. Se outra aba já trocou o token e
     // o evento `storage` ainda não chegou aqui, o clique de sair é da sessão
     // ANTIGA: derrubar o token levaria a conta nova junto (review do PR #292).
@@ -161,8 +184,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
   }, [sessao]);
 
+  const tentarNovamente = useCallback(async () => {
+    setLoading(true);
+    await refreshUser();
+  }, [refreshUser]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, sessao, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, sessao, erroSessao, login, register, logout, refreshUser, tentarNovamente }}>
       {children}
     </AuthContext.Provider>
   );
