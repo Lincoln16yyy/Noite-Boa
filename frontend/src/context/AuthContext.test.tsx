@@ -15,6 +15,21 @@ function MostraUsuario() {
   return <p>{user?.email ?? 'sem usuário'}</p>;
 }
 
+/** Tela mínima com o aviso de erro de sessão e o botão de retry (#294). */
+function TelaComErro() {
+  const { user, loading, erroSessao, tentarNovamente } = useAuth();
+  if (loading) return <p>carregando</p>;
+  if (erroSessao) {
+    return (
+      <>
+        <p role="alert">{erroSessao}</p>
+        <button type="button" onClick={() => void tentarNovamente()}>Tentar de novo</button>
+      </>
+    );
+  }
+  return <p>{user?.email ?? 'sem usuário'}</p>;
+}
+
 /** Imita a guarda do `Layout`: sem usuário (e sem carregar), manda para o login. */
 function RotaProtegida() {
   const { user, loading } = useAuth();
@@ -315,6 +330,98 @@ describe('AuthProvider', () => {
       responderB?.(new Response(JSON.stringify(usuarioB), { status: 200 }));
     });
     expect(await screen.findByText('b@example.com')).toBeInTheDocument();
+  });
+
+  it('falha de rede no /me mantém o token e o retry entra na conta (#294)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    localStorage.setItem('token', 'jwt-A');
+    let falhar = true;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/api/me')) {
+        if (falhar) throw new TypeError('Failed to fetch');
+        return new Response(JSON.stringify(usuarioA), { status: 200 });
+      }
+      return new Response('null', { status: 200 });
+    });
+
+    render(<AuthProvider><TelaComErro /></AuthProvider>);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível carregar/i);
+    // Falha de rede não é logout: o token (e a sessão) continuam.
+    expect(localStorage.getItem('token')).toBe('jwt-A');
+
+    falhar = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('retry que carrega outra conta atualiza a identidade da sessão (#294)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    localStorage.setItem('token', 'jwt-A');
+    let chamadasMe = 0;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/api/me')) {
+        chamadasMe += 1;
+        if (chamadasMe === 1) throw new TypeError('Failed to fetch');
+        return new Response(JSON.stringify(usuarioB), { status: 200 });
+      }
+      return new Response('null', { status: 200 });
+    });
+
+    render(
+      <AuthProvider>
+        <TelaComErro />
+        <BotaoSair />
+      </AuthProvider>,
+    );
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    // Outra aba trocou para B; o `storage` ainda não chegou nesta.
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByText('b@example.com')).toBeInTheDocument();
+
+    // A identidade da tela acompanhou B: o primeiro clique em Sair derruba o
+    // token (sem isso, `logout` acharia que a sessão ainda é A e só recarregaria).
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('retry que falha também atualiza a identidade da sessão (#294)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    render(
+      <AuthProvider>
+        <TelaComErro />
+        <BotaoSair />
+      </AuthProvider>,
+    );
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    // Outra aba trocou para B; o `storage` ainda não chegou e o retry falha.
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    // Mesmo falhando, a tela agora representa B: o primeiro Sair derruba o token.
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('/me sem corpo (204) não vira logout: aviso e token preservado (#294)', async () => {
+    const erroLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockResolvedValue(new Response(null, { status: 204 }));
+
+    render(<AuthProvider><TelaComErro /></AuthProvider>);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível carregar/i);
+    expect(localStorage.getItem('token')).toBe('jwt-A');
+    expect(erroLog).toHaveBeenCalled();
   });
 
   it('resposta antiga de /me não derruba a consulta mais nova (#292)', async () => {
