@@ -85,13 +85,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleSessionChange = () => {
       const token = getToken();
       setSessao(token);
+      // Esconde a conta anterior e segura a guarda em "carregando" até o /me
+      // da sessão nova chegar; sem isso, o `Layout` vê `user` nulo e pisca o
+      // login antes de voltar (#297).
+      setUser(null);
       if (!token) {
-        // Sessão encerrada (logout/401): não deixa a conta anterior visível e
-        // não há o que consultar sem token.
-        setUser(null);
+        // Sessão encerrada (logout/401): não há o que consultar sem token.
         setLoading(false);
         return;
       }
+      setLoading(true);
       void refreshUser();
     };
     window.addEventListener('noiteboa:session-change', handleSessionChange);

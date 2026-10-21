@@ -15,6 +15,14 @@ function MostraUsuario() {
   return <p>{user?.email ?? 'sem usuário'}</p>;
 }
 
+/** Imita a guarda do `Layout`: sem usuário (e sem carregar), manda para o login. */
+function RotaProtegida() {
+  const { user, loading } = useAuth();
+  if (loading) return <p>carregando</p>;
+  if (!user) return <p>login</p>;
+  return <p>{user.email}</p>;
+}
+
 const usuarioA: User = {
   id: 'a1',
   email: 'a@example.com',
@@ -268,6 +276,44 @@ describe('AuthProvider', () => {
 
     // O clique era da sessão A: o token de B sobrevive e a tela passa a B.
     expect(localStorage.getItem('token')).toBe('jwt-B');
+    expect(await screen.findByText('b@example.com')).toBeInTheDocument();
+  });
+
+  it('troca de sessão não pisca o login enquanto o /me da conta nova não chega (#297)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    let responderB: ((resposta: Response) => void) | undefined;
+    let chamadasMe = 0;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/api/me')) {
+        chamadasMe += 1;
+        if (chamadasMe === 1) return new Response(JSON.stringify(usuarioA), { status: 200 });
+        return new Promise<Response>((resolve) => {
+          responderB = resolve;
+        });
+      }
+      return new Response('null', { status: 200 });
+    });
+
+    render(
+      <AuthProvider>
+        <BotaoSair />
+        <RotaProtegida />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+
+    // Outra aba trocou para B e esta ainda não processou o `storage`; o clique
+    // de sair atualiza a sessão desta tela (sem derrubar B).
+    localStorage.setItem('token', 'jwt-B');
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+    // Enquanto o /me de B está em voo, a guarda não pode achar que deslogou.
+    expect(screen.queryByText('login')).not.toBeInTheDocument();
+    expect(screen.getByText('carregando')).toBeInTheDocument();
+
+    await act(async () => {
+      responderB?.(new Response(JSON.stringify(usuarioB), { status: 200 }));
+    });
     expect(await screen.findByText('b@example.com')).toBeInTheDocument();
   });
 
