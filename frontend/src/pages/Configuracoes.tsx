@@ -29,7 +29,7 @@ const toTimeInput = (value?: string | null) => (value ? String(value).slice(0, 5
 export default function Configuracoes() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
-  const { logout } = useAuth();
+  const { logout, sessao } = useAuth();
   const fusoAparelho = fusoDoAparelho();
   const [me, setMe] = useState<User | null>(null);
   const [hours, setHours] = useState('');
@@ -49,18 +49,23 @@ export default function Configuracoes() {
 
   useEffect(() => {
     let active = true;
-    // Token que carregou este perfil: a exclusão só pode ser enviada por ele.
-    // Sem isso, uma tela da conta A ainda aberta podia excluir a conta B que
-    // entrou em outra aba (review do PR #292).
-    const tokenDoCarregamento = getToken();
+    // Sessão que carregou este perfil: as leituras e todas as mutações só
+    // podem ser dela. Sem isso, uma tela da conta A ainda aberta podia salvar
+    // ou excluir a conta B que entrou em outra aba (#292, #298).
+    const sessaoDoCarregamento = sessao;
     (async () => {
       try {
         const [meData, goalData] = await Promise.all([
-          api.get<User>('/me'),
-          api.get<Goal>('/goal'),
+          api.get<User>('/me', { token: sessaoDoCarregamento ?? undefined }),
+          api.get<Goal>('/goal', { token: sessaoDoCarregamento ?? undefined }),
         ]);
         if (!active) return;
-        tokenDoPerfil.current = tokenDoCarregamento;
+        // Outra conta assumiu durante a carga: os dados são dela, não desta tela.
+        if (!sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
+          setError(MSG_SESSAO_MUDOU);
+          return;
+        }
+        tokenDoPerfil.current = sessaoDoCarregamento;
         setMe(meData);
         setHours(String((goalData.targetMinutes ?? 0) / 60));
         setBedtime(toTimeInput(goalData.bedtime));
@@ -75,7 +80,7 @@ export default function Configuracoes() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [sessao]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();

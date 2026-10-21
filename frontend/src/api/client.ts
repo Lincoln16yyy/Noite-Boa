@@ -14,7 +14,10 @@ export interface ProblemDetail {
   instance?: string;
 }
 
-/** Opções aceitas por uma requisição (mesma forma repassada ao `fetch`). */
+/**
+ * Opções de uma requisição. Tudo é repassado ao `fetch`, exceto `token`: ele é
+ * consumido pelo cliente para montar o `Authorization` (#298).
+ */
 export interface RequestOptions {
   method?: string;
   body?: string;

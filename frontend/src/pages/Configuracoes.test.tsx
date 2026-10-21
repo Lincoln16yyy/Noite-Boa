@@ -396,4 +396,25 @@ describe('tela de Configurações', () => {
     expect(localStorage.getItem('token')).toBe('jwt-B');
   });
 
+  it('não comita o perfil se outra conta assumiu durante a carga (#298)', async () => {
+    const liberar: Array<() => void> = [];
+    fetchMock.mockImplementation(async (url: any) => {
+      await new Promise<void>((resolve) => {
+        liberar.push(resolve);
+      });
+      return String(url).includes('/goal') ? jsonResponse(GOAL) : jsonResponse(ME);
+    });
+
+    openScreen();
+    await waitFor(() => expect(liberar.length).toBeGreaterThanOrEqual(2));
+    localStorage.setItem('token', 'jwt-B');
+    await act(async () => {
+      liberar.forEach((fn) => fn());
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou/i);
+    // Se o perfil de B fosse comitado, a meta (8h) apareceria preenchida.
+    expect(screen.queryByDisplayValue('8')).not.toBeInTheDocument();
+  });
+
 });

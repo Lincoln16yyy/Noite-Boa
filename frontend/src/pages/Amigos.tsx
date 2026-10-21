@@ -64,12 +64,15 @@ export default function Amigos() {
     rankingRequest.current?.abort();
     const controller = new AbortController();
     rankingRequest.current = controller;
+    const sessaoDaRequisicao = sessao;
     try {
       const resultado = await api.get<{ ranking: RankingEntry[] }>(
         `/friends/ranking?days=${periodo}`,
-        { signal: controller.signal },
+        { signal: controller.signal, token: sessaoDaRequisicao ?? undefined },
       );
       if (controller.signal.aborted) return; // resposta de requisição cancelada: ignora
+      // Ranking de outra sessão não entra nesta tela (#298).
+      if (!sessaoDaTelaAindaVale(sessaoDaRequisicao)) return;
       setRanking(resultado.ranking);
     } catch (err: unknown) {
       // O cliente converte abort em erro genérico, então checar o signal (e não
@@ -86,11 +89,12 @@ export default function Amigos() {
     // repõe o alerta, então o botão de retry não some.
     setErroDaCarga('');
     const sessaoDoCarregamento = sessao;
+    const opcoes = { token: sessaoDoCarregamento ?? undefined };
     try {
       const [meData, amigosData, convitesData] = await Promise.all([
-        api.get<User>('/me'),
-        api.get<Friend[]>('/friends'),
-        api.get<FriendRequests>('/friends/requests'),
+        api.get<User>('/me', opcoes),
+        api.get<Friend[]>('/friends', opcoes),
+        api.get<FriendRequests>('/friends/requests', opcoes),
       ]);
       // Outra conta assumiu no meio: estes dados podem ser dela, mas a tela
       // continua sendo a desta sessão. Não comita nem rebinda o token (#298).

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { api, getToken } from '../api/client';
+import { api } from '../api/client';
 import type { Goal, SleepLog, SleepLogPage } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -117,7 +117,7 @@ function dataVisivel(valor: string): string {
 }
 
 export default function Registrar() {
-  const { user } = useAuth();
+  const { user, sessao } = useAuth();
   const fuso = user?.timezone; // fonte única: fuso do perfil (issue #102)
   const [sleepStart, setSleepStart] = useState<string>('');
   const [sleepEnd, setSleepEnd] = useState<string>('');
@@ -130,9 +130,6 @@ export default function Registrar() {
   const [recent, setRecent] = useState<SleepLog[]>([]);
   const [recentLoaded, setRecentLoaded] = useState<boolean>(false);
   const digitouRef = useRef(false); // não repor o digitado quando o fuso do perfil chegar (#102)
-  // Sessão que abriu a tela: o formulário pode ter sido preenchido na conta A
-  // e não pode ser salvo na B que entrou em outra aba (#298).
-  const tokenDaTela = useRef<string | null>(getToken());
 
   const applyDefaults = useCallback(() => {
     const defaults = smartDefaults(new Date(), fuso);
@@ -141,23 +138,31 @@ export default function Registrar() {
   }, [fuso]);
 
   const loadRecent = useCallback(async () => {
+    const sessaoDaLeitura = sessao;
     try {
-      const page = await api.get<SleepLogPage>('/sleep-logs?page=0&size=5');
+      const page = await api.get<SleepLogPage>('/sleep-logs?page=0&size=5', {
+        token: sessaoDaLeitura ?? undefined,
+      });
+      // Resposta de outra conta não entra nesta tela (#298).
+      if (!sessaoDaTelaAindaVale(sessaoDaLeitura)) return;
       setRecent(page.content ?? []);
     } catch {
       setRecent([]);
     } finally {
       setRecentLoaded(true);
     }
-  }, []);
+  }, [sessao]);
 
   // Meta para a porcentagem da duração ao vivo (default 8h sem o /goal).
   useEffect(() => {
+    const sessaoDaLeitura = sessao;
     api
-      .get<Goal>('/goal')
-      .then((goal) => setMetaMinutos(normalizarMeta(goal).minutos))
+      .get<Goal>('/goal', { token: sessaoDaLeitura ?? undefined })
+      .then((goal) => {
+        if (sessaoDaTelaAindaVale(sessaoDaLeitura)) setMetaMinutos(normalizarMeta(goal).minutos);
+      })
       .catch(() => setMetaMinutos(META_PADRAO));
-  }, []);
+  }, [sessao]);
 
   // Padrões com o fuso do perfil assim que ele chegar (o /me é assíncrono);
   // quem já digitou um horário não tem o campo reposto no meio da edição.
@@ -184,7 +189,7 @@ export default function Registrar() {
       setError(problem);
       return;
     }
-    const token = tokenDaTela.current;
+    const token = sessao;
     if (!sessaoDaTelaAindaVale(token)) {
       setError(MSG_SESSAO_MUDOU);
       return;

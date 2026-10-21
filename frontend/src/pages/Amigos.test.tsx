@@ -411,7 +411,7 @@ describe('tela de Amigos', () => {
         await new Promise<void>((resolve) => {
           liberarMe.push(resolve);
         });
-        return jsonResponse({ ...ME, displayName: 'Conta B' });
+        return jsonResponse({ ...ME, shareWithFriends: true });
       }
       if (path.includes('/api/me')) return jsonResponse(ME);
       if (path.includes('/friends/ranking')) return jsonResponse({ days: 7, ranking: [] });
@@ -429,7 +429,8 @@ describe('tela de Amigos', () => {
     });
 
     expect(await screen.findByText(/sessão mudou/i)).toBeInTheDocument();
-    expect(screen.queryByText('Conta B')).not.toBeInTheDocument();
+    // Se a resposta de B fosse comitada, o compartilhamento apareceria ligado.
+    expect(screen.getByRole('checkbox', { name: /compartilhar minhas noites/i })).not.toBeChecked();
   });
 
 });

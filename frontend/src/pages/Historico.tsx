@@ -184,7 +184,9 @@ export default function Historico() {
     setError('');
     const sessaoDoCarregamento = sessao;
     try {
-      const data = await api.get<SleepLogPage>(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`);
+      const data = await api.get<SleepLogPage>(`/sleep-logs?page=${p}&size=${PAGE_SIZE}`, {
+        token: sessaoDoCarregamento ?? undefined,
+      });
       // Se outra conta assumiu no meio da carga, os registros são dela mas o
       // fuso na tela ainda é o da sessão anterior: não comita (#298).
       if (!sessaoDaTelaAindaVale(sessaoDoCarregamento)) {
@@ -210,11 +212,14 @@ export default function Historico() {
 
   // Meta para a barra de duração contra a meta (default 8h sem o /goal).
   useEffect(() => {
+    const sessaoDaLeitura = sessao;
     api
-      .get<Goal>('/goal')
-      .then((goal) => setMetaMinutos(normalizarMeta(goal).minutos))
+      .get<Goal>('/goal', { token: sessaoDaLeitura ?? undefined })
+      .then((goal) => {
+        if (sessaoDaTelaAindaVale(sessaoDaLeitura)) setMetaMinutos(normalizarMeta(goal).minutos);
+      })
       .catch(() => setMetaMinutos(480));
-  }, []);
+  }, [sessao]);
 
   useEffect(() => {
     load(page);
