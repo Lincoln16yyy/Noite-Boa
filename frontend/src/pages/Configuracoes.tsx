@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, clearSession, getToken } from '../api/client';
+import { api, clearSessionIfCurrent, getToken } from '../api/client';
 import type { Goal, User } from '../api/types';
 import {
   agendarLembrete,
@@ -188,7 +188,7 @@ export default function Configuracoes() {
     // Pelo AuthContext: limpa o token E derruba o usuário do estado. Só com
     // `clearSession` o Layout continuava vendo a sessão e devolvia /login para
     // /hoje (review do PR #292).
-    logout();
+    void logout();
     navigate('/login');
   }
 
@@ -224,7 +224,12 @@ export default function Configuracoes() {
         setDeleting(false);
         return;
       }
-      clearSession();
+      // A remoção confere o token de novo dentro do lock (#293): se outra aba
+      // entrou entre a conferência acima e o `removeItem`, a conta nova fica.
+      if (!(await clearSessionIfCurrent(tokenDaExclusao))) {
+        setDeleting(false);
+        return;
+      }
       // Avisa o AuthProvider para derrubar o usuário da sessão
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       navigate('/?deleted=true');

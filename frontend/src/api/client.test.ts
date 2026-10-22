@@ -1,5 +1,16 @@
 import { vi } from 'vitest';
-import { api, setRequestTimeout } from './client';
+import { api, clearSessionIfCurrent, saveSession, setRequestTimeout } from './client';
+import { comLockDeSessao } from '../lib/lock-sessao';
+
+/** Segura o lock e devolve a função que libera, para enfileirar operações. */
+function segurarLock() {
+  let liberar!: () => void;
+  const segurando = new Promise<void>((resolver) => {
+    liberar = resolver;
+  });
+  const dono = comLockDeSessao(() => segurando);
+  return { dono, liberar };
+}
 
 describe('api client', () => {
   beforeEach(() => {
@@ -140,5 +151,57 @@ describe('api client', () => {
     const promessa = api.get('/friends/ranking?days=7', { signal: controller.signal });
     controller.abort();
     await expect(promessa).rejects.toThrow('Não foi possível conectar');
+  });
+});
+
+describe('escritas do token entre abas (#293)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('limpeza que espera o lock relê o token e não derruba a conta nova', async () => {
+    localStorage.setItem('token', 'token-A');
+    const { dono, liberar } = segurarLock();
+
+    // A limpeza entra na fila antes de B existir. Sem o lock, a conferência
+    // aconteceria agora (token A) e o `removeItem` apagaria B depois (#292).
+    const limpeza = clearSessionIfCurrent('token-A');
+    localStorage.setItem('token', 'token-B');
+    liberar();
+
+    await dono;
+    await expect(limpeza).resolves.toBe(false);
+    expect(localStorage.getItem('token')).toBe('token-B');
+  });
+
+  it('login espera o lock para não gravar no meio de uma limpeza', async () => {
+    const { dono, liberar } = segurarLock();
+
+    const escrita = saveSession('token-B');
+    await Promise.resolve();
+    expect(localStorage.getItem('token')).toBeNull();
+
+    liberar();
+    await dono;
+    await escrita;
+    expect(localStorage.getItem('token')).toBe('token-B');
+  });
+
+  it('sem Web Locks continua funcionando direto (navegador antigo)', async () => {
+    const nav = navigator as unknown as { locks?: LockManager };
+    const locks = nav.locks;
+    delete nav.locks;
+
+    try {
+      await saveSession('token-A');
+      await expect(clearSessionIfCurrent('token-B')).resolves.toBe(false);
+      expect(localStorage.getItem('token')).toBe('token-A');
+
+      await expect(clearSessionIfCurrent('token-A')).resolves.toBe(true);
+      expect(localStorage.getItem('token')).toBeNull();
+    } finally {
+      if (locks) Object.defineProperty(navigator, 'locks', { configurable: true, value: locks });
+      else delete nav.locks;
+    }
   });
 });

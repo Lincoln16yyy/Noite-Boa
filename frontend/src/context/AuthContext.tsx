@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { api, clearSession, getToken } from '../api/client';
+import { api, clearSessionIfCurrent, getToken, saveSession } from '../api/client';
 import type { LoginResult, RegisterResult, User } from '../api/types';
 
 /** Valor do contexto de autenticação. */
@@ -21,7 +21,7 @@ export interface AuthContextValue {
   erroSessao: string | null;
   login: (email: string, password: string) => Promise<LoginResult>;
   register: (displayName: string, email: string, password: string) => Promise<RegisterResult>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   /** Reconsulta o `/me` depois de uma falha de sessão, com o `loading` ligado. */
   tentarNovamente: () => Promise<void>;
@@ -169,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.post<LoginResult>('/auth/login', { email, password });
     if (res?.accessToken) {
-      localStorage.setItem('token', res.accessToken);
+      await saveSession(res.accessToken);
       setSessao(res.accessToken);
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       return res;
@@ -182,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res;
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     const token = getToken();
     setErroSessao(null);
     // Esta tela representa a sessão `sessao`. Se outra aba já trocou o token e
@@ -194,10 +194,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       return;
     }
-    // `clearSession` também esquece a sonda do primeiro uso: a próxima conta
-    // desta aba precisa ser sondada de novo (#273). O indicador do aparelho
-    // (localStorage) continua.
-    clearSession();
+    // Mesmo depois dessa guarda, outra aba pode gravar um token novo antes da
+    // remoção. `clearSessionIfCurrent` reconfere dentro do lock e, se a conta
+    // mudou, não derruba a nova (#293).
+    if (!(await clearSessionIfCurrent(token))) {
+      setSessao(getToken());
+      setUser(null);
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+      return;
+    }
+    // `clearSessionIfCurrent` também esquece a sonda do primeiro uso: a próxima
+    // conta desta aba precisa ser sondada de novo (#273). O indicador do
+    // aparelho (localStorage) continua.
     setSessao(null);
     setUser(null);
     window.dispatchEvent(new CustomEvent('noiteboa:session-change'));

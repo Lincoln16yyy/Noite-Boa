@@ -1,4 +1,5 @@
 import { esquecerSondagem } from '../lib/sonda';
+import { comLockDeSessao } from '../lib/lock-sessao';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
@@ -48,7 +49,8 @@ export function getToken(): string | null {
   return localStorage.getItem('token');
 }
 
-export function clearSession(): void {
+/** Remove o token e esquece a sonda. Só usar já dentro do lock de sessão. */
+function limparSessaoSemLock(): void {
   localStorage.removeItem('token');
   // A sondagem do primeiro uso vale para a conta que estava logada. Toda saída
   // de sessão passa por aqui (logout, exclusão da conta, 401), então a próxima
@@ -57,15 +59,25 @@ export function clearSession(): void {
 }
 
 /**
- * Limpa a sessão apenas se o token atual ainda for `token` (inclusive `null`).
- * Fecha a maior parte da janela em que outra aba troca a conta entre a resposta
- * e a limpeza — a checagem e o `removeItem` ficam no mesmo bloco síncrono
- * (review do PR #292). Devolve se limpou.
+ * Grava o token da sessão que acabou de entrar, serializado com as limpezas
+ * das outras abas — senão um 401 atrasado poderia apagar o token novo (#293).
  */
-export function clearSessionIfCurrent(token: string | null): boolean {
-  if (getToken() !== token) return false;
-  clearSession();
-  return true;
+export async function saveSession(token: string): Promise<void> {
+  await comLockDeSessao(() => localStorage.setItem('token', token));
+}
+
+/**
+ * Limpa a sessão apenas se o token atual ainda for `token` (inclusive `null`).
+ * A conferência e o `removeItem` rodam dentro do mesmo lock; como as escritas
+ * de token das outras abas também passam por ele, não sobra janela entre ler e
+ * remover (review do PR #292, #293). Devolve se limpou.
+ */
+export async function clearSessionIfCurrent(token: string | null): Promise<boolean> {
+  return comLockDeSessao(() => {
+    if (getToken() !== token) return false;
+    limparSessaoSemLock();
+    return true;
+  });
 }
 
 /**
@@ -144,11 +156,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         // `null` = outra aba deslogou durante a requisição (a sessão desta
         // janela acabou); igual = token expirou. Diferente e não nulo = outra
         // conta assumiu, e o 401 é da sessão antiga, que não pode derrubar a
-        // nova. A limpeza reconfere o token imediatamente antes do `removeItem`
-        // (review do PR #292).
+        // nova. A limpeza reconfere o token dentro do lock (#293), então uma
+        // troca de conta entre a resposta e o `removeItem` não é derrubada.
         if (
           (tokenAgora === null || tokenAgora === token) &&
-          clearSessionIfCurrent(tokenAgora)
+          (await clearSessionIfCurrent(tokenAgora))
         ) {
           window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
           throw new Error('Sessão expirada. Faça login novamente.');

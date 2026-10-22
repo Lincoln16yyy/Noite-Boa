@@ -120,7 +120,7 @@ describe('tela de Configurações', () => {
     openScreen();
     fireEvent.click(await screen.findByRole('button', { name: 'Sair da conta' }));
 
-    expect(localStorage.getItem('token')).toBeNull();
+    await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
   });
 
   it('sair da conta derruba o usuário do contexto, não só o token (#292)', async () => {
@@ -148,7 +148,7 @@ describe('tela de Configurações', () => {
     // Com só `clearSession` o contexto continuaria com o usuário e o Layout
     // devolveria /login para /hoje: a pessoa saía do token, mas não do app.
     expect(await screen.findByText('sem usuário')).toBeInTheDocument();
-    expect(localStorage.getItem('token')).toBeNull();
+    await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
   });
 
   it('explica as limitações do lembrete na tela', async () => {

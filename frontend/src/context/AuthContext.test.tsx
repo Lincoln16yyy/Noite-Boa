@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from './AuthContext';
 import type { User } from '../api/types';
+import { comLockDeSessao } from '../lib/lock-sessao';
 
 function BotaoSair() {
   const { logout } = useAuth();
@@ -294,6 +295,40 @@ describe('AuthProvider', () => {
     expect(await screen.findByText('b@example.com')).toBeInTheDocument();
   });
 
+  it('logout espera o lock da sessão antes de remover o token (#293)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+
+    render(
+      <AuthProvider>
+        <BotaoSair />
+        <MostraUsuario />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+
+    let liberar!: () => void;
+    const segurando = new Promise<void>((resolver) => {
+      liberar = resolver;
+    });
+    const dono = comLockDeSessao(() => segurando);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // A remoção espera o lock (#293): sem isso, uma conta que outra aba
+    // gravasse no meio do clique seria apagada junto.
+    expect(localStorage.getItem('token')).toBe('jwt-A');
+
+    liberar();
+    await dono;
+    await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
+  });
+
   it('troca de sessão não pisca o login enquanto o /me da conta nova não chega (#297)', async () => {
     localStorage.setItem('token', 'jwt-A');
     let responderB: ((resposta: Response) => void) | undefined;
@@ -386,7 +421,7 @@ describe('AuthProvider', () => {
     // A identidade da tela acompanhou B: o primeiro clique em Sair derruba o
     // token (sem isso, `logout` acharia que a sessão ainda é A e só recarregaria).
     fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
-    expect(localStorage.getItem('token')).toBeNull();
+    await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
   });
 
   it('retry que falha também atualiza a identidade da sessão (#294)', async () => {
@@ -409,7 +444,7 @@ describe('AuthProvider', () => {
 
     // Mesmo falhando, a tela agora representa B: o primeiro Sair derruba o token.
     fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
-    expect(localStorage.getItem('token')).toBeNull();
+    await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
   });
 
   it('/me sem corpo (204) não vira logout: aviso e token preservado (#294)', async () => {
