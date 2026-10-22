@@ -255,6 +255,10 @@ export default function Configuracoes() {
         geracaoDaExclusao,
       );
       if (!avisou) {
+        // A conta foi excluída no servidor, mas a sessão local é outra (mesmo
+        // token, nova geração): não derrubamos, mas também não fingimos
+        // sucesso silencioso (#310).
+        setDeleteError('Conta excluída, mas a sessão local não foi encerrada. Recarregue a página.');
         setDeleting(false);
         return;
       }
@@ -269,7 +273,10 @@ export default function Configuracoes() {
           // A geração é relida aqui (sem o valor do início): a tentativa que
           // falhou pode tê-la avançado sem trocar o token.
           if (await clearSessionIfCurrent(tokenDaExclusao, avisarExclusao)) return;
-          // A sessão já era outra: esta tela não tem o que derrubar.
+          // A sessão é outra (mesmo token, nova geração) ou já era outra: a
+          // conta foi excluída, mas a sessão local não foi encerrada por esta
+          // tela. Dizer isso evita uma tela silenciosa com o token antigo.
+          setDeleteError('Conta excluída, mas a sessão local não foi encerrada. Recarregue a página.');
           setDeleting(false);
           return;
         } catch {

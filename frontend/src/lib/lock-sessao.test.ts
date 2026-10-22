@@ -62,6 +62,8 @@ describe('comLockDeSessao', () => {
       await expect(comLockDeSessao(acao)).resolves.toBe('ok');
       expect(request).toHaveBeenCalledTimes(2);
       expect(sobLock).toBe(true);
+      // A retentativa não pode executar a escrita duas vezes (review do #310).
+      expect(acao).toHaveBeenCalledTimes(1);
     } finally {
       restaurar();
     }

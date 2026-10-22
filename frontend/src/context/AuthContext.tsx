@@ -65,11 +65,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // sobrescrever o usuário atual. Mesmo com o token igual, só a consulta mais
     // recente pode escrever no estado (review do PR #292).
     const minhaGeracao = ++geracao.current;
+    const geracaoDaConsulta = getSessionGeneration();
     const tokenDaRequisicao = getToken();
     // Nova tentativa: some com o aviso anterior; se falhar de novo, ele volta.
     if (tokenDaRequisicao !== null) setErroSessao(null);
+    // Token E geração: uma sessão reaberta com o mesmo token é outra sessão, e
+    // a resposta antiga não pode mexer nela (review do #310).
     const atual = () =>
-      montado.current && geracao.current === minhaGeracao && getToken() === tokenDaRequisicao;
+      montado.current &&
+      geracao.current === minhaGeracao &&
+      getToken() === tokenDaRequisicao &&
+      getSessionGeneration() === geracaoDaConsulta;
     try {
       const me = await api.get<User>('/me');
       // 204/JSON `null` não é usuário: sem esta checagem o `Layout` trataria
@@ -102,13 +108,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Operadores precisam distinguir 5xx persistente de rede nos
           // relatos; o usuário continua vendo só a mensagem genérica.
           console.error('[auth] falha ao carregar /me', erro);
-          setErroSessao('Não foi possível carregar sua sessão. Tente de novo.');
+          // Sessão expirada cuja limpeza não pôde ser feita (lock fora do ar):
+          // a mensagem genérica esconderia que é preciso entrar de novo.
+          setErroSessao(
+            erro instanceof Error && erro.message.includes('Sessão expirada')
+              ? 'Sua sessão expirou e não foi possível encerrá-la neste navegador. Recarregue a página e entre de novo.'
+              : 'Não foi possível carregar sua sessão. Tente de novo.',
+          );
         }
       }
       return false;
     } finally {
       if (montado.current && geracao.current === minhaGeracao) {
-        if (getToken() === tokenDaRequisicao) {
+        if (
+          getToken() === tokenDaRequisicao &&
+          getSessionGeneration() !== geracaoDaConsulta
+        ) {
+          // Mesmo token, geração nova: a sessão foi reaberta durante o /me.
+          // O resultado descartado não pode deixar a tela em "carregando":
+          // refaz a consulta para a sessão atual (review do #310).
+          window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+        } else if (getToken() === tokenDaRequisicao) {
           setLoading(false);
         } else {
           // O token mudou durante o /me (outra aba trocou de conta, por
@@ -196,8 +216,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async (): Promise<ResultadoLogout> => {
     // Storage bloqueado já na leitura: sem isto o clique rejeitaria a promessa
     // e a tela ficaria sem a mensagem de falha (review do #310).
+    let geracaoDaSessao: string | null;
     let token: string | null;
     try {
+      geracaoDaSessao = getSessionGeneration();
       token = getToken();
     } catch (erro) {
       console.error('[auth] storage indisponível ao ler a sessão', erro);
@@ -217,7 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // mudou, não derruba a nova (#293).
     let limpou = false;
     try {
-      limpou = await clearSessionIfCurrent(token);
+      limpou = await clearSessionIfCurrent(token, undefined, geracaoDaSessao);
     } catch (erro) {
       // A sessão pode ter mudado enquanto o lock falhava: aí o clique era da
       // sessão antiga e a tela nova não pode receber o erro de logout dela
@@ -228,6 +250,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         tokenAgora = token;
       }
+      // Só o token: a geração pode ter avançado por causa desta própria
+      // tentativa que falhou (remoção recusada e rollback impossível). Nesse
+      // caso o token continua o mesmo e a saída falhou de verdade.
       if (tokenAgora !== token) {
         setSessao(tokenAgora);
         setUser(null);

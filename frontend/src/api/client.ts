@@ -198,10 +198,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   // O campo não pode ir para o `fetch`: ele não conhece `token` (#298).
   const { token: tokenExplicito, ...opcoesFetch } = options;
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...options.headers };
-  const token = tokenExplicito !== undefined ? tokenExplicito : getToken();
-  // Geração da sessão que fez o pedido: um 401 que chega depois de a sessão ser
-  // reaberta com o mesmo token não pode derrubar a nova (review do #310).
+  // Geração lida ANTES do token: se a sessão for reaberta com o mesmo token
+  // entre as duas leituras, ficamos com uma geração velha (que não confere) em
+  // vez de um par token velho + geração nova, que apagaria a sessão nova
+  // (review do #310).
   const geracaoDoPedido = getSessionGeneration();
+  const token = tokenExplicito !== undefined ? tokenExplicito : getToken();
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
@@ -261,7 +263,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
             // Outra aba pode ter trocado a conta enquanto este pedido esperava
             // o lock: nesse caso o 401 é da sessão antiga e não pode acusar a
             // nova de expirada (review do #310).
-            if (getToken() !== token) {
+            if (
+              getToken() !== token ||
+              getSessionGeneration() !== geracaoDoPedido
+            ) {
               throw new Error(message || `Erro ${response.status}`, { cause: erroLimpeza });
             }
             // O 401 já provou que ESTA sessão não vale. Se o lock falhou, a

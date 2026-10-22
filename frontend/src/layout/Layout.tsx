@@ -92,6 +92,11 @@ export default function Layout() {
             <button type="button" className="btn btn-ghost" onClick={handleLogout}>
               Sair
             </button>
+            {/* Recarregar não depende do lock: último caminho quando a sessão
+                expirou e a limpeza local não pôde ser feita (review do #310). */}
+            <button type="button" className="btn btn-ghost" onClick={() => window.location.reload()}>
+              Recarregar
+            </button>
           </div>
         </main>
       </div>

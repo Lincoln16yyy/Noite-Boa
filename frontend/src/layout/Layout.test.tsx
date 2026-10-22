@@ -301,6 +301,7 @@ describe('Layout — falha de sessão (#294)', () => {
     // continua com a explicação e o botão de tentar de novo (#310).
     expect(await screen.findByText('Não foi possível sair. Tente de novo.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Recarregar' })).toBeInTheDocument();
     expect(localStorage.getItem('token')).toBe('mock-token');
     expect(screen.queryByText('marcador login')).not.toBeInTheDocument();
   });
