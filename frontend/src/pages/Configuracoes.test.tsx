@@ -394,6 +394,45 @@ describe('tela de Configurações', () => {
     expect(localStorage.getItem('token')).not.toBeNull();
   });
 
+  it('exclusão com outra conta aberta avisa que a sessão foi preservada (#310)', async () => {
+    let responderDelete: ((valor: Response) => void) | undefined;
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'DELETE') {
+        return new Promise<Response>((resolve) => {
+          responderDelete = resolve;
+        });
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+    renderWithAuth(
+      <Routes>
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/" element={<h1>Página inicial</h1>} />
+      </Routes>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+    fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), {
+      target: { value: 'EXCLUIR' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
+
+    // O DELETE da conta antiga está em voo quando outra aba entra em outra
+    // conta. A conta antiga é excluída no servidor, mas a sessão nova fica.
+    await waitFor(() => expect(responderDelete).toBeDefined());
+    localStorage.setItem('token', 'token-de-outra-conta');
+    await act(async () => {
+      responderDelete?.(new Response(null, { status: 204 }));
+    });
+
+    expect(
+      await screen.findByText(/Conta excluída\. A sessão local agora é de outra conta e foi preservada/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Página inicial' })).not.toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBe('token-de-outra-conta');
+  });
+
   it('storage bloqueado na exclusão avisa que não conseguiu encerrar a sessão (#310)', async () => {
     fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);

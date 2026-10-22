@@ -709,6 +709,66 @@ describe('AuthProvider', () => {
     }
   });
 
+  it('aba parada não derruba a sessão reaberta com o mesmo token (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+        <BotaoSairComResultado />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+
+    // Outra aba saiu e reabriu a sessão com o mesmo token: geração nova, sem
+    // evento `storage` (o valor do token não mudou). Esta tela está velha.
+    localStorage.setItem('noiteboa-sessao-geracao', 'geracao-nova');
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+    expect(await screen.findByText('sessao-mudou')).toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBe('jwt-A');
+  });
+
+  it('falha ao reler a sessão depois da limpeza recusada vira falha de logout (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+        <BotaoSairComResultado />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+    localStorage.setItem('noiteboa-sessao-geracao', 'geracao-nova');
+
+    // Deixa o logout e a limpeza lerem o token; a releitura do ramo
+    // "a sessão já não é a atual" é que falha (#310).
+    const ler = Storage.prototype.getItem;
+    let leiturasDoToken = 0;
+    const getItem = vi
+      .spyOn(Storage.prototype, 'getItem')
+      .mockImplementation(function (this: Storage, chave: string) {
+        if (chave === 'token') {
+          leiturasDoToken += 1;
+          if (leiturasDoToken >= 3) throw new Error('storage bloqueado');
+        }
+        return ler.call(this, chave);
+      });
+
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+      expect(await screen.findByText('falhou')).toBeInTheDocument();
+      expect(ler.call(localStorage, 'token')).toBe('jwt-A');
+    } finally {
+      getItem.mockRestore();
+    }
+  });
+
   it('storage bloqueado na leitura devolve falha em vez de rejeitar o logout (#310)', async () => {
     localStorage.setItem('token', 'jwt-A');
     vi.spyOn(console, 'error').mockImplementation(() => {});

@@ -243,6 +243,9 @@ export default function Configuracoes() {
       await api.delete('/me', { token: tokenDaExclusao });
       contaExcluida = true;
       if (getToken() !== tokenDaExclusao) {
+        // A conta foi excluída no servidor, mas outra conta já está aberta
+        // nesta aba: não derrubamos a nova nem voltamos em silêncio (#310).
+        setDeleteError('Conta excluída. A sessão local agora é de outra conta e foi preservada.');
         setDeleting(false);
         return;
       }

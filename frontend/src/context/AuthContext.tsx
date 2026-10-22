@@ -32,6 +32,15 @@ export interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** Geração da sessão; storage bloqueado conta como desconhecida. */
+function geracaoAtual(): string | null {
+  try {
+    return getSessionGeneration();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Provedor de estado de autenticação reativo.
  * Atualiza automaticamente no login, logout e 401.
@@ -43,6 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // parte troca a sessão; as rotas que dependem da conta (primeiro uso, por
   // exemplo) precisam de um valor que mude junto.
   const [sessao, setSessao] = useState<string | null>(getToken);
+  // Geração da sessão que a TELA representa. Não é a geração do momento do
+  // clique: se outra aba reabriu a sessão com o mesmo token, a tela está velha
+  // e o Sair dela não pode derrubar a sessão nova (review do #310).
+  const geracaoDaSessao = useRef<string | null>(geracaoAtual());
   const [erroSessao, setErroSessao] = useState<string | null>(null);
   // Evita setState após o desmonte (o /me pendente pode responder tarde e o
   // jsdom já ter sido desmontado nos testes — "window is not defined").
@@ -90,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // token e esta ainda não processou o `storage`, o retry carrega a
         // conta nova — a identidade da tela precisa acompanhar (#294).
         setSessao(tokenDaRequisicao);
+        geracaoDaSessao.current = geracaoDaConsulta;
         return true;
       }
       return false;
@@ -100,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // token e esta tela ainda não processou o `storage`, a identidade
         // precisa acompanhar para o primeiro Sair derrubar o token certo (#294).
         setSessao(tokenDaRequisicao);
+        geracaoDaSessao.current = geracaoDaConsulta;
         // Token ainda presente: a sessão não acabou, o `/me` é que não veio.
         // Não pode virar logout (#294). A mensagem é neutra de propósito: o
         // mesmo caminho cobre rede, 5xx e resposta inválida — prometer "é a
@@ -150,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleSessionChange = () => {
       const token = getToken();
       setSessao(token);
+      geracaoDaSessao.current = geracaoAtual();
       // Esconde a conta anterior e segura a guarda em "carregando" até o /me
       // da sessão nova chegar; sem isso, o `Layout` vê `user` nulo e pisca o
       // login antes de voltar (#297).
@@ -177,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (evento.key !== null && evento.key !== 'token') return;
       const token = getToken();
       setSessao(token);
+      geracaoDaSessao.current = geracaoAtual();
       // Esconde a conta anterior enquanto o /me da nova não chega: as páginas
       // não podem continuar mostrando (nem salvar) dados da sessão que saiu.
       setUser(null);
@@ -202,6 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const gravou = await saveSession(res.accessToken, geracaoDoPedido);
       if (!gravou) throw new Error('A sessão mudou durante o login. Tente de novo.');
       setSessao(res.accessToken);
+      geracaoDaSessao.current = geracaoAtual();
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       return res;
     }
@@ -216,10 +234,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async (): Promise<ResultadoLogout> => {
     // Storage bloqueado já na leitura: sem isto o clique rejeitaria a promessa
     // e a tela ficaria sem a mensagem de falha (review do #310).
-    let geracaoDaSessao: string | null;
+    // Geração da sessão que esta tela representa, capturada quando ela foi
+    // carregada — não a do instante do clique (#310).
+    const geracaoDaTela = geracaoDaSessao.current;
     let token: string | null;
     try {
-      geracaoDaSessao = getSessionGeneration();
       token = getToken();
     } catch (erro) {
       console.error('[auth] storage indisponível ao ler a sessão', erro);
@@ -239,7 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // mudou, não derruba a nova (#293).
     let limpou = false;
     try {
-      limpou = await clearSessionIfCurrent(token, undefined, geracaoDaSessao);
+      limpou = await clearSessionIfCurrent(token, undefined, geracaoDaTela);
     } catch (erro) {
       // A sessão pode ter mudado enquanto o lock falhava: aí o clique era da
       // sessão antiga e a tela nova não pode receber o erro de logout dela
@@ -258,9 +277,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         erro instanceof Error && erro.message.includes('operação de sessão');
       if (
         tokenAgora !== token ||
-        (falhaDeLock && getSessionGeneration() !== geracaoDaSessao)
+        (falhaDeLock && geracaoAtual() !== geracaoDaTela)
       ) {
         setSessao(tokenAgora);
+        geracaoDaSessao.current = geracaoAtual();
         setUser(null);
         setErroSessao(null);
         window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
@@ -273,7 +293,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return 'falhou';
     }
     if (!limpou) {
-      setSessao(getToken());
+      // A sessão da tela já não é a atual. A releitura pode falhar com o
+      // storage bloqueado; nesse caso a saída falhou e a tela mostra o erro
+      // (review do #310).
+      let tokenAgora: string | null;
+      try {
+        tokenAgora = getToken();
+      } catch (erro) {
+        console.error('[auth] storage indisponível ao reler a sessão', erro);
+        return 'falhou';
+      }
+      setSessao(tokenAgora);
+      geracaoDaSessao.current = geracaoAtual();
       setUser(null);
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       return 'sessao-mudou';
@@ -283,6 +314,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // aparelho (localStorage) continua.
     setErroSessao(null);
     setSessao(null);
+    geracaoDaSessao.current = geracaoAtual();
     setUser(null);
     window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
     return 'saiu';
