@@ -70,15 +70,24 @@ function avancarGeracao(): void {
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random()}`;
-  localStorage.setItem(CHAVE_GERACAO, nova);
+  try {
+    localStorage.setItem(CHAVE_GERACAO, nova);
+  } catch {
+    // A geração só serve para descartar logins em voo. Se o storage recusar
+    // esta escrita, a troca de token que já deu certo não pode virar erro
+    // depois de aplicada (review do #310).
+  }
 }
 
 /** Remove o token e esquece a sonda. Só usar já dentro do lock de sessão. */
 function limparSessaoSemLock(): void {
+  // Sem token não há troca de sessão: não avance a geração, senão um 401
+  // atrasado descartaria o login que está em voo nesta aba (review do #310).
+  const tinhaToken = getToken() !== null;
   localStorage.removeItem('token');
   // Toda saída invalida os logins que ainda estão em voo nesta ou em outras
   // abas (review do #310).
-  avancarGeracao();
+  if (tinhaToken) avancarGeracao();
   // A sondagem do primeiro uso vale para a conta que estava logada. Toda saída
   // de sessão passa por aqui (logout, exclusão da conta, 401), então a próxima
   // conta desta aba é sondada de novo (#273).
@@ -105,20 +114,6 @@ export async function saveSession(
     avancarGeracao();
     return true;
   });
-}
-
-/**
- * Limpeza de última instância, sem o lock, para quando a sessão já não pode
- * ser usada (a conta foi excluída no servidor e o lock falhou). Confere o
- * token antes de remover para não derrubar uma sessão que outra aba abriu.
- *
- * Sem compare-and-swap, a janela entre conferir e remover não é atômica; só
- * chame quando descartar a sessão for seguro (review do #310).
- */
-export function removeSessionIfCurrent(token: string | null): boolean {
-  if (getToken() !== token) return false;
-  limparSessaoSemLock();
-  return true;
 }
 
 /**
@@ -222,12 +217,23 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         // conta assumiu, e o 401 é da sessão antiga, que não pode derrubar a
         // nova. A limpeza reconfere o token dentro do lock (#293), então uma
         // troca de conta entre a resposta e o `removeItem` não é derrubada.
-        if (
-          (tokenAgora === null || tokenAgora === token) &&
-          (await clearSessionIfCurrent(tokenAgora))
-        ) {
-          window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
-          throw new Error('Sessão expirada. Faça login novamente.');
+        if (tokenAgora === null || tokenAgora === token) {
+          let limpou = false;
+          try {
+            limpou = await clearSessionIfCurrent(tokenAgora);
+          } catch (erroLimpeza) {
+            // O 401 já provou que a sessão não vale. Se o lock falhou, a
+            // limpeza fica para a próxima operação: devolver o erro do lock
+            // esconderia a sessão expirada e o contexto mostraria uma falha
+            // genérica, sem o caminho de entrar de novo (review do #310).
+            throw new Error('Sessão expirada. Faça login novamente.', {
+              cause: erroLimpeza,
+            });
+          }
+          if (limpou) {
+            window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+            throw new Error('Sessão expirada. Faça login novamente.');
+          }
         }
       }
 

@@ -308,7 +308,7 @@ describe('tela de Configurações', () => {
     expect(localStorage.getItem('token')).toBeNull();
   });
 
-  it('exclusão já feita no servidor sai mesmo sem o lock, sem deixar o token morto (#310)', async () => {
+  it('exclusão sem lock não derruba a sessão de outra aba e avisa que a local ficou pendente (#310)', async () => {
     fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);
       if (path.includes('/me') && options.method === 'DELETE') {
@@ -336,12 +336,15 @@ describe('tela de Configurações', () => {
       fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), { target: { value: 'EXCLUIR' } });
       fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
 
-      // A conta já não existe no servidor: mostrar "falha ao excluir" prenderia
-      // a pessoa numa sessão morta. O DELETE precisa ter ido de fato e o token
-      // morto não pode ficar no storage (#310).
+      // A conta já não existe no servidor. Sem lock, remover o token seria uma
+      // corrida com outra aba: a tela avisa que a sessão local ficou pendente
+      // em vez de arriscar derrubar a conta nova (#310).
       await waitFor(() => expect(calls('DELETE', '/me').length).toBe(1));
-      expect(await screen.findByRole('heading', { name: 'Página inicial' })).toBeInTheDocument();
-      expect(localStorage.getItem('token')).toBeNull();
+      expect(
+        await screen.findByText(/Conta excluída, mas não foi possível encerrar a sessão/),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Página inicial' })).not.toBeInTheDocument();
+      expect(localStorage.getItem('token')).not.toBeNull();
     } finally {
       Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
     }

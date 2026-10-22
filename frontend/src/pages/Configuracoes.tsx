@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, clearSessionIfCurrent, getToken, removeSessionIfCurrent } from '../api/client';
+import { api, clearSessionIfCurrent, getToken } from '../api/client';
 import type { Goal, User } from '../api/types';
 import {
   agendarLembrete,
@@ -202,6 +202,13 @@ export default function Configuracoes() {
     }
   }
 
+  // O callback só roda dentro do lock, com o token conferido: o aviso e a
+  // navegação não alcançam uma conta que entre no meio.
+  const avisarExclusao = () => {
+    window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    navigate('/?deleted=true');
+  };
+
   async function handleDeleteAccount() {
     const email = me?.email;
     const confirmation = deleteConfirm.trim();
@@ -229,13 +236,6 @@ export default function Configuracoes() {
     // para /?deleted=true (review do PR #292).
     const tokenDaExclusao = tokenDaTela;
     let contaExcluida = false;
-    let avisouExclusao = false;
-    // O aviso e a navegação só valem se a sessão excluída ainda for a atual.
-    const avisarExclusao = () => {
-      avisouExclusao = true;
-      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
-      navigate('/?deleted=true');
-    };
     try {
       await api.delete('/me', { token: tokenDaExclusao });
       contaExcluida = true;
@@ -257,31 +257,21 @@ export default function Configuracoes() {
       // deixar a pessoa presa numa conta que não existe (#310).
       if (contaExcluida) {
         console.error('[configuracoes] falha ao limpar a sessão depois de excluir a conta', err);
-        let saiu = false;
-        let limpezaFalhou = false;
         try {
           // A falha do lock pode ser transitória: tenta de novo, serializada.
-          saiu = await clearSessionIfCurrent(tokenDaExclusao, avisarExclusao);
+          if (await clearSessionIfCurrent(tokenDaExclusao, avisarExclusao)) return;
+          // A sessão já era outra: esta tela não tem o que derrubar.
+          setDeleting(false);
+          return;
         } catch {
-          try {
-            // Lock fora do ar (navegador antigo/política): a conta já não
-            // existe, então remover o token desta sessão é seguro depois de
-            // conferir que ainda é ela. Evita deixar um JWT morto no storage.
-            saiu = removeSessionIfCurrent(tokenDaExclusao);
-          } catch (erroStorage) {
-            limpezaFalhou = true;
-            console.error('[configuracoes] storage indisponível ao limpar a sessão', erroStorage);
-          }
-        }
-        if (saiu) {
-          if (!avisouExclusao) avisarExclusao();
+          // Sem lock não dá para conferir e remover o token sem correr o risco
+          // de derrubar a conta que outra aba abriu. A conta já não existe, mas
+          // derrubar a sessão errada seria pior: a tela informa que a sessão
+          // local não foi encerrada em vez de fingir uma saída (#310).
+          setDeleteError('Conta excluída, mas não foi possível encerrar a sessão neste navegador. Recarregue a página.');
+          setDeleting(false);
           return;
         }
-        if (limpezaFalhou) {
-          setDeleteError('Conta excluída, mas não foi possível encerrar a sessão neste navegador. Recarregue a página.');
-        }
-        setDeleting(false);
-        return;
       }
       if (sessaoDaTelaAindaVale(tokenDaExclusao, sessaoAtual.current)) {
         setDeleteError(err instanceof Error ? err.message : String(err));

@@ -548,6 +548,7 @@ describe('AuthProvider', () => {
   });
 
   it('login que responde depois da saída de outra aba não ressuscita a sessão (#310)', async () => {
+    localStorage.setItem('token', 'jwt-antigo');
     let responderLogin: ((resposta: Response) => void) | undefined;
     vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
       if (String(url).includes('/auth/login')) {
@@ -555,7 +556,7 @@ describe('AuthProvider', () => {
           responderLogin = resolve;
         });
       }
-      return new Response('{}', { status: 401 });
+      return new Response(JSON.stringify(usuarioA), { status: 200 });
     });
 
     render(
@@ -568,7 +569,7 @@ describe('AuthProvider', () => {
 
     // Outra aba saiu enquanto o login estava em voo: a geração da sessão mudou.
     await act(async () => {
-      await clearSessionIfCurrent(null);
+      await clearSessionIfCurrent('jwt-antigo');
     });
 
     await act(async () => {
