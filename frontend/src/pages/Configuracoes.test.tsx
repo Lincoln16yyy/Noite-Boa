@@ -5,6 +5,7 @@ import Configuracoes from './Configuracoes';
 import { renderWithAuth } from '../test/test-utils';
 import { useAuth } from '../context/AuthContext';
 import { agendarLembrete, cancelarLembrete, lembreteAtivo, permissaoNotificacao, setLembreteAtivo } from '../lib/reminder';
+import { comLockDeSessao } from '../lib/lock-sessao';
 
 /** Mostra quem o contexto ainda considera logado. */
 function MostraUsuario() {
@@ -121,6 +122,36 @@ describe('tela de Configurações', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Sair da conta' }));
 
     await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
+  });
+
+  it('espera o lock antes de navegar no logout (#293)', async () => {
+    renderWithAuth(
+      <Routes>
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/login" element={<p>tela de login</p>} />
+      </Routes>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+    expect(await screen.findByRole('heading', { name: 'Configurações' })).toBeInTheDocument();
+
+    // Outra aba está com o lock: o logout espera e não pode navegar antes de
+    // limpar a sessão, senão o Layout devolve a pessoa para /hoje (#293).
+    let liberar!: () => void;
+    const segurando = new Promise<void>((resolver) => {
+      liberar = resolver;
+    });
+    const dono = comLockDeSessao(() => segurando);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sair da conta' }));
+    expect(localStorage.getItem('token')).toBe('mock-token');
+    // Ainda não navegou: com o lock preso, o logout não terminou.
+    expect(screen.queryByText('tela de login')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Configurações' })).toBeInTheDocument();
+
+    liberar();
+    await dono;
+    expect(await screen.findByText('tela de login')).toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBeNull();
   });
 
   it('sair da conta derruba o usuário do contexto, não só o token (#292)', async () => {

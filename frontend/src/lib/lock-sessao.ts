@@ -16,9 +16,29 @@ type NavigatorComLocks = Navigator & {
  * Sem a API de Web Locks (navegador antigo, jsdom sem shim), executa direto:
  * é o comportamento anterior, sem a garantia entre abas. A função continua
  * assíncrona para que os chamadores não dependam de qual caminho rodou.
+ *
+ * Se o pedido do lock em si falhar (documento inativo, política do navegador),
+ * também executa direto: um lock indisponível não pode prender a pessoa na
+ * conta, e a ação ainda reconfere o token. Erros da própria ação são
+ * propagados sem repeti-la.
+ *
+ * Limite conhecido: uma aba com bundle anterior ao #293 não pede este lock.
+ * Como `localStorage` não tem compare-and-swap, não dá para serializar com
+ * código que não coopera; resta ao evento `storage` alinhar a interface ao
+ * token final.
  */
 export async function comLockDeSessao<T>(acao: () => T | Promise<T>): Promise<T> {
   const locks = typeof navigator === 'undefined' ? undefined : (navigator as NavigatorComLocks).locks;
   if (!locks || typeof locks.request !== 'function') return await acao();
-  return (await locks.request(LOCK_SESSAO, () => acao())) as T;
+
+  let entrou = false;
+  try {
+    return (await locks.request(LOCK_SESSAO, () => {
+      entrou = true;
+      return acao();
+    })) as T;
+  } catch (erro) {
+    if (entrou) throw erro;
+    return await acao();
+  }
 }

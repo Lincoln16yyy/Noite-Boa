@@ -184,11 +184,15 @@ export default function Configuracoes() {
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
     // Pelo AuthContext: limpa o token E derruba o usuário do estado. Só com
     // `clearSession` o Layout continuava vendo a sessão e devolvia /login para
     // /hoje (review do PR #292).
-    void logout();
+    //
+    // Espera a limpeza terminar: ela pode aguardar o lock de outra aba (#293).
+    // Navegar antes deixaria o Layout ver o usuário ainda logado e devolver
+    // /hoje em vez do login.
+    await logout();
     navigate('/login');
   }
 
@@ -227,6 +231,13 @@ export default function Configuracoes() {
       // A remoção confere o token de novo dentro do lock (#293): se outra aba
       // entrou entre a conferência acima e o `removeItem`, a conta nova fica.
       if (!(await clearSessionIfCurrent(tokenDaExclusao))) {
+        setDeleting(false);
+        return;
+      }
+      // Entre soltar o lock e este ponto, outra aba ainda pode ter entrado. O
+      // aviso de exclusão e a ida para `/?deleted=true` seriam falsos para a
+      // conta nova (review do #310).
+      if (getToken() !== null) {
         setDeleting(false);
         return;
       }
