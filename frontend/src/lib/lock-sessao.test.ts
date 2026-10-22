@@ -1,24 +1,51 @@
 import { describe, expect, it, vi } from 'vitest';
 import { comLockDeSessao } from './lock-sessao';
 
-describe('comLockDeSessao', () => {
-  it('executa a ação direto se o pedido do lock falhar (review do #310)', async () => {
-    const nav = navigator as unknown as { locks?: LockManager };
-    const original = nav.locks;
-    const acao = vi.fn(() => 'ok');
+/** Troca o `navigator.locks` pelo objeto dado e devolve a restauração. */
+function comLocksFalsos(value: unknown): () => void {
+  const nav = navigator as unknown as { locks?: LockManager };
+  const original = nav.locks;
+  Object.defineProperty(navigator, 'locks', { configurable: true, value });
+  return () => {
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
+  };
+}
 
-    Object.defineProperty(navigator, 'locks', {
-      configurable: true,
-      value: { request: vi.fn().mockRejectedValue(new Error('documento inativo')) },
-    });
+describe('comLockDeSessao', () => {
+  it('tenta de novo e só então executa direto se o lock falhar (review do #310)', async () => {
+    const request = vi.fn().mockRejectedValue(new Error('documento inativo'));
+    const restaurar = comLocksFalsos({ request });
+    const acao = vi.fn(() => 'ok');
 
     try {
       // Um lock indisponível não pode prender a pessoa na conta: a ação roda
       // direto, como no fallback de navegador antigo.
       await expect(comLockDeSessao(acao)).resolves.toBe('ok');
+      expect(request).toHaveBeenCalledTimes(2); // a rejeição veio do lock, não do caminho direto
       expect(acao).toHaveBeenCalledTimes(1);
     } finally {
-      Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
+      restaurar();
+    }
+  });
+
+  it('retenta o lock e usa o callback quando a segunda tentativa funciona (#310)', async () => {
+    const request = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('falha transitória'))
+      .mockImplementationOnce((_nome: string, callback: () => unknown) => Promise.resolve(callback()));
+    const restaurar = comLocksFalsos({ request });
+    let sobLock = false;
+    const acao = vi.fn(() => {
+      sobLock = true;
+      return 'ok';
+    });
+
+    try {
+      await expect(comLockDeSessao(acao)).resolves.toBe('ok');
+      expect(request).toHaveBeenCalledTimes(2);
+      expect(sobLock).toBe(true);
+    } finally {
+      restaurar();
     }
   });
 

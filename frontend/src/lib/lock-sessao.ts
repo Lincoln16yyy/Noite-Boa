@@ -1,6 +1,9 @@
 /** Nome do lock que serializa as escritas do token entre abas (#293). */
 export const LOCK_SESSAO = 'noiteboa-sessao';
 
+/** Quantas vezes pedimos o lock antes de abrir mão da serialização. */
+const TENTATIVAS_DE_LOCK = 2;
+
 type NavigatorComLocks = Navigator & {
   locks?: { request: (nome: string, callback: () => unknown) => Promise<unknown> };
 };
@@ -19,9 +22,12 @@ type NavigatorComLocks = Navigator & {
  * assíncrona para que os chamadores não dependam de qual caminho rodou.
  *
  * Se o pedido do lock em si falhar (documento inativo, política do navegador),
- * também executa direto: um lock indisponível não pode prender a pessoa na
- * conta, e a ação ainda reconfere o token. Erros da própria ação são
- * propagados sem repeti-la.
+ * tenta mais uma vez e então executa direto. Outra aba segurando o lock não
+ * rejeita o pedido — ele entra na fila; a rejeição significa que o gerenciador
+ * de locks não está disponível, e aí não há serialização a preservar. Executar
+ * direto mantém o comportamento anterior e não prende a pessoa na conta; a
+ * ação ainda reconfere o token. Erros da própria ação são propagados sem
+ * repeti-la.
  *
  * Limite conhecido: uma aba com bundle anterior ao #293 não pede este lock.
  * Como `localStorage` não tem compare-and-swap, não dá para serializar com
@@ -32,14 +38,19 @@ export async function comLockDeSessao<T>(acao: () => T | Promise<T>): Promise<T>
   const locks = typeof navigator === 'undefined' ? undefined : (navigator as NavigatorComLocks).locks;
   if (!locks || typeof locks.request !== 'function') return await acao();
 
-  let entrou = false;
-  try {
-    return (await locks.request(LOCK_SESSAO, () => {
-      entrou = true;
-      return acao();
-    })) as T;
-  } catch (erro) {
-    if (entrou) throw erro;
-    return await acao();
+  for (let tentativa = 1; tentativa <= TENTATIVAS_DE_LOCK; tentativa += 1) {
+    let entrou = false;
+    try {
+      return (await locks.request(LOCK_SESSAO, () => {
+        entrou = true;
+        return acao();
+      })) as T;
+    } catch (erro) {
+      // Se a ação já começou, o erro é dela: repetir duplicaria a escrita.
+      if (entrou) throw erro;
+      // Sem callback, a falha foi do lock. A última tentativa cai no fallback.
+    }
   }
+
+  return await acao();
 }
