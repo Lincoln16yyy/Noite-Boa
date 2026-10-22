@@ -291,6 +291,9 @@ describe('escritas do token entre abas (#293)', () => {
     const ordem: string[] = [];
 
     const limpeza = clearSessionIfCurrent('token-A', () => {
+      // O aviso roda com o lock ainda preso; fora do callback a marca estaria
+      // vazia (review do #310).
+      expect((navigator.locks as any).emExecucao.has('noiteboa-sessao')).toBe(true);
       ordem.push(`aviso:${localStorage.getItem('token')}`);
     });
     const escrita = saveSession('token-B').then(() => ordem.push('conta-B'));

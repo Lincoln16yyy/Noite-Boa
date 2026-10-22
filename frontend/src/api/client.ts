@@ -54,7 +54,7 @@ export function getToken(): string | null {
  * para saber se uma escrita ficou obsoleta enquanto a requisição estava em voo
  * (um login cuja resposta chega depois de outra aba sair, review do #310).
  */
-const CHAVE_GERACAO = 'noiteboa-sessao-geracao';
+export const CHAVE_GERACAO = 'noiteboa-sessao-geracao';
 
 export function getSessionGeneration(): string | null {
   try {

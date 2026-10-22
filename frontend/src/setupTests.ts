@@ -22,9 +22,13 @@ Object.defineProperty(window, 'matchMedia', {
 // removem a propriedade.
 if (!('locks' in navigator)) {
   const filas = new Map<string, Promise<unknown>>();
+  // Quais locks estão com o callback em execução agora. Os testes usam isto
+  // para provar que um efeito rodou DENTRO do lock, não logo depois (#310).
+  const emExecucao = new Set<string>();
   Object.defineProperty(navigator, 'locks', {
     configurable: true,
     value: {
+      emExecucao,
       request(nome: string, opcoesOuCallback: unknown, talvezCallback?: () => unknown) {
         const callback =
           typeof opcoesOuCallback === 'function'
@@ -32,7 +36,14 @@ if (!('locks' in navigator)) {
             : talvezCallback;
         if (!callback) throw new Error('request sem callback');
         const anterior = filas.get(nome) ?? Promise.resolve();
-        const atual = anterior.then(() => callback());
+        const atual = anterior.then(async () => {
+          emExecucao.add(nome);
+          try {
+            return await callback();
+          } finally {
+            emExecucao.delete(nome);
+          }
+        });
         // A fila não pode carregar a rejeição de uma operação para a próxima.
         filas.set(
           nome,

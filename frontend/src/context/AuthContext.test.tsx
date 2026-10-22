@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from './AuthContext';
 import type { User } from '../api/types';
 import { comLockDeSessao } from '../lib/lock-sessao';
-import { clearSessionIfCurrent } from '../api/client';
+import { CHAVE_GERACAO, clearSessionIfCurrent } from '../api/client';
 
 function BotaoSair() {
   const { logout } = useAuth();
@@ -767,6 +767,30 @@ describe('AuthProvider', () => {
     } finally {
       getItem.mockRestore();
     }
+  });
+
+  it('evento da geração reabre a sessão da tela e o Sair funciona (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+        <BotaoSairComResultado />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+
+    // Outra aba reabriu a sessão com o mesmo token: só a geração mudou, e o
+    // evento storage correspondente chega nesta aba.
+    localStorage.setItem(CHAVE_GERACAO, 'geracao-nova');
+    window.dispatchEvent(new StorageEvent('storage', { key: CHAVE_GERACAO }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+    // A tela já representa a sessão atual: o primeiro clique sai.
+    expect(await screen.findByText('saiu')).toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBeNull();
   });
 
   it('storage bloqueado na leitura devolve falha em vez de rejeitar o logout (#310)', async () => {

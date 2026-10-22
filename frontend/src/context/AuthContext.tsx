@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { api, clearSessionIfCurrent, getSessionGeneration, getToken, saveSession } from '../api/client';
+import { api, CHAVE_GERACAO, clearSessionIfCurrent, getSessionGeneration, getToken, saveSession } from '../api/client';
 import type { LoginResult, RegisterResult, User } from '../api/types';
 
 /** Como um logout terminou: saiu, a sessão já era outra, ou falhou. */
@@ -189,6 +189,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // (review do PR #292).
   useEffect(() => {
     const handleStorage = (evento: StorageEvent) => {
+      // Outra aba reabriu a sessão com o MESMO token: o valor de `token` não
+      // muda, então só a geração avisa. Sem isto, o próximo Sair desta tela
+      // seria ignorado como "a sessão mudou" (review do #310).
+      if (evento.key === CHAVE_GERACAO) {
+        geracaoDaSessao.current = geracaoAtual();
+        return;
+      }
       // `localStorage.clear()` chega com `key` nulo (qualquer chave mudou).
       if (evento.key !== null && evento.key !== 'token') return;
       const token = getToken();
