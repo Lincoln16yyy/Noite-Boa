@@ -211,9 +211,14 @@ describe('tela de Configurações', () => {
   });
 
   it('ativa o lembrete pedindo permissão só no clique', async () => {
+    // Aparelho em outro fuso: o lembrete tem de usar o do perfil (#278).
+    (globalThis as any).__fusoAparelho = 'Asia/Tokyo';
     openScreen();
     fireEvent.click(await screen.findByLabelText(/Avisar às/));
-    await waitFor(() => expect(agendarLembrete).toHaveBeenCalledWith('23:00'));
+    // O horário é de parede no fuso do perfil, não no do aparelho (#278).
+    await waitFor(() =>
+      expect(agendarLembrete).toHaveBeenCalledWith('23:00', 'America/Sao_Paulo'),
+    );
     expect(setLembreteAtivo).toHaveBeenCalledWith(true);
   });
 
@@ -255,7 +260,9 @@ describe('tela de Configurações', () => {
     fireEvent.change(await screen.findByLabelText('Horário de dormir'), { target: { value: '22:30' } });
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Preferências salvas.'));
-    await waitFor(() => expect(agendarLembrete).toHaveBeenCalledWith('22:30'));
+    await waitFor(() =>
+      expect(agendarLembrete).toHaveBeenCalledWith('22:30', 'America/Sao_Paulo'),
+    );
   });
 
   it('cancela o lembrete se o horário de dormir for removido', async () => {

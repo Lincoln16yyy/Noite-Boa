@@ -69,6 +69,27 @@ describe('lembrete de dormir', () => {
     expect(msAte('banana', agora)).toBeNull();
   });
 
+  it('interpreta HH:MM no fuso do perfil, não no do aparelho (#278)', () => {
+    // 05/01/2026 01:00 UTC = 22:00 em São Paulo e 10:00 em Tóquio.
+    const agora = new Date(Date.UTC(2026, 0, 5, 1, 0, 0));
+    expect(msAte('23:00', agora, 'America/Sao_Paulo')).toBe(60 * 60 * 1000);
+    expect(msAte('23:00', agora, 'Asia/Tokyo')).toBe(13 * 60 * 60 * 1000);
+    // 09:00 em Tóquio já passou: cai para o dia seguinte.
+    expect(msAte('09:00', agora, 'Asia/Tokyo')).toBe(23 * 60 * 60 * 1000);
+  });
+
+  it('agenda no fuso do perfil (#278)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(Date.UTC(2026, 0, 5, 1, 0, 0))); // 22:00 em SP
+
+    expect(agendarLembrete('23:00', 'Asia/Tokyo')).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
+    expect(NotificationFake.chamadas).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 1000);
+    expect(NotificationFake.chamadas).toHaveLength(1);
+  });
+
   it('dispara no horário e rearma para o dia seguinte', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 0, 5, 22, 59, 0));
@@ -127,16 +148,52 @@ describe('lembrete de dormir', () => {
 
   it('agenda na abertura do app quando a preferência está ativa', async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 0, 5, 22, 0, 0));
+    // 01:00 UTC = 22:00 em São Paulo: o alvo de 23:00 do perfil é daqui a 1 h,
+    // independente do fuso do aparelho que roda o teste (#278).
+    vi.setSystemTime(new Date(Date.UTC(2026, 0, 5, 1, 0, 0)));
     setLembreteAtivo(true);
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(jsonResponse({ targetMinutes: 480, bedtime: '23:00:00', wakeTime: '07:00:00' }));
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/me')) {
+        return jsonResponse({
+          id: 'u1',
+          email: 'a@example.com',
+          displayName: 'A',
+          timezone: 'America/Sao_Paulo',
+        });
+      }
+      return jsonResponse({ targetMinutes: 480, bedtime: '23:00:00', wakeTime: '07:00:00' });
+    });
 
     await expect(iniciarLembrete()).resolves.toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(NotificationFake.chamadas).toHaveLength(1);
+  });
+
+  it('na abertura usa o fuso do perfil mesmo com o aparelho em outro fuso (#278)', async () => {
+    vi.useFakeTimers();
+    // 01:00 UTC = 10:00 em Tóquio; 23:00 no perfil de Tóquio é daqui a 13 h.
+    // Em UTC seriam 22 h e em São Paulo 1 h — qualquer um dos dois falha aqui.
+    vi.setSystemTime(new Date(Date.UTC(2026, 0, 5, 1, 0, 0)));
+    setLembreteAtivo(true);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/me')) {
+        return jsonResponse({
+          id: 'u1',
+          email: 'a@example.com',
+          displayName: 'A',
+          timezone: 'Asia/Tokyo',
+        });
+      }
+      return jsonResponse({ targetMinutes: 480, bedtime: '23:00:00', wakeTime: '07:00:00' });
+    });
+
+    await expect(iniciarLembrete()).resolves.toBe(true);
+
+    await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
+    expect(NotificationFake.chamadas).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 1000);
     expect(NotificationFake.chamadas).toHaveLength(1);
   });
 

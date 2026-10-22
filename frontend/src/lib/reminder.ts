@@ -1,5 +1,6 @@
 import { api } from '../api/client';
-import type { Goal } from '../api/types';
+import type { Goal, User } from '../api/types';
+import { fusoDoAparelho, isoDateNoFuso, menosDiasIso, parseNoFuso } from './fuso';
 
 /**
  * Lembrete de hora de dormir (issue #38) — melhor esforço.
@@ -29,14 +30,28 @@ export function permissaoNotificacao(): NotificationPermission | 'unsupported' {
   return suportaNotificacao() ? window.Notification.permission : 'unsupported';
 }
 
-/** ms até a próxima ocorrência de "HH:MM" no relógio local (se já passou, amanhã). */
-export function msAte(hora: string, agora: Date = new Date()): number | null {
+/**
+ * ms até a próxima ocorrência de "HH:MM" (se já passou, amanhã).
+ *
+ * "HH:MM" é hora de PAREDE no fuso do perfil — o mesmo que rege dias e
+ * estatísticas (#102, #278). O fuso do aparelho só entra como fallback quando
+ * o perfil ainda não trouxe o dele. Assim o lembrete dispara na hora de dormir
+ * configurada, mesmo que o aparelho esteja em outro fuso.
+ */
+export function msAte(
+  hora: string,
+  agora: Date = new Date(),
+  fuso: string = fusoDoAparelho(),
+): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec(String(hora).trim());
   if (!m) return null;
-  const alvo = new Date(agora);
-  alvo.setHours(Number(m[1]), Number(m[2]), 0, 0);
-  if (alvo.getTime() <= agora.getTime()) alvo.setDate(alvo.getDate() + 1);
-  return alvo.getTime() - agora.getTime();
+  const hh = String(Number(m[1])).padStart(2, '0');
+  const mm = m[2];
+  const hoje = isoDateNoFuso(agora, fuso);
+  const alvoHoje = parseNoFuso(`${hoje}T${hh}:${mm}`, fuso);
+  if (alvoHoje.getTime() > agora.getTime()) return alvoHoje.getTime() - agora.getTime();
+  const amanha = menosDiasIso(hoje, -1);
+  return parseNoFuso(`${amanha}T${hh}:${mm}`, fuso).getTime() - agora.getTime();
 }
 
 async function notificar(titulo: string, corpo: string): Promise<void> {
@@ -65,15 +80,18 @@ async function notificar(titulo: string, corpo: string): Promise<void> {
   }
 }
 
-/** Agenda o disparo na próxima ocorrência de `hora` e rearma para o dia seguinte. */
-export function agendarLembrete(hora: string): boolean {
+/**
+ * Agenda o disparo na próxima ocorrência de `hora` e rearma para o dia
+ * seguinte, no mesmo fuso (o do perfil — #278).
+ */
+export function agendarLembrete(hora: string, fuso: string = fusoDoAparelho()): boolean {
   cancelarLembrete();
-  const atraso = msAte(hora);
+  const atraso = msAte(hora, new Date(), fuso);
   if (atraso === null) return false;
   timer = window.setTimeout(() => {
     timer = null;
     void notificar('Noite Boa — hora de dormir', `${hora}: seu horário de dormir. Durma melhor, no seu ritmo.`);
-    agendarLembrete(hora);
+    agendarLembrete(hora, fuso);
   }, atraso);
   return true;
 }
@@ -92,9 +110,17 @@ export function cancelarLembrete(): void {
 export async function iniciarLembrete(): Promise<boolean> {
   if (!lembreteAtivo() || permissaoNotificacao() !== 'granted') return false;
   try {
-    const goal = await api.get<Goal>('/goal');
+    // `/me` traz o fuso do perfil; sem ele (rede/5xx) o aparelho é o fallback,
+    // para o lembrete não deixar de ser armado (#278).
+    const [goal, me] = await Promise.all([
+      api.get<Goal>('/goal'),
+      api.get<User>('/me').catch(() => null),
+    ]);
     if (!goal?.bedtime) return false;
-    return agendarLembrete(String(goal.bedtime).slice(0, 5));
+    return agendarLembrete(
+      String(goal.bedtime).slice(0, 5),
+      me?.timezone || fusoDoAparelho(),
+    );
   } catch {
     return false;
   }

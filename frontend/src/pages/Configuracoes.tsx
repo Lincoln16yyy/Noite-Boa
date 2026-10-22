@@ -143,7 +143,7 @@ export default function Configuracoes() {
       // (e cancela se o horário foi removido — a preferência fica guardada
       // e volta a valer quando houver um horário novo)
       if (lembreteAtivo()) {
-        if (bedtime) agendarLembrete(bedtime);
+        if (bedtime) agendarLembrete(bedtime, me?.timezone || fusoDoAparelho());
         else cancelarLembrete();
       }
     } catch (err: unknown) {
@@ -331,7 +331,7 @@ export default function Configuracoes() {
       }
     }
     salvarLembrete(true);
-    agendarLembrete(bedtime);
+    agendarLembrete(bedtime, me?.timezone || fusoDoAparelho());
     setLembre(true);
     setMsgLembrete(`Lembrete armado para ${bedtime}, enquanto o app estiver aberto.`);
   }
