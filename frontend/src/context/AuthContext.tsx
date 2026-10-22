@@ -17,6 +17,12 @@ export interface AuthContextValue {
    */
   sessao: string | null;
   /**
+   * Geração da sessão representada pela tela. Muda quando outra aba reabre a
+   * sessão com o mesmo token (o valor de `sessao` não muda), para os avisos da
+   * sessão anterior não ficarem na tela nova (review do #310).
+   */
+  geracaoSessao: string | null;
+  /**
    * Mensagem quando o `/me` falhou com o token ainda presente — qualquer
    * falha que não seja sessão encerrada (rede, 5xx, resposta inválida). O
    * `Layout` mostra um aviso com "Tentar de novo" (#294).
@@ -56,6 +62,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // clique: se outra aba reabriu a sessão com o mesmo token, a tela está velha
   // e o Sair dela não pode derrubar a sessão nova (review do #310).
   const geracaoDaSessao = useRef<string | null>(geracaoAtual());
+  const [geracaoSessao, setGeracaoSessao] = useState<string | null>(() => geracaoAtual());
+  const marcarGeracao = useCallback((geracao: string | null) => {
+    geracaoDaSessao.current = geracao;
+    setGeracaoSessao(geracao);
+  }, []);
   const [erroSessao, setErroSessao] = useState<string | null>(null);
   // Evita setState após o desmonte (o /me pendente pode responder tarde e o
   // jsdom já ter sido desmontado nos testes — "window is not defined").
@@ -103,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // token e esta ainda não processou o `storage`, o retry carrega a
         // conta nova — a identidade da tela precisa acompanhar (#294).
         setSessao(tokenDaRequisicao);
-        geracaoDaSessao.current = geracaoDaConsulta;
+        marcarGeracao(geracaoDaConsulta);
         return true;
       }
       return false;
@@ -114,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // token e esta tela ainda não processou o `storage`, a identidade
         // precisa acompanhar para o primeiro Sair derrubar o token certo (#294).
         setSessao(tokenDaRequisicao);
-        geracaoDaSessao.current = geracaoDaConsulta;
+        marcarGeracao(geracaoDaConsulta);
         // Token ainda presente: a sessão não acabou, o `/me` é que não veio.
         // Não pode virar logout (#294). A mensagem é neutra de propósito: o
         // mesmo caminho cobre rede, 5xx e resposta inválida — prometer "é a
@@ -154,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-  }, []);
+  }, [marcarGeracao]);
 
   useEffect(() => {
     refreshUser();
@@ -165,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleSessionChange = () => {
       const token = getToken();
       setSessao(token);
-      geracaoDaSessao.current = geracaoAtual();
+      marcarGeracao(geracaoAtual());
       // Esconde a conta anterior e segura a guarda em "carregando" até o /me
       // da sessão nova chegar; sem isso, o `Layout` vê `user` nulo e pisca o
       // login antes de voltar (#297).
@@ -193,14 +204,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // muda, então só a geração avisa. Sem isto, o próximo Sair desta tela
       // seria ignorado como "a sessão mudou" (review do #310).
       if (evento.key === CHAVE_GERACAO) {
-        geracaoDaSessao.current = geracaoAtual();
+        marcarGeracao(geracaoAtual());
         return;
       }
       // `localStorage.clear()` chega com `key` nulo (qualquer chave mudou).
       if (evento.key !== null && evento.key !== 'token') return;
       const token = getToken();
       setSessao(token);
-      geracaoDaSessao.current = geracaoAtual();
+      marcarGeracao(geracaoAtual());
       // Esconde a conta anterior enquanto o /me da nova não chega: as páginas
       // não podem continuar mostrando (nem salvar) dados da sessão que saiu.
       setUser(null);
@@ -226,12 +237,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const gravou = await saveSession(res.accessToken, geracaoDoPedido);
       if (!gravou) throw new Error('A sessão mudou durante o login. Tente de novo.');
       setSessao(res.accessToken);
-      geracaoDaSessao.current = geracaoAtual();
+      marcarGeracao(geracaoAtual());
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       return res;
     }
     throw new Error('Login falhou');
-  }, []);
+  }, [marcarGeracao]);
 
   const register = useCallback(async (displayName: string, email: string, password: string) => {
     const res = await api.post<RegisterResult>('/auth/register', { displayName, email, password });
@@ -287,7 +298,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (falhaDeLock && geracaoAtual() !== geracaoDaTela)
       ) {
         setSessao(tokenAgora);
-        geracaoDaSessao.current = geracaoAtual();
+        marcarGeracao(geracaoAtual());
         setUser(null);
         setErroSessao(null);
         window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
@@ -311,7 +322,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return 'falhou';
       }
       setSessao(tokenAgora);
-      geracaoDaSessao.current = geracaoAtual();
+      marcarGeracao(geracaoAtual());
       setUser(null);
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       return 'sessao-mudou';
@@ -321,11 +332,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // aparelho (localStorage) continua.
     setErroSessao(null);
     setSessao(null);
-    geracaoDaSessao.current = geracaoAtual();
+    marcarGeracao(geracaoAtual());
     setUser(null);
     window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
     return 'saiu';
-  }, [sessao]);
+  }, [sessao, marcarGeracao]);
 
   const tentarNovamente = useCallback(async (): Promise<boolean> => {
     setLoading(true);
@@ -333,7 +344,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshUser]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, sessao, erroSessao, login, register, logout, refreshUser, tentarNovamente }}>
+    <AuthContext.Provider value={{ user, loading, sessao, geracaoSessao, erroSessao, login, register, logout, refreshUser, tentarNovamente }}>
       {children}
     </AuthContext.Provider>
   );

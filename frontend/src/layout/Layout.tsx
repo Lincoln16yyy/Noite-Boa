@@ -27,7 +27,7 @@ const AUTH_ROUTES: string[] = ['/login', '/cadastro'];
 const MENU_DESKTOP = [...NAV_PRINCIPAL, ...NAV_SECUNDARIA];
 
 export default function Layout() {
-  const { user, loading, logout, sessao, erroSessao, tentarNovamente } = useAuth();
+  const { user, loading, logout, sessao, geracaoSessao, erroSessao, tentarNovamente } = useAuth();
   // Falha ao sair (storage/lock): a sessão continua, então a pessoa precisa
   // saber que o clique não funcionou em vez de ficar sem retorno (#310).
   const [erroLogout, setErroLogout] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export default function Layout() {
   // aba trocar a sessão, ela não pode continuar na tela nova (review do #310).
   useEffect(() => {
     setErroLogout(null);
-  }, [sessao]);
+  }, [sessao, geracaoSessao]);
 
   // Retry bem-sucedido da sessão também some com o erro do logout anterior.
   // Se o retry falhar de novo, o aviso da saída continua: o token segue aqui.

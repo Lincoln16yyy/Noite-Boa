@@ -5,6 +5,7 @@ import { mockMe, renderWithAuth } from '../test/test-utils';
 import Layout from './Layout';
 import BottomBar from './BottomBar';
 import type { User } from '../api/types';
+import { CHAVE_GERACAO } from '../api/client';
 
 const usuario: User = {
   id: 'u1',
@@ -348,6 +349,38 @@ describe('Layout — falha de sessão (#294)', () => {
     expect(await screen.findByRole('banner')).toBeInTheDocument();
     expect(screen.queryByText('Não foi possível sair. Tente de novo.')).not.toBeInTheDocument();
     expect(screen.queryByText(/não foi possível carregar/i)).not.toBeInTheDocument();
+  });
+
+  it('reabertura do mesmo token em outra aba limpa o aviso do logout (#310)', async () => {
+    instalarMatchMedia(false);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+
+    renderWithAuth(
+      <Routes>
+        <Route path="/login" element={<p>marcador login</p>} />
+        <Route path="*" element={<Layout />} />
+      </Routes>,
+      { user: usuario, route: '/hoje' },
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível carregar/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(await screen.findByText('Não foi possível sair. Tente de novo.')).toBeInTheDocument();
+
+    // Outra aba reabriu a sessão com o mesmo token: `sessao` não muda, só a
+    // geração. O aviso do clique antigo não pode ficar na tela nova.
+    localStorage.setItem(CHAVE_GERACAO, 'geracao-nova');
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: CHAVE_GERACAO }));
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByText('Não foi possível sair. Tente de novo.')).not.toBeInTheDocument(),
+    );
   });
 
   it('401 no /me limpa a sessão e manda para /login, sem tela de erro', async () => {
