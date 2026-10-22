@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -27,6 +28,9 @@ const MENU_DESKTOP = [...NAV_PRINCIPAL, ...NAV_SECUNDARIA];
 
 export default function Layout() {
   const { user, loading, logout, sessao, erroSessao, tentarNovamente } = useAuth();
+  // Falha ao sair (storage/lock): a sessão continua, então a pessoa precisa
+  // saber que o clique não funcionou em vez de ficar sem retorno (#310).
+  const [erroLogout, setErroLogout] = useState<string | null>(null);
   const location = useLocation();
   // Reativo a redimensionamento/rotação (media query do navegador), não um
   // `window.innerWidth` lido uma única vez no primeiro render.
@@ -37,6 +41,12 @@ export default function Layout() {
   const primeiroUso = usePrimeiroUso(!loading && Boolean(user), sessao);
 
   const rotaProtegida = PROTECTED_ROUTES.some((r) => location.pathname.startsWith(r));
+
+  // Definido antes do retorno da tela de erro: ela também tem um botão Sair.
+  const handleLogout = async () => {
+    const resultado = await logout();
+    setErroLogout(resultado === 'falhou' ? 'Não foi possível sair. Tente de novo.' : null);
+  };
 
   // Falha no /me com token presente não é logout: avisa e deixa tentar de
   // novo, em vez de mandar para /login (#294).
@@ -57,13 +67,16 @@ export default function Layout() {
           }}
         >
           <p role="alert" style={{ color: 'var(--color-lavanda)', margin: 0 }}>{erroSessao}</p>
+          {erroLogout && (
+            <p role="alert" style={{ color: 'var(--color-ambar)', margin: 0 }}>{erroLogout}</p>
+          )}
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button type="button" className="btn btn-primary" onClick={() => void tentarNovamente()}>
               Tentar de novo
             </button>
             {/* Sem o layout normal não haveria como sair: a sessão pode estar
                 quebrada de um jeito que só um novo login resolve (#294). */}
-            <button type="button" className="btn btn-ghost" onClick={logout}>
+            <button type="button" className="btn btn-ghost" onClick={handleLogout}>
               Sair
             </button>
           </div>
@@ -123,10 +136,6 @@ export default function Layout() {
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
-  };
-
-  const handleLogout = () => {
-    logout();
   };
 
   return (
@@ -287,6 +296,16 @@ export default function Layout() {
           )}
         </div>
       </header>
+
+      {erroLogout && (
+        <p
+          role="alert"
+          className="app-container"
+          style={{ color: 'var(--color-ambar)', margin: '0.75rem auto 0', textAlign: 'center' }}
+        >
+          {erroLogout}
+        </p>
+      )}
 
       {/* Bottom bar mobile (só para usuário logado) — issue #209 */}
       {isMobile && user && <BottomBar onLogout={handleLogout} />}

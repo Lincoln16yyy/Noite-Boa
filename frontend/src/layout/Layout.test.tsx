@@ -278,8 +278,34 @@ describe('Layout — falha de sessão (#294)', () => {
     expect(await screen.findByText('marcador login')).toBeInTheDocument();
   });
 
-  it('401 no /me limpa a sessão e manda para /login, sem tela de erro', async () => {
+  it('falha ao sair mantém a tela de erro e explica, sem fingir logout (#310)', async () => {
     instalarMatchMedia(false);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+
+    renderWithAuth(
+      <Routes>
+        <Route path="/login" element={<p>marcador login</p>} />
+        <Route path="*" element={<Layout />} />
+      </Routes>,
+      { user: usuario, route: '/hoje' },
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível carregar/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+    // O token não saiu: em vez de sumir com o aviso e parecer que saiu, a tela
+    // continua com a explicação e o botão de tentar de novo (#310).
+    expect(await screen.findByText('Não foi possível sair. Tente de novo.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBe('mock-token');
+    expect(screen.queryByText('marcador login')).not.toBeInTheDocument();
+  });
+
+  it('401 no /me limpa a sessão e manda para /login, sem tela de erro', async () => {    instalarMatchMedia(false);
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
 
     renderWithAuth(

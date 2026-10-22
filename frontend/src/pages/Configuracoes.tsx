@@ -228,8 +228,10 @@ export default function Configuracoes() {
     // o DELETE está em voo, a sessão nova não pode ser derrubada nem levada
     // para /?deleted=true (review do PR #292).
     const tokenDaExclusao = tokenDaTela;
+    let contaExcluida = false;
     try {
       await api.delete('/me', { token: tokenDaExclusao });
+      contaExcluida = true;
       if (getToken() !== tokenDaExclusao) {
         setDeleting(false);
         return;
@@ -246,6 +248,18 @@ export default function Configuracoes() {
         return;
       }
     } catch (err: unknown) {
+      // O DELETE já apagou a conta: o token desta sessão não serve mais. Se a
+      // limpeza local falhar, não dá para tratar como "exclusão falhou" e
+      // deixar a pessoa presa numa conta que não existe (#310).
+      if (contaExcluida) {
+        if (getToken() === tokenDaExclusao) {
+          window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+          navigate('/?deleted=true');
+        } else {
+          setDeleting(false);
+        }
+        return;
+      }
       if (sessaoDaTelaAindaVale(tokenDaExclusao, sessaoAtual.current)) {
         setDeleteError(err instanceof Error ? err.message : String(err));
       }

@@ -187,7 +187,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async (): Promise<ResultadoLogout> => {
     const token = getToken();
-    setErroSessao(null);
     // Esta tela representa a sessão `sessao`. Se outra aba já trocou o token e
     // o evento `storage` ainda não chegou aqui, o clique de sair é da sessão
     // ANTIGA: derrubar o token levaria a conta nova junto (review do PR #292).
@@ -219,6 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // `clearSessionIfCurrent` também esquece a sonda do primeiro uso: a próxima
     // conta desta aba precisa ser sondada de novo (#273). O indicador do
     // aparelho (localStorage) continua.
+    setErroSessao(null);
     setSessao(null);
     setUser(null);
     window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
