@@ -36,6 +36,7 @@
 **Navegadores não garantem tocar alarme com o celular bloqueado ou o app fechado.** Notificações web têm suporte irregular entre sistemas, principalmente no iOS. Por isso:
 - O MVP **não promete alarme confiável**. Entrega registro, estatística e metas.
 - Lembretes de dormir entram como "melhor esforço" no pós-MVP.
+- O horário do lembrete é hora de **parede no fuso do perfil** (o mesmo de dias e estatísticas), não no relógio do aparelho: com o aparelho em outro fuso, o aviso dispara no instante correspondente à hora de dormir configurada (issue #278).
 - Alarme confiável exige app nativo (ex.: Android). Isso vira uma issue de investigação (spike), não uma promessa.
 - O primeiro uso (`/onboarding`, issue #215) respeita isso: o passo 3 **só explica** o limite e não persiste nada. O fluxo aparece uma vez por aparelho, controlado por um indicador no `localStorage` — preferência do **dispositivo**, não da conta: não é apagada no logout e, em outro aparelho, o fluxo aparece de novo. Como `GET /api/goal` sempre responde 200 (com um default de 8h quando nunca houve meta), a resposta ganhou o campo `hasGoal` para o cliente separar "nunca configurou" de "escolheu 8h de propósito".
 

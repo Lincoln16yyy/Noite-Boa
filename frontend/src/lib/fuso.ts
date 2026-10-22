@@ -54,7 +54,7 @@ export function menosDiasIso(iso: string, n: number): string {
 }
 
 /** Offset (minutos, arredondado) do fuso em um instante. */
-function offsetMinutos(ms: number, timeZone: string): number {
+export function offsetMinutos(ms: number, timeZone: string): number {
   const { ano, mes, dia, hora, minuto } = partesNoFuso(new Date(ms), timeZone);
   const comoUtc = Date.UTC(ano, mes - 1, dia, hora, minuto);
   return Math.round((comoUtc - ms) / 60000);

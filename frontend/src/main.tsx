@@ -1,7 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-import { iniciarLembrete } from './lib/reminder';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import './styles/tokens.css';
@@ -17,11 +16,8 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Lembrete de dormir (issue #38): melhor esforço, só com o app aberto.
-// Só agenda se o usuário já tiver ativado e permitido a notificação.
-window.addEventListener('load', () => {
-  iniciarLembrete();
-});
+// O lembrete de dormir (issue #38) é armado no Layout, quando o `/me` já
+// trouxe o fuso do perfil (#278).
 
 // PWA (issue #37): registra o service worker só no build de produção,
 // para não interferir no hot reload do desenvolvimento.
