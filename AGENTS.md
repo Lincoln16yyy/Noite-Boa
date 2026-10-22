@@ -25,9 +25,10 @@ docs/       ADRs e documentação
 
 ## Comandos
 ```bash
-docker compose up -d          # PostgreSQL local (só para rodar o app com `spring-boot:run`)
+docker compose up -d          # PostgreSQL local, só para rodar o app com `spring-boot:run` (a suíte usa Testcontainers)
 cd backend && mvn -B verify   # compila e roda os testes (banco efêmero via Testcontainers: exige Docker, não o compose)
-cd frontend && npm ci && npm run typecheck && npm run lint && npm test && npm run build
+cd frontend && npm ci
+npm run typecheck && npm run lint && TZ=UTC npm test && TZ=America/Sao_Paulo npm test && npm run build
 ```
 Todos os comandos acima existem e são os mesmos usados pela CI; se algum falhar, corrija a causa em vez de contornar.
 

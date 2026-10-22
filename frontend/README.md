@@ -1,6 +1,6 @@
 # Noite Boa — Front-end
 
-React + Vite (JavaScript).
+React + Vite + TypeScript.
 
 Rodar:
 

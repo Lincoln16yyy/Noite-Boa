@@ -63,7 +63,7 @@ Decisões ficam registradas em `docs/ADR-0001-stack.md` (stack) e `docs/ADR-0002
 
 ## 5. Modelo de dados (v1)
 
-- **users**: `id uuid PK`, `email unique`, `password_hash`, `display_name`, `timezone` (padrão `America/Sao_Paulo`), `created_at`
+- **users**: `id uuid PK`, `email unique`, `password_hash`, `display_name`, `timezone` (padrão `America/Sao_Paulo`), `share_with_friends boolean not null default false` (opt-in de compartilhamento com amigos), `created_at`
 - **sleep_logs**: `id uuid PK`, `user_id FK`, `sleep_start timestamptz`, `sleep_end timestamptz`, `quality smallint (1-5)`, `notes text null`, `created_at`, `updated_at`
   - `CHECK (sleep_end > sleep_start)`; índice `(user_id, sleep_start DESC)`
 - **sleep_goals**: `user_id PK/FK`, `target_minutes int`, `bedtime time`, `wake_time time`, `updated_at`
