@@ -8,7 +8,7 @@ App de registro e análise de sono. Escopo, arquitetura, modelo de dados e API e
 ## Estrutura
 ```
 backend/    Java 21 + Spring Boot 3 + Maven (API REST, Flyway, PostgreSQL)
-frontend/   React + Vite (JavaScript)
+frontend/   React + Vite + TypeScript
 docs/       ADRs e documentação
 .github/    Templates, workflows e issues seed
 ```
@@ -29,7 +29,7 @@ docker compose up -d          # PostgreSQL local (só para rodar o app com `spri
 cd backend && mvn -B verify   # compila e roda os testes (banco efêmero via Testcontainers: exige Docker, não o compose)
 cd frontend && npm ci && npm run typecheck && npm run lint && npm test && npm run build
 ```
-Se um comando ainda não existe (estrutura inicial), diga isso no PR e não invente.
+Todos os comandos acima existem e são os mesmos usados pela CI; se algum falhar, corrija a causa em vez de contornar.
 
 ## Convenções
 - **Commits:** Conventional Commits em português: `feat: ...`, `fix: ...`, `docs: ...`, `test: ...`, `chore: ...`.
@@ -43,7 +43,6 @@ Se um comando ainda não existe (estrutura inicial), diga isso no PR e não inve
 - Não commite segredos, tokens, `.env` ou dados reais.
 - Não altere `.github/workflows/`, configurações de segurança ou permissões, a menos que a issue peça.
 - Não force push na `main`; não faça merge do próprio PR.
-- Não apague testes para fazer o CI passar.
 - Nunca pule (`it.skip`, `describe.skip`), comente ou apague teste para deixar o CI verde.
 
 ## Segurança (checklist rápido)
