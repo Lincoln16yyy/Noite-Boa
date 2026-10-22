@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { usePrimeiroUso } from '../hooks/usePrimeiroUso';
+import { iniciarLembrete } from '../lib/reminder';
 import NightBackground from '../components/NightBackground';
 import BottomBar from './BottomBar';
 import { primeiroNome, saudacao } from '../lib/saudacao';
@@ -53,6 +54,13 @@ export default function Layout() {
   useEffect(() => {
     setErroLogout(null);
   }, [sessao, geracaoSessao]);
+
+  // Lembrete de dormir (issue #38): melhor esforço, só com o app aberto.
+  // Depende do fuso do perfil, que só existe depois do `/me` (#278).
+  useEffect(() => {
+    if (!user?.timezone) return;
+    void iniciarLembrete(user.timezone);
+  }, [user?.timezone]);
 
   // Retry bem-sucedido da sessão também some com o erro do logout anterior.
   // Se o retry falhar de novo, o aviso da saída continua: o token segue aqui.

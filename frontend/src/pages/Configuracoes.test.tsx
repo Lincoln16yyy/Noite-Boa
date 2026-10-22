@@ -256,12 +256,44 @@ describe('tela de Configurações', () => {
 
   it('reagenda o lembrete quando o horário de dormir muda', async () => {
     (lembreteAtivo as any).mockReturnValue(true);
+    (globalThis as any).__fusoAparelho = 'Asia/Tokyo';
     openScreen();
     fireEvent.change(await screen.findByLabelText('Horário de dormir'), { target: { value: '22:30' } });
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Preferências salvas.'));
+    await waitFor(() => expect(screen.getByText('Preferências salvas.')).toBeInTheDocument());
+    // O aparelho está em Tóquio neste teste: o segundo argumento prova que a
+    // tela usa o fuso do perfil (#278).
     await waitFor(() =>
       expect(agendarLembrete).toHaveBeenCalledWith('22:30', 'America/Sao_Paulo'),
+    );
+  });
+
+  it('reagenda o lembrete quando o fuso do perfil muda (#278)', async () => {
+    (lembreteAtivo as any).mockReturnValue(true);
+    openScreen();
+    fireEvent.change(await screen.findByLabelText('Fuso horário'), {
+      target: { value: 'Asia/Tokyo' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+
+    await waitFor(() => expect(screen.getByText('Preferências salvas.')).toBeInTheDocument());
+    // O `PUT /me` devolve o perfil com o fuso novo; o lembrete tem de seguir
+    // esse valor, não o `me` de antes de salvar.
+    await waitFor(() =>
+      expect(agendarLembrete).toHaveBeenCalledWith('23:00', 'Asia/Tokyo'),
+    );
+  });
+
+  it('reagenda o lembrete ao alinhar o fuso com o aparelho (#278)', async () => {
+    (lembreteAtivo as any).mockReturnValue(true);
+    (globalThis as any).__fusoAparelho = 'Asia/Tokyo';
+    openScreen();
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Usar o fuso do aparelho/ }),
+    );
+
+    await waitFor(() =>
+      expect(agendarLembrete).toHaveBeenCalledWith('23:00', 'Asia/Tokyo'),
     );
   });
 

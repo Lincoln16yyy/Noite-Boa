@@ -143,7 +143,7 @@ export default function Configuracoes() {
       // (e cancela se o horário foi removido — a preferência fica guardada
       // e volta a valer quando houver um horário novo)
       if (lembreteAtivo()) {
-        if (bedtime) agendarLembrete(bedtime, me?.timezone || fusoDoAparelho());
+        if (bedtime) agendarLembrete(bedtime, updatedMe?.timezone || fusoDoAparelho());
         else cancelarLembrete();
       }
     } catch (err: unknown) {
@@ -175,7 +175,10 @@ export default function Configuracoes() {
       const updatedMe = await api.put<User>('/me', { timezone: fusoAparelho }, { token: tokenDaTela });
       if (!sessaoDaTelaAindaVale(tokenDaTela, sessaoAtual.current)) return;
       setMe(updatedMe);
-      setTimezone(updatedMe.timezone ?? 'America/Sao_Paulo');
+      const fusoNovo = updatedMe.timezone ?? 'America/Sao_Paulo';
+      setTimezone(fusoNovo);
+      // Um lembrete ativo estava armado no fuso antigo: reagenda no novo.
+      if (lembreteAtivo() && bedtime) agendarLembrete(bedtime, fusoNovo);
       setSuccess('Fuso horário atualizado para o do aparelho.');
     } catch (err: unknown) {
       if (sessaoDaTelaAindaVale(tokenDaTela, sessaoAtual.current)) setError(err instanceof Error ? err.message : String(err));

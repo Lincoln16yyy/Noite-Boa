@@ -152,23 +152,29 @@ describe('lembrete de dormir', () => {
     // independente do fuso do aparelho que roda o teste (#278).
     vi.setSystemTime(new Date(Date.UTC(2026, 0, 5, 1, 0, 0)));
     setLembreteAtivo(true);
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
-      if (String(url).includes('/me')) {
-        return jsonResponse({
-          id: 'u1',
-          email: 'a@example.com',
-          displayName: 'A',
-          timezone: 'America/Sao_Paulo',
-        });
-      }
-      return jsonResponse({ targetMinutes: 480, bedtime: '23:00:00', wakeTime: '07:00:00' });
-    });
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse({ targetMinutes: 480, bedtime: '23:00:00', wakeTime: '07:00:00' }));
 
-    await expect(iniciarLembrete()).resolves.toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await expect(iniciarLembrete('America/Sao_Paulo')).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
     expect(NotificationFake.chamadas).toHaveLength(1);
+  });
+
+  it('na ida do horário de verão usa o fim do buraco (#278)', () => {
+    // Lisboa, 29/03/2026: 01:00 → 02:00; 01:30 não existe. O primeiro
+    // instante com relógio de parede depois de 01:30 é 02:00 (01:00Z).
+    const agora = new Date('2026-03-29T00:00:00Z');
+    expect(msAte('01:30', agora, 'Europe/Lisbon')).toBe(60 * 60 * 1000);
+  });
+
+  it('na volta do horário de verão usa a primeira ocorrência ainda à frente (#278)', () => {
+    // Lisboa, 25/10/2026: 02:00 → 01:00; 01:30 ocorre às 00:30Z (WEST) e
+    // 01:30Z (WET). Às 00:00Z (01:00 WEST) o alvo é a primeira: 30 min.
+    const agora = new Date('2026-10-25T00:00:00Z');
+    expect(msAte('01:30', agora, 'Europe/Lisbon')).toBe(30 * 60 * 1000);
   });
 
   it('na abertura usa o fuso do perfil mesmo com o aparelho em outro fuso (#278)', async () => {
@@ -177,24 +183,61 @@ describe('lembrete de dormir', () => {
     // Em UTC seriam 22 h e em São Paulo 1 h — qualquer um dos dois falha aqui.
     vi.setSystemTime(new Date(Date.UTC(2026, 0, 5, 1, 0, 0)));
     setLembreteAtivo(true);
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
-      if (String(url).includes('/me')) {
-        return jsonResponse({
-          id: 'u1',
-          email: 'a@example.com',
-          displayName: 'A',
-          timezone: 'Asia/Tokyo',
-        });
-      }
-      return jsonResponse({ targetMinutes: 480, bedtime: '23:00:00', wakeTime: '07:00:00' });
-    });
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse({ targetMinutes: 480, bedtime: '23:00:00', wakeTime: '07:00:00' }));
 
-    await expect(iniciarLembrete()).resolves.toBe(true);
+    await expect(iniciarLembrete('Asia/Tokyo')).resolves.toBe(true);
+    // O fuso vem do contexto (/me), não de uma segunda consulta na abertura.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
     expect(NotificationFake.chamadas).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 1000);
     expect(NotificationFake.chamadas).toHaveLength(1);
+  });
+
+  it('resposta velha do /goal não desfaz um agendamento mais novo (#278)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-05T22:00:00Z'));
+    setLembreteAtivo(true);
+    let responderGoal: ((valor: Response) => void) | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          responderGoal = resolve;
+        }),
+    );
+
+    const iniciar = iniciarLembrete('UTC');
+    // A pessoa salva 22:30 enquanto o /goal da abertura ainda está em voo.
+    agendarLembrete('22:30', 'UTC');
+    responderGoal?.(jsonResponse({ bedtime: '23:00:00' }));
+
+    await expect(iniciar).resolves.toBe(false);
+    await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+    expect(NotificationFake.chamadas).toHaveLength(1);
+    expect(NotificationFake.chamadas[0].body).toContain('22:30');
+  });
+
+  it('não arma se o lembrete for desligado durante a abertura (#278)', async () => {
+    vi.useFakeTimers();
+    setLembreteAtivo(true);
+    let responderGoal: ((valor: Response) => void) | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          responderGoal = resolve;
+        }),
+    );
+
+    const iniciar = iniciarLembrete('UTC');
+    setLembreteAtivo(false);
+    cancelarLembrete();
+    responderGoal?.(jsonResponse({ bedtime: '23:00:00' }));
+
+    await expect(iniciar).resolves.toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('não busca a meta sem a preferência ativa', async () => {
