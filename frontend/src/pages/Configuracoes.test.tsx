@@ -308,7 +308,46 @@ describe('tela de Configurações', () => {
     expect(localStorage.getItem('token')).toBeNull();
   });
 
-  it('exclusão já feita no servidor segue para a página inicial mesmo se a limpeza local falhar (#310)', async () => {
+  it('exclusão já feita no servidor sai mesmo sem o lock, sem deixar o token morto (#310)', async () => {
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+    renderWithAuth(
+      <Routes>
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/" element={<h1>Página inicial</h1>} />
+      </Routes>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const nav = navigator as unknown as { locks?: LockManager };
+    const original = nav.locks;
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: { request: vi.fn().mockRejectedValue(new Error('lock fora do ar')) },
+    });
+
+    try {
+      fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), { target: { value: 'EXCLUIR' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
+
+      // A conta já não existe no servidor: mostrar "falha ao excluir" prenderia
+      // a pessoa numa sessão morta. O DELETE precisa ter ido de fato e o token
+      // morto não pode ficar no storage (#310).
+      await waitFor(() => expect(calls('DELETE', '/me').length).toBe(1));
+      expect(await screen.findByRole('heading', { name: 'Página inicial' })).toBeInTheDocument();
+      expect(localStorage.getItem('token')).toBeNull();
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
+    }
+  });
+
+  it('storage bloqueado na exclusão avisa que não conseguiu encerrar a sessão (#310)', async () => {
     fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);
       if (path.includes('/me') && options.method === 'DELETE') {
@@ -332,9 +371,12 @@ describe('tela de Configurações', () => {
     fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), { target: { value: 'EXCLUIR' } });
     fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
 
-    // A conta já não existe no servidor: mostrar "falha ao excluir" prenderia
-    // a pessoa numa sessão morta (#310).
-    expect(await screen.findByRole('heading', { name: 'Página inicial' })).toBeInTheDocument();
+    await waitFor(() => expect(calls('DELETE', '/me').length).toBe(1));
+    expect(
+      await screen.findByText(/Conta excluída, mas não foi possível encerrar a sessão/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Página inicial' })).not.toBeInTheDocument();
+    expect(localStorage.getItem('token')).not.toBeNull();
   });
 
   it('exclui a conta com confirmação EXCLUIR', async () => {    fetchMock.mockImplementation(async (url: any, options: any = {}) => {

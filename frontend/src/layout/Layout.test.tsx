@@ -305,7 +305,47 @@ describe('Layout — falha de sessão (#294)', () => {
     expect(screen.queryByText('marcador login')).not.toBeInTheDocument();
   });
 
-  it('401 no /me limpa a sessão e manda para /login, sem tela de erro', async () => {    instalarMatchMedia(false);
+  it('retry da sessão limpa o aviso do logout que falhou (#310)', async () => {
+    instalarMatchMedia(false);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+
+    renderWithAuth(
+      <Routes>
+        <Route path="/login" element={<p>marcador login</p>} />
+        <Route path="*" element={<Layout />} />
+      </Routes>,
+      { user: usuario, route: '/hoje' },
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível carregar/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(await screen.findByText('Não foi possível sair. Tente de novo.')).toBeInTheDocument();
+
+    // A sessão volta: o aviso daquele clique falho não pode ficar na tela nova.
+    fetchSpy.mockResolvedValue(
+      new Response(JSON.stringify(usuario), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+
+    // Espera o layout normal (o cabeçalho) antes de conferir: durante o retry a
+    // tela de erro desmonta, e conferir só a ausência da mensagem passaria
+    // mesmo que ela voltasse depois com a sessão recuperada (#310).
+    expect(await screen.findByRole('banner')).toBeInTheDocument();
+    expect(screen.queryByText('Não foi possível sair. Tente de novo.')).not.toBeInTheDocument();
+    expect(screen.queryByText(/não foi possível carregar/i)).not.toBeInTheDocument();
+  });
+
+  it('401 no /me limpa a sessão e manda para /login, sem tela de erro', async () => {
+    instalarMatchMedia(false);
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
 
     renderWithAuth(

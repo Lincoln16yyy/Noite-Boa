@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from './AuthContext';
 import type { User } from '../api/types';
 import { comLockDeSessao } from '../lib/lock-sessao';
+import { clearSessionIfCurrent } from '../api/client';
 
 function BotaoSair() {
   const { logout } = useAuth();
@@ -29,6 +31,25 @@ function TelaComErro() {
     );
   }
   return <p>{user?.email ?? 'sem usuário'}</p>;
+}
+
+/** Tela mínima de login: guarda o erro para o teste conferir (#310). */
+function TelaLogin() {
+  const { login } = useAuth();
+  const [erro, setErro] = useState('');
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          void login('a@example.com', 'senha').catch((e: Error) => setErro(e.message));
+        }}
+      >
+        Entrar
+      </button>
+      {erro && <p role="alert">{erro}</p>}
+    </>
+  );
 }
 
 /** Imita a guarda do `Layout`: sem usuário (e sem carregar), manda para o login. */
@@ -524,5 +545,39 @@ describe('AuthProvider', () => {
       rejeitarAntiga?.(new TypeError('Failed to fetch'));
     });
     expect(screen.getByText('b@example.com')).toBeInTheDocument();
+  });
+
+  it('login que responde depois da saída de outra aba não ressuscita a sessão (#310)', async () => {
+    let responderLogin: ((resposta: Response) => void) | undefined;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/auth/login')) {
+        return new Promise<Response>((resolve) => {
+          responderLogin = resolve;
+        });
+      }
+      return new Response('{}', { status: 401 });
+    });
+
+    render(
+      <AuthProvider>
+        <TelaLogin />
+      </AuthProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    await waitFor(() => expect(responderLogin).toBeDefined());
+
+    // Outra aba saiu enquanto o login estava em voo: a geração da sessão mudou.
+    await act(async () => {
+      await clearSessionIfCurrent(null);
+    });
+
+    await act(async () => {
+      responderLogin?.(
+        new Response(JSON.stringify({ accessToken: 'jwt-novo' }), { status: 200 }),
+      );
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou durante o login/i);
+    expect(localStorage.getItem('token')).toBeNull();
   });
 });

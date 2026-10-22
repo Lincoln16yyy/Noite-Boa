@@ -19,7 +19,9 @@ type NavigatorComLocks = Navigator & {
  *
  * Sem a API de Web Locks (navegador antigo, jsdom sem shim), executa direto:
  * é o comportamento anterior, sem a garantia entre abas. A função continua
- * assíncrona para que os chamadores não dependam de qual caminho rodou.
+ * assíncrona para que os chamadores não dependam de qual caminho rodou. Nesse
+ * caminho avisa uma vez no console: operadores precisam saber que a
+ * serialização entre abas não está valendo (review do #310).
  *
  * Se o pedido do lock em si falhar (documento inativo, política do navegador),
  * tenta mais uma vez e então devolve erro. Outra aba segurando o lock não
@@ -33,9 +35,19 @@ type NavigatorComLocks = Navigator & {
  * código que não coopera; resta ao evento `storage` alinhar a interface ao
  * token final.
  */
+let avisouSemLock = false;
+
 export async function comLockDeSessao<T>(acao: () => T | Promise<T>): Promise<T> {
   const locks = typeof navigator === 'undefined' ? undefined : (navigator as NavigatorComLocks).locks;
-  if (!locks || typeof locks.request !== 'function') return await acao();
+  if (!locks || typeof locks.request !== 'function') {
+    if (!avisouSemLock) {
+      avisouSemLock = true;
+      console.warn(
+        '[sessao] Web Locks indisponível: as escritas do token não estão serializadas entre abas.',
+      );
+    }
+    return await acao();
+  }
 
   let ultimaFalha: unknown;
   for (let tentativa = 1; tentativa <= TENTATIVAS_DE_LOCK; tentativa += 1) {

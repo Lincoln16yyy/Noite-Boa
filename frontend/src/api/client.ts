@@ -49,9 +49,36 @@ export function getToken(): string | null {
   return localStorage.getItem('token');
 }
 
+/**
+ * Marca de geração da sessão: muda a cada gravação ou remoção do token. Serve
+ * para saber se uma escrita ficou obsoleta enquanto a requisição estava em voo
+ * (um login cuja resposta chega depois de outra aba sair, review do #310).
+ */
+const CHAVE_GERACAO = 'noiteboa-sessao-geracao';
+
+export function getSessionGeneration(): string | null {
+  try {
+    return localStorage.getItem(CHAVE_GERACAO);
+  } catch {
+    // Storage bloqueado: quem chamar vai falhar na escrita de qualquer forma.
+    return null;
+  }
+}
+
+function avancarGeracao(): void {
+  const nova =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`;
+  localStorage.setItem(CHAVE_GERACAO, nova);
+}
+
 /** Remove o token e esquece a sonda. Só usar já dentro do lock de sessão. */
 function limparSessaoSemLock(): void {
   localStorage.removeItem('token');
+  // Toda saída invalida os logins que ainda estão em voo nesta ou em outras
+  // abas (review do #310).
+  avancarGeracao();
   // A sondagem do primeiro uso vale para a conta que estava logada. Toda saída
   // de sessão passa por aqui (logout, exclusão da conta, 401), então a próxima
   // conta desta aba é sondada de novo (#273).
@@ -61,9 +88,37 @@ function limparSessaoSemLock(): void {
 /**
  * Grava o token da sessão que acabou de entrar, serializado com as limpezas
  * das outras abas — senão um 401 atrasado poderia apagar o token novo (#293).
+ *
+ * `geracaoEsperada` é a geração lida antes do pedido de login. Se outra aba
+ * gravou ou removeu a sessão nesse meio-tempo, a resposta velha não pode
+ * ressuscitar a sessão que saiu: devolve `false` sem escrever (#310).
  */
-export async function saveSession(token: string): Promise<void> {
-  await comLockDeSessao(() => localStorage.setItem('token', token));
+export async function saveSession(
+  token: string,
+  geracaoEsperada?: string | null,
+): Promise<boolean> {
+  return comLockDeSessao(() => {
+    if (geracaoEsperada !== undefined && getSessionGeneration() !== geracaoEsperada) {
+      return false;
+    }
+    localStorage.setItem('token', token);
+    avancarGeracao();
+    return true;
+  });
+}
+
+/**
+ * Limpeza de última instância, sem o lock, para quando a sessão já não pode
+ * ser usada (a conta foi excluída no servidor e o lock falhou). Confere o
+ * token antes de remover para não derrubar uma sessão que outra aba abriu.
+ *
+ * Sem compare-and-swap, a janela entre conferir e remover não é atômica; só
+ * chame quando descartar a sessão for seguro (review do #310).
+ */
+export function removeSessionIfCurrent(token: string | null): boolean {
+  if (getToken() !== token) return false;
+  limparSessaoSemLock();
+  return true;
 }
 
 /**

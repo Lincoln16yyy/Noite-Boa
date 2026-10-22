@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { api, clearSessionIfCurrent, getToken, saveSession } from '../api/client';
+import { api, clearSessionIfCurrent, getSessionGeneration, getToken, saveSession } from '../api/client';
 import type { LoginResult, RegisterResult, User } from '../api/types';
 
 /** Como um logout terminou: saiu, a sessão já era outra, ou falhou. */
@@ -170,9 +170,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshUser]);
 
   const login = useCallback(async (email: string, password: string) => {
+    // Geração antes do pedido: se outra aba sair enquanto o login está em voo,
+    // a resposta não pode gravar o token e ressuscitar a sessão que saiu
+    // (review do #310).
+    const geracaoDoPedido = getSessionGeneration();
     const res = await api.post<LoginResult>('/auth/login', { email, password });
     if (res?.accessToken) {
-      await saveSession(res.accessToken);
+      const gravou = await saveSession(res.accessToken, geracaoDoPedido);
+      if (!gravou) throw new Error('A sessão mudou durante o login. Tente de novo.');
       setSessao(res.accessToken);
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       return res;

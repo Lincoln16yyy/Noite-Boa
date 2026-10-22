@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -48,6 +48,18 @@ export default function Layout() {
     setErroLogout(resultado === 'falhou' ? 'Não foi possível sair. Tente de novo.' : null);
   };
 
+  // A mensagem de falha vale para a sessão em que o clique aconteceu. Se outra
+  // aba trocar a sessão, ela não pode continuar na tela nova (review do #310).
+  useEffect(() => {
+    setErroLogout(null);
+  }, [sessao]);
+
+  // Retry bem-sucedido da sessão também some com o erro do logout anterior.
+  const handleRetry = async () => {
+    setErroLogout(null);
+    await tentarNovamente();
+  };
+
   // Falha no /me com token presente não é logout: avisa e deixa tentar de
   // novo, em vez de mandar para /login (#294).
   if (!loading && !user && erroSessao && rotaProtegida) {
@@ -71,7 +83,7 @@ export default function Layout() {
             <p role="alert" style={{ color: 'var(--color-ambar)', margin: 0 }}>{erroLogout}</p>
           )}
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button type="button" className="btn btn-primary" onClick={() => void tentarNovamente()}>
+            <button type="button" className="btn btn-primary" onClick={() => void handleRetry()}>
               Tentar de novo
             </button>
             {/* Sem o layout normal não haveria como sair: a sessão pode estar

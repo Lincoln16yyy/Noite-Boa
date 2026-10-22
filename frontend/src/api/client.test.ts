@@ -1,5 +1,12 @@
 import { vi } from 'vitest';
-import { api, clearSessionIfCurrent, saveSession, setRequestTimeout } from './client';
+import {
+  api,
+  clearSessionIfCurrent,
+  getSessionGeneration,
+  removeSessionIfCurrent,
+  saveSession,
+  setRequestTimeout,
+} from './client';
 import { comLockDeSessao } from '../lib/lock-sessao';
 
 /** Segura o lock e devolve a função que libera, para enfileirar operações. */
@@ -205,6 +212,26 @@ describe('escritas do token entre abas (#293)', () => {
     // O aviso roda ainda com o lock preso, antes de a conta nova conseguir
     // gravar: ela não pode receber a mensagem de exclusão da conta antiga.
     expect(ordem).toEqual(['aviso:null', 'conta-B']);
+    expect(localStorage.getItem('token')).toBe('token-B');
+  });
+
+  it('login cuja geração mudou enquanto esperava não grava o token (#310)', async () => {
+    const geracaoDoPedido = getSessionGeneration();
+    await saveSession('token-A');
+    // Outra aba saiu (ou entrou) enquanto a resposta do login estava em voo.
+    await clearSessionIfCurrent('token-A');
+
+    await expect(saveSession('token-B', geracaoDoPedido)).resolves.toBe(false);
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('limpeza sem lock só remove a sessão que ainda é a mesma (#310)', () => {
+    localStorage.setItem('token', 'token-A');
+    expect(removeSessionIfCurrent('token-A')).toBe(true);
+    expect(localStorage.getItem('token')).toBeNull();
+
+    localStorage.setItem('token', 'token-B');
+    expect(removeSessionIfCurrent('token-A')).toBe(false);
     expect(localStorage.getItem('token')).toBe('token-B');
   });
 

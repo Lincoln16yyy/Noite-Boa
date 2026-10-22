@@ -12,6 +12,21 @@ function comLocksFalsos(value: unknown): () => void {
 }
 
 describe('comLockDeSessao', () => {
+  it('avisa uma vez quando o navegador não tem Web Locks (review do #310)', async () => {
+    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const restaurar = comLocksFalsos(undefined);
+
+    try {
+      await expect(comLockDeSessao(() => 'a')).resolves.toBe('a');
+      await expect(comLockDeSessao(() => 'b')).resolves.toBe('b');
+      expect(aviso).toHaveBeenCalledTimes(1);
+      expect(aviso.mock.calls[0][0]).toMatch(/Web Locks indisponível/);
+    } finally {
+      restaurar();
+      aviso.mockRestore();
+    }
+  });
+
   it('retenta e devolve erro se o lock não responder, sem rodar a ação solta (review do #310)', async () => {
     const request = vi.fn().mockRejectedValue(new Error('documento inativo'));
     const restaurar = comLocksFalsos({ request });
