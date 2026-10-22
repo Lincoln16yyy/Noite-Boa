@@ -11,7 +11,8 @@ type NavigatorComLocks = Navigator & {
  * `localStorage` não tem compare-and-swap: conferir e remover o token nunca é
  * atômico. Sem um lock, a limpeza de uma aba pode remover o token que outra
  * aba acabou de gravar (review do PR #292). Por isso toda escrita do token
- * (login, logout, 401 e exclusão da conta) passa por aqui (#293).
+ * (login, logout, 401 e exclusão da conta) passa por aqui (#293). O lock vale
+ * entre abas que rodam esta versão do bundle — veja o limite abaixo.
  *
  * Sem a API de Web Locks (navegador antigo, jsdom sem shim), executa direto:
  * é o comportamento anterior, sem a garantia entre abas. A função continua

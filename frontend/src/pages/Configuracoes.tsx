@@ -228,22 +228,17 @@ export default function Configuracoes() {
         setDeleting(false);
         return;
       }
-      // A remoção confere o token de novo dentro do lock (#293): se outra aba
-      // entrou entre a conferência acima e o `removeItem`, a conta nova fica.
-      if (!(await clearSessionIfCurrent(tokenDaExclusao))) {
+      // A remoção confere o token de novo dentro do lock (#293). O aviso e a
+      // navegação vão no callback do lock: se outra aba entrar ao soltar, ela
+      // não recebe o aviso de exclusão da conta antiga (review do #310).
+      const avisou = await clearSessionIfCurrent(tokenDaExclusao, () => {
+        window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+        navigate('/?deleted=true');
+      });
+      if (!avisou) {
         setDeleting(false);
         return;
       }
-      // Entre soltar o lock e este ponto, outra aba ainda pode ter entrado. O
-      // aviso de exclusão e a ida para `/?deleted=true` seriam falsos para a
-      // conta nova (review do #310).
-      if (getToken() !== null) {
-        setDeleting(false);
-        return;
-      }
-      // Avisa o AuthProvider para derrubar o usuário da sessão
-      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
-      navigate('/?deleted=true');
     } catch (err: unknown) {
       if (sessaoDaTelaAindaVale(tokenDaExclusao, sessaoAtual.current)) {
         setDeleteError(err instanceof Error ? err.message : String(err));

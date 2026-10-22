@@ -187,6 +187,27 @@ describe('escritas do token entre abas (#293)', () => {
     expect(localStorage.getItem('token')).toBe('token-B');
   });
 
+  it('conclui a limpeza dentro do lock, antes de outra aba gravar (#310)', async () => {
+    localStorage.setItem('token', 'token-A');
+    const { dono, liberar } = segurarLock();
+    const ordem: string[] = [];
+
+    const limpeza = clearSessionIfCurrent('token-A', () => {
+      ordem.push(`aviso:${localStorage.getItem('token')}`);
+    });
+    const escrita = saveSession('token-B').then(() => ordem.push('conta-B'));
+
+    liberar();
+    await dono;
+    await expect(limpeza).resolves.toBe(true);
+    await escrita;
+
+    // O aviso roda ainda com o lock preso, antes de a conta nova conseguir
+    // gravar: ela não pode receber a mensagem de exclusão da conta antiga.
+    expect(ordem).toEqual(['aviso:null', 'conta-B']);
+    expect(localStorage.getItem('token')).toBe('token-B');
+  });
+
   it('sem Web Locks continua funcionando direto (navegador antigo)', async () => {
     const nav = navigator as unknown as { locks?: LockManager };
     const locks = nav.locks;

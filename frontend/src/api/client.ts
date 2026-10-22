@@ -68,14 +68,23 @@ export async function saveSession(token: string): Promise<void> {
 
 /**
  * Limpa a sessão apenas se o token atual ainda for `token` (inclusive `null`).
- * A conferência e o `removeItem` rodam dentro do mesmo lock; como as escritas
- * de token das outras abas também passam por ele, não sobra janela entre ler e
- * remover (review do PR #292, #293). Devolve se limpou.
+ * A conferência, o `removeItem` e o `aoLimpar` rodam dentro do mesmo lock; como
+ * as escritas de token das outras abas também passam por ele, não sobra janela
+ * entre ler, remover e concluir a saída (review do PR #292, #293, #310).
+ * Devolve se limpou.
+ *
+ * `aoLimpar` existe para quem precisa anunciar a saída sem que outra conta
+ * entre no meio (a exclusão da conta não pode mostrar o aviso de exclusão para
+ * uma sessão nova).
  */
-export async function clearSessionIfCurrent(token: string | null): Promise<boolean> {
+export async function clearSessionIfCurrent(
+  token: string | null,
+  aoLimpar?: () => void,
+): Promise<boolean> {
   return comLockDeSessao(() => {
     if (getToken() !== token) return false;
     limparSessaoSemLock();
+    aoLimpar?.();
     return true;
   });
 }
