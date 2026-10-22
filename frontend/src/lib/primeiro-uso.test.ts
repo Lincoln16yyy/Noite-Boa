@@ -135,7 +135,7 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     expect((globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(4);
   });
 
-  it('toda saída de sessão descarta a sonda: logout, exclusão e 401 (#273)', async () => {
+  it('a limpeza condicional descarta a sonda (#273)', async () => {
     const { precisaDePrimeiroUso } = await carregar();
     const { clearSessionIfCurrent, getToken } = await import('../api/client');
 

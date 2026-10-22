@@ -197,7 +197,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Mesmo depois dessa guarda, outra aba pode gravar um token novo antes da
     // remoção. `clearSessionIfCurrent` reconfere dentro do lock e, se a conta
     // mudou, não derruba a nova (#293).
-    if (!(await clearSessionIfCurrent(token))) {
+    let limpou = false;
+    try {
+      limpou = await clearSessionIfCurrent(token);
+    } catch (erro) {
+      // Storage bloqueado: o token não pôde ser removido. Sair do estado local
+      // deixaria a pessoa "deslogada" até recarregar e voltar para a conta —
+      // pior que não sair. Mantém a sessão e não deixa a rejeição escapar do
+      // clique (review do #310).
+      console.error('[auth] não foi possível limpar a sessão', erro);
+      return;
+    }
+    if (!limpou) {
       setSessao(getToken());
       setUser(null);
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));

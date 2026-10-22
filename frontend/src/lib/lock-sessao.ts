@@ -52,5 +52,8 @@ export async function comLockDeSessao<T>(acao: () => T | Promise<T>): Promise<T>
     }
   }
 
+  // Estado degradado visível para quem investiga; não há como avisar a pessoa
+  // sem travar o fluxo, e perder a ação seria pior.
+  console.warn('[sessão] Web Locks indisponível; executando sem serialização entre abas.');
   return await acao();
 }

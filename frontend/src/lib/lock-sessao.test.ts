@@ -16,6 +16,7 @@ describe('comLockDeSessao', () => {
     const request = vi.fn().mockRejectedValue(new Error('documento inativo'));
     const restaurar = comLocksFalsos({ request });
     const acao = vi.fn(() => 'ok');
+    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
       // Um lock indisponível não pode prender a pessoa na conta: a ação roda
@@ -23,8 +24,10 @@ describe('comLockDeSessao', () => {
       await expect(comLockDeSessao(acao)).resolves.toBe('ok');
       expect(request).toHaveBeenCalledTimes(2); // a rejeição veio do lock, não do caminho direto
       expect(acao).toHaveBeenCalledTimes(1);
+      expect(aviso).toHaveBeenCalledTimes(1); // estado degradado fica visível
     } finally {
       restaurar();
+      aviso.mockRestore();
     }
   });
 

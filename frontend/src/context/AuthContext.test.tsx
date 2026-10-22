@@ -295,6 +295,33 @@ describe('AuthProvider', () => {
     expect(await screen.findByText('b@example.com')).toBeInTheDocument();
   });
 
+  it('falha ao remover o token não deixa rejeição escapar do logout (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const remover = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+
+    render(
+      <AuthProvider>
+        <BotaoSair />
+        <MostraUsuario />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+    await waitFor(() => expect(erro).toHaveBeenCalled());
+    // O token não saiu: fingir logout só faria a conta voltar no próximo reload.
+    expect(screen.getByText('a@example.com')).toBeInTheDocument();
+
+    remover.mockRestore();
+    erro.mockRestore();
+  });
+
   it('logout espera o lock da sessão antes de remover o token (#293)', async () => {
     localStorage.setItem('token', 'jwt-A');
     vi.mocked(globalThis.fetch).mockResolvedValue(
