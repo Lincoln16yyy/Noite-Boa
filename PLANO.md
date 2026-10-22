@@ -43,7 +43,7 @@
 ## 4. Arquitetura e stack
 
 ```
-[ React + Vite (PWA) ]  --HTTPS/JSON-->  [ Spring Boot API ]  --JDBC-->  [ PostgreSQL ]
+[ React + Vite + TypeScript (PWA) ]  --HTTPS/JSON-->  [ Spring Boot API ]  --JDBC-->  [ PostgreSQL ]
         frontend/                              backend/                     (Flyway)
 ```
 
@@ -53,17 +53,17 @@
 | Segurança | Spring Security + JWT, senha com BCrypt | Padrão de mercado |
 | Banco | PostgreSQL 16 + Flyway | Migrações versionadas e reproduzíveis |
 | Testes back | JUnit 5 + Testcontainers | Testa contra Postgres de verdade |
-| Front-end | React + Vite (JavaScript) | Simples de começar; pode migrar para TypeScript depois |
+| Front-end | React + Vite + TypeScript | Tipagem estática no app inteiro (migração do M8) |
 | Gráficos | Recharts | Leve e simples |
 | Dev local | Docker Compose (Postgres) | Ambiente igual para todos (inclusive agentes) |
 | CI | GitHub Actions | Build + testes em todo PR |
-| Hospedagem | A decidir (issue dedicada) | Planos gratuitos mudam; decidir perto do deploy |
+| Hospedagem | Render (API), Vercel (front-end) e Neon (PostgreSQL) | Custo inicial R$ 0; decisão e limites em `docs/ADR-0002-hospedagem.md` |
 
-Decisões ficam registradas em `docs/ADR-0001-stack.md`.
+Decisões ficam registradas em `docs/ADR-0001-stack.md` (stack) e `docs/ADR-0002-hospedagem.md` (deploy).
 
 ## 5. Modelo de dados (v1)
 
-- **users**: `id uuid PK`, `email unique`, `password_hash`, `display_name`, `timezone` (padrão `America/Sao_Paulo`), `created_at`
+- **users**: `id uuid PK`, `email unique`, `password_hash`, `display_name`, `timezone` (padrão `America/Sao_Paulo`), `share_with_friends boolean not null default false` (opt-in de compartilhamento com amigos), `created_at`
 - **sleep_logs**: `id uuid PK`, `user_id FK`, `sleep_start timestamptz`, `sleep_end timestamptz`, `quality smallint (1-5)`, `notes text null`, `created_at`, `updated_at`
   - `CHECK (sleep_end > sleep_start)`; índice `(user_id, sleep_start DESC)`
 - **sleep_goals**: `user_id PK/FK`, `target_minutes int`, `bedtime time`, `wake_time time`, `updated_at`
@@ -83,12 +83,13 @@ Horários sempre em UTC no banco; conversão pelo `timezone` do usuário na hora
 | POST | `/api/auth/register` | Cria conta | não |
 | POST | `/api/auth/login` | Retorna JWT | não |
 | GET | `/api/me` | Dados do usuário logado | sim |
+| PUT | `/api/me` | Atualiza fuso horário e compartilhamento com amigos | sim |
 | DELETE | `/api/me` | Exclui conta e dados | sim |
 | POST | `/api/sleep-logs` | Registra noite | sim |
 | GET | `/api/sleep-logs?from=&to=&page=` | Lista paginada | sim |
 | PUT | `/api/sleep-logs/{id}` | Edita (só dono) | sim |
 | DELETE | `/api/sleep-logs/{id}` | Exclui (só dono) | sim |
-| GET | `/api/stats/summary?days=7` | Métricas | sim |
+| GET | `/api/stats/summary?days=7` | Métricas (aceita 7 ou 30) | sim |
 | GET/PUT | `/api/goal` | Meta de sono | sim |
 
 Erros seguem RFC 7807 (`ProblemDetail`). Documentação interativa via OpenAPI/Swagger.
@@ -104,6 +105,9 @@ Erros seguem RFC 7807 (`ProblemDetail`). Documentação interativa via OpenAPI/S
 | M4 - Estatísticas e metas | Valor do produto | Dashboard e metas funcionando |
 | M5 - Deploy e qualidade | Publicar | App público, docs e exclusão de conta |
 | M6 - Pós-MVP | Evolução | Itens escolhidos depois do lançamento |
+| M7 - Correções e polimento | Bugs da auditoria | Issues de correção fechadas com teste de regressão |
+| M8 - Migração para TypeScript | Tipar o front-end | Sem `.js`/`.jsx` em `frontend/src`; `allowJs` desligado |
+| M9 - Visual v2 | Identidade visual nova | Telas fiéis aos mockups de `docs/design/mockups/` |
 
 ## 8. Fluxo de trabalho com GitHub e agentes de IA
 
@@ -151,7 +155,7 @@ Erros seguem RFC 7807 (`ProblemDetail`). Documentação interativa via OpenAPI/S
 |---|---|
 | Escopo crescer demais | MVP fechado; tudo novo vai para M6 |
 | Alarme não funcionar no navegador | Documentado na seção 3; spike no M6 |
-| Custo de hospedagem do back-end | Decidir hospedagem só no M5, comparando opções vigentes na época |
+| Custo de hospedagem do back-end | Render free + Neon free + Vercel free (R$ 0); limites e alternativas no `docs/ADR-0002-hospedagem.md` |
 | Uso de agentes gerar código ruim | Issues pequenas, testes, CI e revisão humana obrigatória |
 | Nome já usado | Checar domínio, lojas e INPI antes de fixar |
 

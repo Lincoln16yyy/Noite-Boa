@@ -7,7 +7,7 @@ App web para **registrar o sono, entender o padrão e criar consistência de hor
 - Como contribuir (issues, branches, PRs): [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Decisões técnicas (ADRs) e identidade: [`docs/`](docs/)
 
-**Stack:** Java 21 + Spring Boot 3 + PostgreSQL (back-end) · React + Vite (front-end) · GitHub Actions (CI).
+**Stack:** Java 21 + Spring Boot 3 + PostgreSQL (back-end) · React + Vite + TypeScript (front-end) · GitHub Actions (CI) · Render + Neon + Vercel (produção, planos free).
 
 ## Pré-requisitos
 
@@ -168,8 +168,17 @@ SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
 | `RATELIMIT_CADASTRO_LIMITE` / `RATELIMIT_CADASTRO_JANELA` | `5` / `3600` | Cadastros por hora por IP; estouro responde **429** com `Retry-After` |
 | `FORWARD_HEADERS_STRATEGY` | `framework` | Obtém o IP real do cliente atrás do proxy da Render (base do limite acima) |
 | `SPRING_PROFILES_ACTIVE` | — | `dev` habilita o Swagger |
+| `DB_POOL_SIZE` | `5` | Tamanho máximo do pool do Hikari (Render free / Neon free) |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Origens do front-end, separadas por vírgula; aceita padrões (ex.: `https://*.vercel.app`). O nome legado `CORS_ALLOWED_ORIGIN` (singular) também funciona |
+| `PORT` | `8080` | Porta HTTP; a Render injeta a dela (10000) |
 
 Os padrões estão em `backend/src/main/resources/application.yml` e a referência versionada está no [`.env.example`](.env.example).
+
+**Produção (Render + Neon):** o `application.yml` lê `DB_HOST`/`DB_PORT`/`POSTGRES_*` para o
+banco local, mas em produção o Spring Boot aceita as variáveis padrão do Neon, que têm
+precedência: `SPRING_DATASOURCE_URL` (`jdbc:postgresql://<host>/<banco>?sslmode=require`),
+`SPRING_DATASOURCE_USERNAME` e `SPRING_DATASOURCE_PASSWORD`. Elas ficam no dashboard da
+Render (`sync: false`), nunca no Git.
 
 ### Front-end
 
@@ -216,11 +225,17 @@ A imagem roda o Nginx como usuário `nginx` (não-root); por isso o container se
 ## Estrutura
 
 ```
-backend/    Java 21 + Spring Boot 3 (API REST)        -> issue #6
-frontend/   React + Vite (PWA)                        -> issue #21
-docs/       ADRs, identidade visual e documentação
-scripts/    Scripts de setup do repositório
+backend/    Java 21 + Spring Boot 3 + PostgreSQL (API REST, Flyway)
+frontend/   React + Vite + TypeScript (PWA)
+tools/      E2E (Puppeteer), prints/mockups e utilitários de build
+docs/       ADRs, identidade visual, deploy e documentação
+.claude/    Skills dos agentes de IA
+.github/    Workflows, templates e issues seed
+scripts/    Setup do repositório
 ```
+
+A hospedagem de produção está no [`render.yaml`](render.yaml) (API na Render) e no
+[`docs/deploy.md`](docs/deploy.md); o front-end fica na Vercel e o banco no Neon.
 
 ## Como contribuir
 
@@ -242,30 +257,9 @@ Regras de ouro: **uma issue por vez**, `Closes #NUMERO` no PR, CI verde antes do
 | `tipo:*`, `area:*`, `prio:*` | Organização |
 | `mvp` / `pos-mvp` | Fase |
 
-## Setup inicial do repositório (feito na criação do projeto)
+## Setup inicial do repositório
 
-Registro histórico de como o repositório foi preparado; útil para recriar em outro projeto.
-
-1. **Crie o repositório** no GitHub (vazio) e envie este kit:
-   ```bash
-   git init && git add . && git commit -m "chore: kit inicial do projeto"
-   git branch -M main
-   git remote add origin git@github.com:SEU-USUARIO/NOME-DO-REPO.git
-   git push -u origin main
-   ```
-2. **Crie labels, milestones e as issues** (precisa do [GitHub CLI](https://cli.github.com)):
-   ```bash
-   gh auth login
-   scripts/seed-github.sh --dry-run   # confira o que será criado
-   scripts/seed-github.sh             # cria de verdade
-   ```
-3. **Faça as issues `agente:humano` do M0**: nome/identidade e proteção da `main`.
-4. **(Opcional) Ative o `@claude`** nas issues e PRs:
-   - Instale o GitHub App do Claude no repositório e crie o segredo `ANTHROPIC_API_KEY` (a forma mais fácil é rodar `/install-github-app` dentro do Claude Code).
-   - Comente `@claude implemente esta issue seguindo o AGENTS.md` em uma issue `agente:ok`.
-   - Isso consome créditos da API e minutos do GitHub Actions; acompanhe os custos.
-5. **Crie um quadro (GitHub Projects)**, opcional: aba *Projects* > *New project* > Board, e adicione as issues. Colunas sugeridas: Backlog, Pronto para fazer, Em andamento, Em revisão, Feito.
-6. **Trabalhe em ordem**: M0 → M1 → M2 ... Só avance quando o critério "Pronto quando" do milestone (PLANO.md, seção 7) for cumprido.
+Registro histórico de como o repositório foi preparado (labels, milestones, issues seed, `@claude` e quadro opcional): [`docs/setup-repositorio.md`](docs/setup-repositorio.md).
 
 ## Licença
 MIT. Veja [`LICENSE`](LICENSE).
