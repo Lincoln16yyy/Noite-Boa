@@ -250,10 +250,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         tokenAgora = token;
       }
-      // Só o token: a geração pode ter avançado por causa desta própria
-      // tentativa que falhou (remoção recusada e rollback impossível). Nesse
-      // caso o token continua o mesmo e a saída falhou de verdade.
-      if (tokenAgora !== token) {
+      // Se o lock nem chegou a rodar, a geração não mudou por esta tentativa:
+      // compará-la distingue "a sessão foi reaberta" de "a saída falhou". Se a
+      // remoção rodou e falhou, a geração pode ter avançado sem troca de token
+      // (rollback impossível), então aí vale só o token.
+      const falhaDeLock =
+        erro instanceof Error && erro.message.includes('operação de sessão');
+      if (
+        tokenAgora !== token ||
+        (falhaDeLock && getSessionGeneration() !== geracaoDaSessao)
+      ) {
         setSessao(tokenAgora);
         setUser(null);
         setErroSessao(null);

@@ -411,7 +411,7 @@ describe('tela de Configurações', () => {
       { user: mockUser, route: '/configuracoes' },
     );
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+    const remover = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
       throw new Error('storage bloqueado');
     });
 
@@ -422,6 +422,9 @@ describe('tela de Configurações', () => {
     expect(
       await screen.findByText(/Conta excluída, mas não foi possível encerrar a sessão/),
     ).toBeInTheDocument();
+    // A mensagem tem de vir da falha de storage, não de um caminho que pulou
+    // a limpeza (#310).
+    expect(remover).toHaveBeenCalled();
     expect(screen.queryByRole('heading', { name: 'Página inicial' })).not.toBeInTheDocument();
     expect(localStorage.getItem('token')).not.toBeNull();
   });

@@ -642,6 +642,73 @@ describe('AuthProvider', () => {
     }
   });
 
+  it('lock que falha depois de a sessão reabrir com o mesmo token não vira erro (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    const rejeitores: Array<(erro: unknown) => void> = [];
+    const request = vi.fn(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejeitores.push(reject);
+        }),
+    );
+    const nav = navigator as unknown as { locks?: LockManager };
+    const original = nav.locks;
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } });
+
+    try {
+      render(
+        <AuthProvider>
+          <MostraUsuario />
+          <BotaoSairComResultado />
+        </AuthProvider>,
+      );
+      expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+      // O token é o mesmo, mas a sessão foi reaberta (geração nova).
+      while (rejeitores.length < 1) await Promise.resolve();
+      localStorage.setItem('noiteboa-sessao-geracao', 'geracao-nova');
+      rejeitores[0](new Error('lock fora do ar'));
+      while (rejeitores.length < 2) await Promise.resolve();
+      rejeitores[1](new Error('lock fora do ar'));
+
+      expect(await screen.findByText('sessao-mudou')).toBeInTheDocument();
+      expect(localStorage.getItem('token')).toBe('jwt-A');
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
+    }
+  });
+
+  it('401 sem conseguir limpar mostra que a sessão expirou e pede recarregar (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockResolvedValue(new Response('{}', { status: 401 }));
+    const nav = navigator as unknown as { locks?: LockManager };
+    const original = nav.locks;
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: { request: vi.fn().mockRejectedValue(new Error('lock fora do ar')) },
+    });
+
+    try {
+      render(
+        <AuthProvider>
+          <TelaComErro />
+        </AuthProvider>,
+      );
+      // Sem a mensagem específica, a tela ofereceria só retry e "Sair" — ambos
+      // dependem do mesmo lock que está fora do ar (review do #310).
+      expect(await screen.findByRole('alert')).toHaveTextContent(/sessão expirou/i);
+      expect(localStorage.getItem('token')).toBe('jwt-A');
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
+    }
+  });
+
   it('storage bloqueado na leitura devolve falha em vez de rejeitar o logout (#310)', async () => {
     localStorage.setItem('token', 'jwt-A');
     vi.spyOn(console, 'error').mockImplementation(() => {});
