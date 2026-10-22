@@ -12,22 +12,19 @@ function comLocksFalsos(value: unknown): () => void {
 }
 
 describe('comLockDeSessao', () => {
-  it('tenta de novo e só então executa direto se o lock falhar (review do #310)', async () => {
+  it('retenta e devolve erro se o lock não responder, sem rodar a ação solta (review do #310)', async () => {
     const request = vi.fn().mockRejectedValue(new Error('documento inativo'));
     const restaurar = comLocksFalsos({ request });
     const acao = vi.fn(() => 'ok');
-    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      // Um lock indisponível não pode prender a pessoa na conta: a ação roda
-      // direto, como no fallback de navegador antigo.
-      await expect(comLockDeSessao(acao)).resolves.toBe('ok');
-      expect(request).toHaveBeenCalledTimes(2); // a rejeição veio do lock, não do caminho direto
-      expect(acao).toHaveBeenCalledTimes(1);
-      expect(aviso).toHaveBeenCalledTimes(1); // estado degradado fica visível
+      // Sem lock não há serialização: executar solto abriria a corrida que o
+      // módulo fecha. A sessão fica intacta e quem chamou mostra o erro.
+      await expect(comLockDeSessao(acao)).rejects.toThrow(/operação de sessão/);
+      expect(request).toHaveBeenCalledTimes(2);
+      expect(acao).not.toHaveBeenCalled();
     } finally {
       restaurar();
-      aviso.mockRestore();
     }
   });
 

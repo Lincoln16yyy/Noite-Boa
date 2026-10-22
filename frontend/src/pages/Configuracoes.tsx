@@ -190,10 +190,16 @@ export default function Configuracoes() {
     // /hoje (review do PR #292).
     //
     // Espera a limpeza terminar: ela pode aguardar o lock de outra aba (#293).
-    // Navegar antes deixaria o Layout ver o usuário ainda logado e devolver
-    // /hoje em vez do login.
-    await logout();
-    navigate('/login');
+    // Se falhar, fica na tela com o erro — navegar deixaria o Layout devolver
+    // a pessoa para /hoje, como se o clique não tivesse feito nada (#310).
+    const resultado = await logout();
+    if (resultado === 'saiu') {
+      navigate('/login');
+      return;
+    }
+    if (resultado === 'falhou') {
+      setError('Não foi possível sair. Tente de novo.');
+    }
   }
 
   async function handleDeleteAccount() {

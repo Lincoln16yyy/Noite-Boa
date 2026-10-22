@@ -315,6 +315,9 @@ describe('AuthProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
 
     await waitFor(() => expect(erro).toHaveBeenCalled());
+    // O teste prova que a falha veio da tentativa de remoção, não de um logout
+    // que nem tentou limpar.
+    expect(remover).toHaveBeenCalled();
     // O token não saiu: fingir logout só faria a conta voltar no próximo reload.
     expect(screen.getByText('a@example.com')).toBeInTheDocument();
 

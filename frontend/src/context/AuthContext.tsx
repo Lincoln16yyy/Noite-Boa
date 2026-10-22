@@ -3,6 +3,9 @@ import type { ReactNode } from 'react';
 import { api, clearSessionIfCurrent, getToken, saveSession } from '../api/client';
 import type { LoginResult, RegisterResult, User } from '../api/types';
 
+/** Como um logout terminou: saiu, a sessão já era outra, ou falhou. */
+export type ResultadoLogout = 'saiu' | 'sessao-mudou' | 'falhou';
+
 /** Valor do contexto de autenticação. */
 export interface AuthContextValue {
   user: User | null;
@@ -21,7 +24,7 @@ export interface AuthContextValue {
   erroSessao: string | null;
   login: (email: string, password: string) => Promise<LoginResult>;
   register: (displayName: string, email: string, password: string) => Promise<RegisterResult>;
-  logout: () => Promise<void>;
+  logout: () => Promise<ResultadoLogout>;
   refreshUser: () => Promise<void>;
   /** Reconsulta o `/me` depois de uma falha de sessão, com o `loading` ligado. */
   tentarNovamente: () => Promise<void>;
@@ -182,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res;
   }, []);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (): Promise<ResultadoLogout> => {
     const token = getToken();
     setErroSessao(null);
     // Esta tela representa a sessão `sessao`. Se outra aba já trocou o token e
@@ -192,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSessao(token);
       setUser(null);
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
-      return;
+      return 'sessao-mudou';
     }
     // Mesmo depois dessa guarda, outra aba pode gravar um token novo antes da
     // remoção. `clearSessionIfCurrent` reconfere dentro do lock e, se a conta
@@ -201,18 +204,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       limpou = await clearSessionIfCurrent(token);
     } catch (erro) {
-      // Storage bloqueado: o token não pôde ser removido. Sair do estado local
-      // deixaria a pessoa "deslogada" até recarregar e voltar para a conta —
-      // pior que não sair. Mantém a sessão e não deixa a rejeição escapar do
-      // clique (review do #310).
+      // Storage bloqueado ou lock indisponível: o token não saiu. Sair do
+      // estado local deixaria a pessoa "deslogada" até recarregar e voltar
+      // para a conta — pior que não sair. A tela que chamou mostra o erro.
       console.error('[auth] não foi possível limpar a sessão', erro);
-      return;
+      return 'falhou';
     }
     if (!limpou) {
       setSessao(getToken());
       setUser(null);
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
-      return;
+      return 'sessao-mudou';
     }
     // `clearSessionIfCurrent` também esquece a sonda do primeiro uso: a próxima
     // conta desta aba precisa ser sondada de novo (#273). O indicador do
@@ -220,6 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessao(null);
     setUser(null);
     window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    return 'saiu';
   }, [sessao]);
 
   const tentarNovamente = useCallback(async () => {

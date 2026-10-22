@@ -22,12 +22,11 @@ type NavigatorComLocks = Navigator & {
  * assíncrona para que os chamadores não dependam de qual caminho rodou.
  *
  * Se o pedido do lock em si falhar (documento inativo, política do navegador),
- * tenta mais uma vez e então executa direto. Outra aba segurando o lock não
+ * tenta mais uma vez e então devolve erro. Outra aba segurando o lock não
  * rejeita o pedido — ele entra na fila; a rejeição significa que o gerenciador
- * de locks não está disponível, e aí não há serialização a preservar. Executar
- * direto mantém o comportamento anterior e não prende a pessoa na conta; a
- * ação ainda reconfere o token. Erros da própria ação são propagados sem
- * repeti-la.
+ * de locks não está disponível, e executar sem ele abriria a corrida que este
+ * módulo existe para fechar. Quem chama decide o que mostrar (a sessão fica
+ * intacta para tentar de novo).
  *
  * Limite conhecido: uma aba com bundle anterior ao #293 não pede este lock.
  * Como `localStorage` não tem compare-and-swap, não dá para serializar com
@@ -38,6 +37,7 @@ export async function comLockDeSessao<T>(acao: () => T | Promise<T>): Promise<T>
   const locks = typeof navigator === 'undefined' ? undefined : (navigator as NavigatorComLocks).locks;
   if (!locks || typeof locks.request !== 'function') return await acao();
 
+  let ultimaFalha: unknown;
   for (let tentativa = 1; tentativa <= TENTATIVAS_DE_LOCK; tentativa += 1) {
     let entrou = false;
     try {
@@ -48,12 +48,11 @@ export async function comLockDeSessao<T>(acao: () => T | Promise<T>): Promise<T>
     } catch (erro) {
       // Se a ação já começou, o erro é dela: repetir duplicaria a escrita.
       if (entrou) throw erro;
-      // Sem callback, a falha foi do lock. A última tentativa cai no fallback.
+      ultimaFalha = erro;
     }
   }
 
-  // Estado degradado visível para quem investiga; não há como avisar a pessoa
-  // sem travar o fluxo, e perder a ação seria pior.
-  console.warn('[sessão] Web Locks indisponível; executando sem serialização entre abas.');
-  return await acao();
+  throw new Error('Não foi possível concluir a operação de sessão. Tente de novo.', {
+    cause: ultimaFalha,
+  });
 }

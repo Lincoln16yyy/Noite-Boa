@@ -124,6 +124,28 @@ describe('tela de Configurações', () => {
     await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
   });
 
+  it('mostra erro e não navega quando o logout falha (#310)', async () => {
+    renderWithAuth(
+      <Routes>
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/login" element={<p>tela de login</p>} />
+      </Routes>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Sair da conta' }));
+
+    // Sem o token removido, navegar para /login faria o Layout devolver para
+    // /hoje — o clique pareceria não ter feito nada (#310).
+    expect(await screen.findByText('Não foi possível sair. Tente de novo.')).toBeInTheDocument();
+    expect(screen.queryByText('tela de login')).not.toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBe('mock-token');
+  });
+
   it('espera o lock antes de navegar no logout (#293)', async () => {
     renderWithAuth(
       <Routes>
