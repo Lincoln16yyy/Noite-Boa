@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, clearSession, getToken } from '../api/client';
+import { api, clearSessionIfCurrent, getSessionGeneration, getToken } from '../api/client';
 import type { Goal, User } from '../api/types';
 import {
   agendarLembrete,
@@ -184,13 +184,30 @@ export default function Configuracoes() {
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
     // Pelo AuthContext: limpa o token E derruba o usuário do estado. Só com
     // `clearSession` o Layout continuava vendo a sessão e devolvia /login para
     // /hoje (review do PR #292).
-    logout();
-    navigate('/login');
+    //
+    // Espera a limpeza terminar: ela pode aguardar o lock de outra aba (#293).
+    // Se falhar, fica na tela com o erro — navegar deixaria o Layout devolver
+    // a pessoa para /hoje, como se o clique não tivesse feito nada (#310).
+    const resultado = await logout();
+    if (resultado === 'saiu') {
+      navigate('/login');
+      return;
+    }
+    if (resultado === 'falhou') {
+      setError('Não foi possível sair. Tente de novo.');
+    }
   }
+
+  // O callback só roda dentro do lock, com o token conferido: o aviso e a
+  // navegação não alcançam uma conta que entre no meio.
+  const avisarExclusao = () => {
+    window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+    navigate('/?deleted=true');
+  };
 
   async function handleDeleteAccount() {
     const email = me?.email;
@@ -218,17 +235,73 @@ export default function Configuracoes() {
     // o DELETE está em voo, a sessão nova não pode ser derrubada nem levada
     // para /?deleted=true (review do PR #292).
     const tokenDaExclusao = tokenDaTela;
+    // Geração no início do DELETE: se a sessão for reaberta com o mesmo token
+    // enquanto o pedido está em voo, a limpeza não derruba a nova (#310).
+    const geracaoDaExclusao = getSessionGeneration();
+    let contaExcluida = false;
     try {
       await api.delete('/me', { token: tokenDaExclusao });
+      contaExcluida = true;
       if (getToken() !== tokenDaExclusao) {
+        // A conta foi excluída no servidor, mas outra conta já está aberta
+        // nesta aba: não derrubamos a nova nem voltamos em silêncio (#310).
+        setDeleteError('Conta excluída. A sessão local agora é de outra conta e foi preservada.');
         setDeleting(false);
         return;
       }
-      clearSession();
-      // Avisa o AuthProvider para derrubar o usuário da sessão
-      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
-      navigate('/?deleted=true');
+      // A remoção confere o token de novo dentro do lock (#293). O aviso e a
+      // navegação vão no callback do lock: se outra aba entrar ao soltar, ela
+      // não recebe o aviso de exclusão da conta antiga (review do #310).
+      const avisou = await clearSessionIfCurrent(
+        tokenDaExclusao,
+        avisarExclusao,
+        geracaoDaExclusao,
+      );
+      if (!avisou) {
+        // A conta foi excluída no servidor, mas a sessão local é outra (mesmo
+        // token, nova geração): não derrubamos, mas também não fingimos
+        // sucesso silencioso (#310).
+        setDeleteError('Conta excluída, mas não foi possível encerrar a sessão neste navegador. Recarregue a página.');
+        setDeleting(false);
+        return;
+      }
     } catch (err: unknown) {
+      // O DELETE já apagou a conta: o token desta sessão não serve mais. Se a
+      // limpeza local falhar, não dá para tratar como "exclusão falhou" e
+      // deixar a pessoa presa numa conta que não existe (#310).
+      if (contaExcluida) {
+        console.error('[configuracoes] falha ao limpar a sessão depois de excluir a conta', err);
+        try {
+          // A falha do lock pode ser transitória: tenta de novo, serializada,
+          // com a geração do INÍCIO do DELETE. Se outra aba reabriu a sessão
+          // com o mesmo token nesse meio-tempo, a nova tentativa não a apaga.
+          // (Se a tentativa anterior avançou a geração sem remover, a nova
+          // tentativa devolve `false` e a tela informa o que ficou pendente.)
+          if (
+            await clearSessionIfCurrent(
+              tokenDaExclusao,
+              avisarExclusao,
+              geracaoDaExclusao,
+            )
+          ) {
+            return;
+          }
+          // A sessão é outra (mesmo token, nova geração) ou já era outra: a
+          // conta foi excluída, mas a sessão local não foi encerrada por esta
+          // tela. Dizer isso evita uma tela silenciosa com o token antigo.
+          setDeleteError('Conta excluída, mas não foi possível encerrar a sessão neste navegador. Recarregue a página.');
+          setDeleting(false);
+          return;
+        } catch {
+          // Sem lock não dá para conferir e remover o token sem correr o risco
+          // de derrubar a conta que outra aba abriu. A conta já não existe, mas
+          // derrubar a sessão errada seria pior: a tela informa que a sessão
+          // local não foi encerrada em vez de fingir uma saída (#310).
+          setDeleteError('Conta excluída, mas não foi possível encerrar a sessão neste navegador. Recarregue a página.');
+          setDeleting(false);
+          return;
+        }
+      }
       if (sessaoDaTelaAindaVale(tokenDaExclusao, sessaoAtual.current)) {
         setDeleteError(err instanceof Error ? err.message : String(err));
       }

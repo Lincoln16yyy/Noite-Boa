@@ -5,6 +5,7 @@ import { mockMe, renderWithAuth } from '../test/test-utils';
 import Layout from './Layout';
 import BottomBar from './BottomBar';
 import type { User } from '../api/types';
+import { CHAVE_GERACAO } from '../api/client';
 
 const usuario: User = {
   id: 'u1',
@@ -276,6 +277,110 @@ describe('Layout — falha de sessão (#294)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
     await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
     expect(await screen.findByText('marcador login')).toBeInTheDocument();
+  });
+
+  it('falha ao sair mantém a tela de erro e explica, sem fingir logout (#310)', async () => {
+    instalarMatchMedia(false);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+
+    renderWithAuth(
+      <Routes>
+        <Route path="/login" element={<p>marcador login</p>} />
+        <Route path="*" element={<Layout />} />
+      </Routes>,
+      { user: usuario, route: '/hoje' },
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível carregar/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+    // O token não saiu: em vez de sumir com o aviso e parecer que saiu, a tela
+    // continua com a explicação e o botão de tentar de novo (#310).
+    expect(await screen.findByText('Não foi possível sair. Tente de novo.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Recarregar' })).toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBe('mock-token');
+    expect(screen.queryByText('marcador login')).not.toBeInTheDocument();
+  });
+
+  it('retry da sessão limpa o aviso do logout que falhou (#310)', async () => {
+    instalarMatchMedia(false);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+
+    renderWithAuth(
+      <Routes>
+        <Route path="/login" element={<p>marcador login</p>} />
+        <Route path="*" element={<Layout />} />
+      </Routes>,
+      { user: usuario, route: '/hoje' },
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível carregar/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(await screen.findByText('Não foi possível sair. Tente de novo.')).toBeInTheDocument();
+
+    // Retry que também falha: o aviso da saída continua, porque o token ficou.
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    await waitFor(() => expect(screen.getByText(/não foi possível carregar/i)).toBeInTheDocument());
+    expect(screen.getByText('Não foi possível sair. Tente de novo.')).toBeInTheDocument();
+
+    // A sessão volta: o aviso daquele clique falho não pode ficar na tela nova.
+    fetchSpy.mockResolvedValue(
+      new Response(JSON.stringify(usuario), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+
+    // Espera o layout normal (o cabeçalho) antes de conferir: durante o retry a
+    // tela de erro desmonta, e conferir só a ausência da mensagem passaria
+    // mesmo que ela voltasse depois com a sessão recuperada (#310).
+    expect(await screen.findByRole('banner')).toBeInTheDocument();
+    expect(screen.queryByText('Não foi possível sair. Tente de novo.')).not.toBeInTheDocument();
+    expect(screen.queryByText(/não foi possível carregar/i)).not.toBeInTheDocument();
+  });
+
+  it('reabertura do mesmo token em outra aba limpa o aviso do logout (#310)', async () => {
+    instalarMatchMedia(false);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+
+    renderWithAuth(
+      <Routes>
+        <Route path="/login" element={<p>marcador login</p>} />
+        <Route path="*" element={<Layout />} />
+      </Routes>,
+      { user: usuario, route: '/hoje' },
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível carregar/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(await screen.findByText('Não foi possível sair. Tente de novo.')).toBeInTheDocument();
+
+    // Outra aba reabriu a sessão com o mesmo token: `sessao` não muda, só a
+    // geração. O aviso do clique antigo não pode ficar na tela nova.
+    localStorage.setItem(CHAVE_GERACAO, 'geracao-nova');
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: CHAVE_GERACAO }));
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByText('Não foi possível sair. Tente de novo.')).not.toBeInTheDocument(),
+    );
   });
 
   it('401 no /me limpa a sessão e manda para /login, sem tela de erro', async () => {

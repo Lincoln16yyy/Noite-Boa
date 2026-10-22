@@ -135,14 +135,15 @@ describe('indicador do primeiro uso (no aparelho)', () => {
     expect((globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(4);
   });
 
-  it('clearSession descarta a sonda: toda saída de sessão passa por ela (#273)', async () => {
+  it('a limpeza condicional descarta a sonda (#273)', async () => {
     const { precisaDePrimeiroUso } = await carregar();
-    const { clearSession } = await import('../api/client');
+    const { clearSessionIfCurrent, getToken } = await import('../api/client');
 
     instalarFetch({ comNoite: true, comMeta: true });
     await expect(precisaDePrimeiroUso()).resolves.toBe(false); // A já usa o app
 
-    clearSession(); // logout, exclusão de conta e 401 passam por aqui
+    // logout, exclusão de conta e 401 passam por aqui
+    await expect(clearSessionIfCurrent(getToken())).resolves.toBe(true);
 
     instalarFetch({ comNoite: false, comMeta: false });
     await expect(precisaDePrimeiroUso()).resolves.toBe(true); // B, recém-criada

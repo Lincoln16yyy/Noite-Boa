@@ -3,8 +3,8 @@
  *
  * Vive num módulo sem dependências porque há dois caminhos que precisam
  * descartá-la: o logout (via `AuthContext`) e o fim de sessão no cliente de API
- * (`clearSession`, inclusive no 401). Como `lib/primeiro-uso.ts` depende do
- * cliente, importá-la de lá criaria um ciclo.
+ * (`clearSessionIfCurrent`, inclusive no 401). Como `lib/primeiro-uso.ts`
+ * depende do cliente, importá-la de lá criaria um ciclo.
  *
  * A memória é presa ao token da sessão. O token é compartilhado entre abas e
  * outra aba pode trocar de conta sem disparar `session-change` (o evento é

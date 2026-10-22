@@ -1,7 +1,10 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { api, clearSession, getToken } from '../api/client';
+import { api, CHAVE_GERACAO, clearSessionIfCurrent, getSessionGeneration, getToken, saveSession } from '../api/client';
 import type { LoginResult, RegisterResult, User } from '../api/types';
+
+/** Como um logout terminou: saiu, a sessão já era outra, ou falhou. */
+export type ResultadoLogout = 'saiu' | 'sessao-mudou' | 'falhou';
 
 /** Valor do contexto de autenticação. */
 export interface AuthContextValue {
@@ -14,6 +17,12 @@ export interface AuthContextValue {
    */
   sessao: string | null;
   /**
+   * Geração da sessão representada pela tela. Muda quando outra aba reabre a
+   * sessão com o mesmo token (o valor de `sessao` não muda), para os avisos da
+   * sessão anterior não ficarem na tela nova (review do #310).
+   */
+  geracaoSessao: string | null;
+  /**
    * Mensagem quando o `/me` falhou com o token ainda presente — qualquer
    * falha que não seja sessão encerrada (rede, 5xx, resposta inválida). O
    * `Layout` mostra um aviso com "Tentar de novo" (#294).
@@ -21,13 +30,22 @@ export interface AuthContextValue {
   erroSessao: string | null;
   login: (email: string, password: string) => Promise<LoginResult>;
   register: (displayName: string, email: string, password: string) => Promise<RegisterResult>;
-  logout: () => void;
-  refreshUser: () => Promise<void>;
+  logout: () => Promise<ResultadoLogout>;
+  refreshUser: () => Promise<boolean>;
   /** Reconsulta o `/me` depois de uma falha de sessão, com o `loading` ligado. */
-  tentarNovamente: () => Promise<void>;
+  tentarNovamente: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+/** Geração da sessão; storage bloqueado conta como desconhecida. */
+function geracaoAtual(): string | null {
+  try {
+    return getSessionGeneration();
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Provedor de estado de autenticação reativo.
@@ -40,6 +58,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // parte troca a sessão; as rotas que dependem da conta (primeiro uso, por
   // exemplo) precisam de um valor que mude junto.
   const [sessao, setSessao] = useState<string | null>(getToken);
+  // Geração da sessão que a TELA representa. Não é a geração do momento do
+  // clique: se outra aba reabriu a sessão com o mesmo token, a tela está velha
+  // e o Sair dela não pode derrubar a sessão nova (review do #310).
+  const geracaoDaSessao = useRef<string | null>(geracaoAtual());
+  const [geracaoSessao, setGeracaoSessao] = useState<string | null>(() => geracaoAtual());
+  const marcarGeracao = useCallback((geracao: string | null) => {
+    geracaoDaSessao.current = geracao;
+    setGeracaoSessao(geracao);
+  }, []);
   const [erroSessao, setErroSessao] = useState<string | null>(null);
   // Evita setState após o desmonte (o /me pendente pode responder tarde e o
   // jsdom já ter sido desmontado nos testes — "window is not defined").
@@ -56,17 +83,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const refreshUser = useCallback(async () => {
+  const refreshUser = useCallback(async (): Promise<boolean> => {
     // O /me vale para a sessão que o pediu. Se o token mudar até a resposta
     // (outra conta logou), o resultado é de uma sessão que já saiu e não pode
     // sobrescrever o usuário atual. Mesmo com o token igual, só a consulta mais
     // recente pode escrever no estado (review do PR #292).
     const minhaGeracao = ++geracao.current;
+    const geracaoDaConsulta = getSessionGeneration();
     const tokenDaRequisicao = getToken();
     // Nova tentativa: some com o aviso anterior; se falhar de novo, ele volta.
     if (tokenDaRequisicao !== null) setErroSessao(null);
+    // Token E geração: uma sessão reaberta com o mesmo token é outra sessão, e
+    // a resposta antiga não pode mexer nela (review do #310).
     const atual = () =>
-      montado.current && geracao.current === minhaGeracao && getToken() === tokenDaRequisicao;
+      montado.current &&
+      geracao.current === minhaGeracao &&
+      getToken() === tokenDaRequisicao &&
+      getSessionGeneration() === geracaoDaConsulta;
     try {
       const me = await api.get<User>('/me');
       // 204/JSON `null` não é usuário: sem esta checagem o `Layout` trataria
@@ -81,7 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // token e esta ainda não processou o `storage`, o retry carrega a
         // conta nova — a identidade da tela precisa acompanhar (#294).
         setSessao(tokenDaRequisicao);
+        marcarGeracao(geracaoDaConsulta);
+        return true;
       }
+      return false;
     } catch (erro) {
       if (atual()) {
         setUser(null);
@@ -89,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // token e esta tela ainda não processou o `storage`, a identidade
         // precisa acompanhar para o primeiro Sair derrubar o token certo (#294).
         setSessao(tokenDaRequisicao);
+        marcarGeracao(geracaoDaConsulta);
         // Token ainda presente: a sessão não acabou, o `/me` é que não veio.
         // Não pode virar logout (#294). A mensagem é neutra de propósito: o
         // mesmo caminho cobre rede, 5xx e resposta inválida — prometer "é a
@@ -97,12 +134,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Operadores precisam distinguir 5xx persistente de rede nos
           // relatos; o usuário continua vendo só a mensagem genérica.
           console.error('[auth] falha ao carregar /me', erro);
-          setErroSessao('Não foi possível carregar sua sessão. Tente de novo.');
+          // Sessão expirada cuja limpeza não pôde ser feita (lock fora do ar):
+          // a mensagem genérica esconderia que é preciso entrar de novo.
+          setErroSessao(
+            erro instanceof Error && erro.message.includes('Sessão expirada')
+              ? 'Sua sessão expirou e não foi possível encerrá-la neste navegador. Recarregue a página e entre de novo.'
+              : 'Não foi possível carregar sua sessão. Tente de novo.',
+          );
         }
       }
+      return false;
     } finally {
       if (montado.current && geracao.current === minhaGeracao) {
-        if (getToken() === tokenDaRequisicao) {
+        if (
+          getToken() === tokenDaRequisicao &&
+          getSessionGeneration() !== geracaoDaConsulta
+        ) {
+          // Mesmo token, geração nova: a sessão foi reaberta durante o /me.
+          // O resultado descartado não pode deixar a tela em "carregando":
+          // refaz a consulta para a sessão atual (review do #310).
+          window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+        } else if (getToken() === tokenDaRequisicao) {
           setLoading(false);
         } else {
           // O token mudou durante o /me (outra aba trocou de conta, por
@@ -113,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-  }, []);
+  }, [marcarGeracao]);
 
   useEffect(() => {
     refreshUser();
@@ -124,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleSessionChange = () => {
       const token = getToken();
       setSessao(token);
+      marcarGeracao(geracaoAtual());
       // Esconde a conta anterior e segura a guarda em "carregando" até o /me
       // da sessão nova chegar; sem isso, o `Layout` vê `user` nulo e pisca o
       // login antes de voltar (#297).
@@ -147,10 +200,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // (review do PR #292).
   useEffect(() => {
     const handleStorage = (evento: StorageEvent) => {
+      // Outra aba reabriu a sessão com o MESMO token: o valor de `token` não
+      // muda, então só a geração avisa. Sem isto, o próximo Sair desta tela
+      // seria ignorado como "a sessão mudou" (review do #310).
+      if (evento.key === CHAVE_GERACAO) {
+        marcarGeracao(geracaoAtual());
+        return;
+      }
       // `localStorage.clear()` chega com `key` nulo (qualquer chave mudou).
       if (evento.key !== null && evento.key !== 'token') return;
       const token = getToken();
       setSessao(token);
+      marcarGeracao(geracaoAtual());
       // Esconde a conta anterior enquanto o /me da nova não chega: as páginas
       // não podem continuar mostrando (nem salvar) dados da sessão que saiu.
       setUser(null);
@@ -167,24 +228,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshUser]);
 
   const login = useCallback(async (email: string, password: string) => {
+    // Geração antes do pedido: se outra aba sair enquanto o login está em voo,
+    // a resposta não pode gravar o token e ressuscitar a sessão que saiu
+    // (review do #310).
+    const geracaoDoPedido = getSessionGeneration();
     const res = await api.post<LoginResult>('/auth/login', { email, password });
     if (res?.accessToken) {
-      localStorage.setItem('token', res.accessToken);
+      const gravou = await saveSession(res.accessToken, geracaoDoPedido);
+      if (!gravou) throw new Error('A sessão mudou durante o login. Tente de novo.');
       setSessao(res.accessToken);
+      marcarGeracao(geracaoAtual());
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
       return res;
     }
     throw new Error('Login falhou');
-  }, []);
+  }, [marcarGeracao]);
 
   const register = useCallback(async (displayName: string, email: string, password: string) => {
     const res = await api.post<RegisterResult>('/auth/register', { displayName, email, password });
     return res;
   }, []);
 
-  const logout = useCallback(() => {
-    const token = getToken();
-    setErroSessao(null);
+  const logout = useCallback(async (): Promise<ResultadoLogout> => {
+    // Storage bloqueado já na leitura: sem isto o clique rejeitaria a promessa
+    // e a tela ficaria sem a mensagem de falha (review do #310).
+    // Geração da sessão que esta tela representa, capturada quando ela foi
+    // carregada — não a do instante do clique (#310).
+    const geracaoDaTela = geracaoDaSessao.current;
+    let token: string | null;
+    try {
+      token = getToken();
+    } catch (erro) {
+      console.error('[auth] storage indisponível ao ler a sessão', erro);
+      return 'falhou';
+    }
     // Esta tela representa a sessão `sessao`. Se outra aba já trocou o token e
     // o evento `storage` ainda não chegou aqui, o clique de sair é da sessão
     // ANTIGA: derrubar o token levaria a conta nova junto (review do PR #292).
@@ -192,24 +269,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSessao(token);
       setUser(null);
       window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
-      return;
+      return 'sessao-mudou';
     }
-    // `clearSession` também esquece a sonda do primeiro uso: a próxima conta
-    // desta aba precisa ser sondada de novo (#273). O indicador do aparelho
-    // (localStorage) continua.
-    clearSession();
+    // Mesmo depois dessa guarda, outra aba pode gravar um token novo antes da
+    // remoção. `clearSessionIfCurrent` reconfere dentro do lock e, se a conta
+    // mudou, não derruba a nova (#293).
+    let limpou = false;
+    try {
+      limpou = await clearSessionIfCurrent(token, undefined, geracaoDaTela);
+    } catch (erro) {
+      // A sessão pode ter mudado enquanto o lock falhava: aí o clique era da
+      // sessão antiga e a tela nova não pode receber o erro de logout dela
+      // (review do #310).
+      let tokenAgora: string | null;
+      try {
+        tokenAgora = getToken();
+      } catch {
+        tokenAgora = token;
+      }
+      // Se o lock nem chegou a rodar, a geração não mudou por esta tentativa:
+      // compará-la distingue "a sessão foi reaberta" de "a saída falhou". Se a
+      // remoção rodou e falhou, a geração pode ter avançado sem troca de token
+      // (rollback impossível), então aí vale só o token.
+      const falhaDeLock =
+        erro instanceof Error && erro.message.includes('operação de sessão');
+      if (
+        tokenAgora !== token ||
+        (falhaDeLock && geracaoAtual() !== geracaoDaTela)
+      ) {
+        setSessao(tokenAgora);
+        marcarGeracao(geracaoAtual());
+        setUser(null);
+        setErroSessao(null);
+        window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+        return tokenAgora === null ? 'saiu' : 'sessao-mudou';
+      }
+      // Storage bloqueado ou lock indisponível: o token não saiu. Sair do
+      // estado local deixaria a pessoa "deslogada" até recarregar e voltar
+      // para a conta — pior que não sair. A tela que chamou mostra o erro.
+      console.error('[auth] não foi possível limpar a sessão', erro);
+      return 'falhou';
+    }
+    if (!limpou) {
+      // A sessão da tela já não é a atual. A releitura pode falhar com o
+      // storage bloqueado; nesse caso a saída falhou e a tela mostra o erro
+      // (review do #310).
+      let tokenAgora: string | null;
+      try {
+        tokenAgora = getToken();
+      } catch (erro) {
+        console.error('[auth] storage indisponível ao reler a sessão', erro);
+        return 'falhou';
+      }
+      setSessao(tokenAgora);
+      marcarGeracao(geracaoAtual());
+      setUser(null);
+      window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+      return 'sessao-mudou';
+    }
+    // `clearSessionIfCurrent` também esquece a sonda do primeiro uso: a próxima
+    // conta desta aba precisa ser sondada de novo (#273). O indicador do
+    // aparelho (localStorage) continua.
+    setErroSessao(null);
     setSessao(null);
+    marcarGeracao(geracaoAtual());
     setUser(null);
     window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
-  }, [sessao]);
+    return 'saiu';
+  }, [sessao, marcarGeracao]);
 
-  const tentarNovamente = useCallback(async () => {
+  const tentarNovamente = useCallback(async (): Promise<boolean> => {
     setLoading(true);
-    await refreshUser();
+    return refreshUser();
   }, [refreshUser]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, sessao, erroSessao, login, register, logout, refreshUser, tentarNovamente }}>
+    <AuthContext.Provider value={{ user, loading, sessao, geracaoSessao, erroSessao, login, register, logout, refreshUser, tentarNovamente }}>
       {children}
     </AuthContext.Provider>
   );

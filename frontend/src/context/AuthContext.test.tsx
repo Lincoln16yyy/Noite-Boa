@@ -1,7 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from './AuthContext';
 import type { User } from '../api/types';
+import { comLockDeSessao } from '../lib/lock-sessao';
+import { CHAVE_GERACAO, clearSessionIfCurrent } from '../api/client';
 
 function BotaoSair() {
   const { logout } = useAuth();
@@ -28,6 +31,44 @@ function TelaComErro() {
     );
   }
   return <p>{user?.email ?? 'sem usuário'}</p>;
+}
+
+/** Tela mínima de login: guarda o erro para o teste conferir (#310). */
+function TelaLogin() {
+  const { login } = useAuth();
+  const [erro, setErro] = useState('');
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          void login('a@example.com', 'senha').catch((e: Error) => setErro(e.message));
+        }}
+      >
+        Entrar
+      </button>
+      {erro && <p role="alert">{erro}</p>}
+    </>
+  );
+}
+
+/** Mostra como o logout terminou, para conferir o resultado (#310). */
+function BotaoSairComResultado() {
+  const { logout } = useAuth();
+  const [resultado, setResultado] = useState('');
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          void logout().then(setResultado, () => setResultado('rejeitou'));
+        }}
+      >
+        Sair
+      </button>
+      <p>{resultado}</p>
+    </>
+  );
 }
 
 /** Imita a guarda do `Layout`: sem usuário (e sem carregar), manda para o login. */
@@ -294,6 +335,70 @@ describe('AuthProvider', () => {
     expect(await screen.findByText('b@example.com')).toBeInTheDocument();
   });
 
+  it('falha ao remover o token não deixa rejeição escapar do logout (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const remover = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+
+    render(
+      <AuthProvider>
+        <BotaoSair />
+        <MostraUsuario />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+    await waitFor(() => expect(erro).toHaveBeenCalled());
+    // O teste prova que a falha veio da tentativa de remoção, não de um logout
+    // que nem tentou limpar.
+    expect(remover).toHaveBeenCalled();
+    // O token não saiu: fingir logout só faria a conta voltar no próximo reload.
+    expect(screen.getByText('a@example.com')).toBeInTheDocument();
+
+    remover.mockRestore();
+    erro.mockRestore();
+  });
+
+  it('logout espera o lock da sessão antes de remover o token (#293)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+
+    render(
+      <AuthProvider>
+        <BotaoSair />
+        <MostraUsuario />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+
+    let liberar!: () => void;
+    const segurando = new Promise<void>((resolver) => {
+      liberar = resolver;
+    });
+    const dono = comLockDeSessao(() => segurando);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // A remoção espera o lock (#293): sem isso, uma conta que outra aba
+    // gravasse no meio do clique seria apagada junto.
+    expect(localStorage.getItem('token')).toBe('jwt-A');
+
+    liberar();
+    await dono;
+    await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
+  });
+
   it('troca de sessão não pisca o login enquanto o /me da conta nova não chega (#297)', async () => {
     localStorage.setItem('token', 'jwt-A');
     let responderB: ((resposta: Response) => void) | undefined;
@@ -386,7 +491,7 @@ describe('AuthProvider', () => {
     // A identidade da tela acompanhou B: o primeiro clique em Sair derruba o
     // token (sem isso, `logout` acharia que a sessão ainda é A e só recarregaria).
     fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
-    expect(localStorage.getItem('token')).toBeNull();
+    await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
   });
 
   it('retry que falha também atualiza a identidade da sessão (#294)', async () => {
@@ -409,7 +514,7 @@ describe('AuthProvider', () => {
 
     // Mesmo falhando, a tela agora representa B: o primeiro Sair derruba o token.
     fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
-    expect(localStorage.getItem('token')).toBeNull();
+    await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
   });
 
   it('/me sem corpo (204) não vira logout: aviso e token preservado (#294)', async () => {
@@ -459,5 +564,254 @@ describe('AuthProvider', () => {
       rejeitarAntiga?.(new TypeError('Failed to fetch'));
     });
     expect(screen.getByText('b@example.com')).toBeInTheDocument();
+  });
+
+  it('login que responde depois da saída de outra aba não ressuscita a sessão (#310)', async () => {
+    localStorage.setItem('token', 'jwt-antigo');
+    let responderLogin: ((resposta: Response) => void) | undefined;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (String(url).includes('/auth/login')) {
+        return new Promise<Response>((resolve) => {
+          responderLogin = resolve;
+        });
+      }
+      return new Response(JSON.stringify(usuarioA), { status: 200 });
+    });
+
+    render(
+      <AuthProvider>
+        <TelaLogin />
+      </AuthProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    await waitFor(() => expect(responderLogin).toBeDefined());
+
+    // Outra aba saiu enquanto o login estava em voo: a geração da sessão mudou.
+    await act(async () => {
+      await clearSessionIfCurrent('jwt-antigo');
+    });
+
+    await act(async () => {
+      responderLogin?.(
+        new Response(JSON.stringify({ accessToken: 'jwt-novo' }), { status: 200 }),
+      );
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou durante o login/i);
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('falha de logout depois que a sessão mudou não vira erro na conta nova (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    const rejeitores: Array<(erro: unknown) => void> = [];
+    const request = vi.fn(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejeitores.push(reject);
+        }),
+    );
+    const nav = navigator as unknown as { locks?: LockManager };
+    const original = nav.locks;
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } });
+
+    try {
+      render(
+        <AuthProvider>
+          <MostraUsuario />
+          <BotaoSairComResultado />
+        </AuthProvider>,
+      );
+      expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+      // A limpeza começa com A; outra aba troca a conta antes de o lock falhar.
+      while (rejeitores.length < 1) await Promise.resolve();
+      localStorage.setItem('token', 'jwt-B');
+      rejeitores[0](new Error('lock fora do ar'));
+      while (rejeitores.length < 2) await Promise.resolve();
+      rejeitores[1](new Error('lock fora do ar'));
+
+      expect(await screen.findByText('sessao-mudou')).toBeInTheDocument();
+      expect(localStorage.getItem('token')).toBe('jwt-B');
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
+    }
+  });
+
+  it('lock que falha depois de a sessão reabrir com o mesmo token não vira erro (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    const rejeitores: Array<(erro: unknown) => void> = [];
+    const request = vi.fn(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejeitores.push(reject);
+        }),
+    );
+    const nav = navigator as unknown as { locks?: LockManager };
+    const original = nav.locks;
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } });
+
+    try {
+      render(
+        <AuthProvider>
+          <MostraUsuario />
+          <BotaoSairComResultado />
+        </AuthProvider>,
+      );
+      expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+      // O token é o mesmo, mas a sessão foi reaberta (geração nova).
+      while (rejeitores.length < 1) await Promise.resolve();
+      localStorage.setItem('noiteboa-sessao-geracao', 'geracao-nova');
+      rejeitores[0](new Error('lock fora do ar'));
+      while (rejeitores.length < 2) await Promise.resolve();
+      rejeitores[1](new Error('lock fora do ar'));
+
+      expect(await screen.findByText('sessao-mudou')).toBeInTheDocument();
+      expect(localStorage.getItem('token')).toBe('jwt-A');
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
+    }
+  });
+
+  it('401 sem conseguir limpar mostra que a sessão expirou e pede recarregar (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockResolvedValue(new Response('{}', { status: 401 }));
+    const nav = navigator as unknown as { locks?: LockManager };
+    const original = nav.locks;
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: { request: vi.fn().mockRejectedValue(new Error('lock fora do ar')) },
+    });
+
+    try {
+      render(
+        <AuthProvider>
+          <TelaComErro />
+        </AuthProvider>,
+      );
+      // Sem a mensagem específica, a tela ofereceria só retry e "Sair" — ambos
+      // dependem do mesmo lock que está fora do ar (review do #310).
+      expect(await screen.findByRole('alert')).toHaveTextContent(/sessão expirou/i);
+      expect(localStorage.getItem('token')).toBe('jwt-A');
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
+    }
+  });
+
+  it('aba parada não derruba a sessão reaberta com o mesmo token (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+        <BotaoSairComResultado />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+
+    // Outra aba saiu e reabriu a sessão com o mesmo token: geração nova, sem
+    // evento `storage` (o valor do token não mudou). Esta tela está velha.
+    localStorage.setItem('noiteboa-sessao-geracao', 'geracao-nova');
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+    expect(await screen.findByText('sessao-mudou')).toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBe('jwt-A');
+  });
+
+  it('falha ao reler a sessão depois da limpeza recusada vira falha de logout (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+        <BotaoSairComResultado />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+    localStorage.setItem('noiteboa-sessao-geracao', 'geracao-nova');
+
+    // Deixa o logout e a limpeza lerem o token; a releitura do ramo
+    // "a sessão já não é a atual" é que falha (#310).
+    const ler = Storage.prototype.getItem;
+    let leiturasDoToken = 0;
+    const getItem = vi
+      .spyOn(Storage.prototype, 'getItem')
+      .mockImplementation(function (this: Storage, chave: string) {
+        if (chave === 'token') {
+          leiturasDoToken += 1;
+          if (leiturasDoToken >= 3) throw new Error('storage bloqueado');
+        }
+        return ler.call(this, chave);
+      });
+
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+      expect(await screen.findByText('falhou')).toBeInTheDocument();
+      expect(ler.call(localStorage, 'token')).toBe('jwt-A');
+    } finally {
+      getItem.mockRestore();
+    }
+  });
+
+  it('evento da geração reabre a sessão da tela e o Sair funciona (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+        <BotaoSairComResultado />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+
+    // Outra aba reabriu a sessão com o mesmo token: só a geração mudou, e o
+    // evento storage correspondente chega nesta aba.
+    localStorage.setItem(CHAVE_GERACAO, 'geracao-nova');
+    window.dispatchEvent(new StorageEvent('storage', { key: CHAVE_GERACAO }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+    // A tela já representa a sessão atual: o primeiro clique sai.
+    expect(await screen.findByText('saiu')).toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('storage bloqueado na leitura devolve falha em vez de rejeitar o logout (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+        <BotaoSairComResultado />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+    expect(await screen.findByText('falhou')).toBeInTheDocument();
   });
 });

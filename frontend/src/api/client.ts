@@ -1,4 +1,5 @@
 import { esquecerSondagem } from '../lib/sonda';
+import { comLockDeSessao } from '../lib/lock-sessao';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
@@ -48,8 +49,56 @@ export function getToken(): string | null {
   return localStorage.getItem('token');
 }
 
-export function clearSession(): void {
-  localStorage.removeItem('token');
+/**
+ * Marca de geração da sessão: muda a cada gravação ou remoção do token. Serve
+ * para saber se uma escrita ficou obsoleta enquanto a requisição estava em voo
+ * (um login cuja resposta chega depois de outra aba sair, review do #310).
+ */
+export const CHAVE_GERACAO = 'noiteboa-sessao-geracao';
+
+export function getSessionGeneration(): string | null {
+  try {
+    return localStorage.getItem(CHAVE_GERACAO);
+  } catch {
+    // Storage bloqueado: quem chamar vai falhar na escrita de qualquer forma.
+    return null;
+  }
+}
+
+function avancarGeracao(): void {
+  const nova =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`;
+  localStorage.setItem(CHAVE_GERACAO, nova);
+}
+
+/** Volta a geração ao valor anterior; o erro original é o que importa. */
+function restaurarGeracao(anterior: string | null): void {
+  try {
+    if (anterior === null) localStorage.removeItem(CHAVE_GERACAO);
+    else localStorage.setItem(CHAVE_GERACAO, anterior);
+  } catch {
+    // Best-effort: se nem o rollback couber no storage, a falha já vai subir.
+  }
+}
+
+/** Remove o token e esquece a sonda. Só usar já dentro do lock de sessão. */
+function limparSessaoSemLock(): void {
+  // Sem token não há troca de sessão: não avance a geração, senão um 401
+  // atrasado descartaria o login que está em voo nesta aba (review do #310).
+  const tinhaToken = getToken() !== null;
+  const geracaoAnterior = tinhaToken ? getSessionGeneration() : null;
+  // A geração vem antes da remoção: se ela não puder ser gravada, nada mudou.
+  if (tinhaToken) avancarGeracao();
+  try {
+    localStorage.removeItem('token');
+  } catch (erro) {
+    // A remoção falhou e o token continua: a geração também tem de continuar,
+    // senão pedidos antigos seriam tratados como de outra sessão (review do #310).
+    if (tinhaToken) restaurarGeracao(geracaoAnterior);
+    throw erro;
+  }
   // A sondagem do primeiro uso vale para a conta que estava logada. Toda saída
   // de sessão passa por aqui (logout, exclusão da conta, 401), então a próxima
   // conta desta aba é sondada de novo (#273).
@@ -57,15 +106,73 @@ export function clearSession(): void {
 }
 
 /**
- * Limpa a sessão apenas se o token atual ainda for `token` (inclusive `null`).
- * Fecha a maior parte da janela em que outra aba troca a conta entre a resposta
- * e a limpeza — a checagem e o `removeItem` ficam no mesmo bloco síncrono
- * (review do PR #292). Devolve se limpou.
+ * Grava o token da sessão que acabou de entrar, serializado com as limpezas
+ * das outras abas — senão um 401 atrasado poderia apagar o token novo (#293).
+ *
+ * `geracaoEsperada` é a geração lida antes do pedido de login. Se outra aba
+ * gravou ou removeu a sessão nesse meio-tempo, a resposta velha não pode
+ * ressuscitar a sessão que saiu: devolve `false` sem escrever (#310).
  */
-export function clearSessionIfCurrent(token: string | null): boolean {
-  if (getToken() !== token) return false;
-  clearSession();
-  return true;
+export async function saveSession(
+  token: string,
+  geracaoEsperada?: string | null,
+): Promise<boolean> {
+  return comLockDeSessao(() => {
+    if (geracaoEsperada !== undefined && getSessionGeneration() !== geracaoEsperada) {
+      return false;
+    }
+    const tokenAnterior = getToken();
+    // Token antes da geração: uma requisição que comece entre as duas escritas
+    // (fora do lock) vê geração velha + token novo — combinação que nunca
+    // confere no 401 e por isso não apaga a sessão (review do #310).
+    localStorage.setItem('token', token);
+    try {
+      avancarGeracao();
+    } catch (erro) {
+      // Sem a geração, a sessão não pode ficar trocada pela metade: volta o
+      // token anterior e falha (review do #310).
+      try {
+        if (tokenAnterior === null) localStorage.removeItem('token');
+        else localStorage.setItem('token', tokenAnterior);
+      } catch {
+        // Best-effort: o storage já recusou a escrita; o erro original sobe.
+      }
+      throw erro;
+    }
+    return true;
+  });
+}
+
+/**
+ * Limpa a sessão apenas se o token atual ainda for `token` (inclusive `null`).
+ * A conferência, o `removeItem` e o `aoLimpar` rodam dentro do mesmo lock; como
+ * as escritas de token das outras abas também passam por ele, não sobra janela
+ * entre ler, remover e concluir a saída (review do PR #292, #293, #310).
+ * Devolve se limpou.
+ *
+ * `aoLimpar` existe para quem precisa anunciar a saída sem que outra conta
+ * entre no meio (a exclusão da conta não pode mostrar o aviso de exclusão para
+ * uma sessão nova).
+ */
+export async function clearSessionIfCurrent(
+  token: string | null,
+  aoLimpar?: () => void,
+  geracaoEsperada?: string | null,
+): Promise<boolean> {
+  // Lida antes de entrar na fila: se a sessão for reaberta com o MESMO token
+  // enquanto este pedido espera, a geração muda e o pedido antigo não apaga a
+  // sessão nova (review do #310). Quem fez a requisição pode passar a geração
+  // que valia no INÍCIO dela, para um 401 atrasado não derrubar a sessão nova.
+  const geracaoDoPedido =
+    geracaoEsperada === undefined ? getSessionGeneration() : geracaoEsperada;
+  return comLockDeSessao(() => {
+    if (getToken() !== token || getSessionGeneration() !== geracaoDoPedido) {
+      return false;
+    }
+    limparSessaoSemLock();
+    aoLimpar?.();
+    return true;
+  });
 }
 
 /**
@@ -98,6 +205,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   // O campo não pode ir para o `fetch`: ele não conhece `token` (#298).
   const { token: tokenExplicito, ...opcoesFetch } = options;
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...options.headers };
+  // Geração lida ANTES do token: se a sessão for reaberta com o mesmo token
+  // entre as duas leituras, ficamos com uma geração velha (que não confere) em
+  // vez de um par token velho + geração nova, que apagaria a sessão nova
+  // (review do #310).
+  const geracaoDoPedido = getSessionGeneration();
   const token = tokenExplicito !== undefined ? tokenExplicito : getToken();
   if (token) {
     headers.Authorization = `Bearer ${token}`;
@@ -144,14 +256,38 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         // `null` = outra aba deslogou durante a requisição (a sessão desta
         // janela acabou); igual = token expirou. Diferente e não nulo = outra
         // conta assumiu, e o 401 é da sessão antiga, que não pode derrubar a
-        // nova. A limpeza reconfere o token imediatamente antes do `removeItem`
-        // (review do PR #292).
-        if (
-          (tokenAgora === null || tokenAgora === token) &&
-          clearSessionIfCurrent(tokenAgora)
-        ) {
-          window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
-          throw new Error('Sessão expirada. Faça login novamente.');
+        // nova. A limpeza reconfere o token dentro do lock (#293), então uma
+        // troca de conta entre a resposta e o `removeItem` não é derrubada.
+        if (tokenAgora === null || tokenAgora === token) {
+          let limpou = false;
+          try {
+            limpou = await clearSessionIfCurrent(
+              tokenAgora,
+              undefined,
+              tokenAgora === null ? undefined : geracaoDoPedido,
+            );
+          } catch (erroLimpeza) {
+            // Outra aba pode ter trocado a conta enquanto este pedido esperava
+            // o lock: nesse caso o 401 é da sessão antiga e não pode acusar a
+            // nova de expirada (review do #310).
+            if (
+              getToken() !== token ||
+              getSessionGeneration() !== geracaoDoPedido
+            ) {
+              throw new Error(message || `Erro ${response.status}`, { cause: erroLimpeza });
+            }
+            // O 401 já provou que ESTA sessão não vale. Se o lock falhou, a
+            // limpeza fica para a próxima operação: devolver o erro do lock
+            // esconderia a sessão expirada e o contexto mostraria uma falha
+            // genérica, sem o caminho de entrar de novo (review do #310).
+            throw new Error('Sessão expirada. Faça login novamente.', {
+              cause: erroLimpeza,
+            });
+          }
+          if (limpou) {
+            window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+            throw new Error('Sessão expirada. Faça login novamente.');
+          }
         }
       }
 

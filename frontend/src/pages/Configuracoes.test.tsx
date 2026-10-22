@@ -5,6 +5,7 @@ import Configuracoes from './Configuracoes';
 import { renderWithAuth } from '../test/test-utils';
 import { useAuth } from '../context/AuthContext';
 import { agendarLembrete, cancelarLembrete, lembreteAtivo, permissaoNotificacao, setLembreteAtivo } from '../lib/reminder';
+import { comLockDeSessao } from '../lib/lock-sessao';
 
 /** Mostra quem o contexto ainda considera logado. */
 function MostraUsuario() {
@@ -120,6 +121,58 @@ describe('tela de Configurações', () => {
     openScreen();
     fireEvent.click(await screen.findByRole('button', { name: 'Sair da conta' }));
 
+    await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
+  });
+
+  it('mostra erro e não navega quando o logout falha (#310)', async () => {
+    renderWithAuth(
+      <Routes>
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/login" element={<p>tela de login</p>} />
+      </Routes>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Sair da conta' }));
+
+    // Sem o token removido, navegar para /login faria o Layout devolver para
+    // /hoje — o clique pareceria não ter feito nada (#310).
+    expect(await screen.findByText('Não foi possível sair. Tente de novo.')).toBeInTheDocument();
+    expect(screen.queryByText('tela de login')).not.toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBe('mock-token');
+  });
+
+  it('espera o lock antes de navegar no logout (#293)', async () => {
+    renderWithAuth(
+      <Routes>
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/login" element={<p>tela de login</p>} />
+      </Routes>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+    expect(await screen.findByRole('heading', { name: 'Configurações' })).toBeInTheDocument();
+
+    // Outra aba está com o lock: o logout espera e não pode navegar antes de
+    // limpar a sessão, senão o Layout devolve a pessoa para /hoje (#293).
+    let liberar!: () => void;
+    const segurando = new Promise<void>((resolver) => {
+      liberar = resolver;
+    });
+    const dono = comLockDeSessao(() => segurando);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sair da conta' }));
+    expect(localStorage.getItem('token')).toBe('mock-token');
+    // Ainda não navegou: com o lock preso, o logout não terminou.
+    expect(screen.queryByText('tela de login')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Configurações' })).toBeInTheDocument();
+
+    liberar();
+    await dono;
+    expect(await screen.findByText('tela de login')).toBeInTheDocument();
     expect(localStorage.getItem('token')).toBeNull();
   });
 
@@ -148,7 +201,7 @@ describe('tela de Configurações', () => {
     // Com só `clearSession` o contexto continuaria com o usuário e o Layout
     // devolveria /login para /hoje: a pessoa saía do token, mas não do app.
     expect(await screen.findByText('sem usuário')).toBeInTheDocument();
-    expect(localStorage.getItem('token')).toBeNull();
+    await waitFor(() => expect(localStorage.getItem('token')).toBeNull());
   });
 
   it('explica as limitações do lembrete na tela', async () => {
@@ -255,8 +308,167 @@ describe('tela de Configurações', () => {
     expect(localStorage.getItem('token')).toBeNull();
   });
 
-  it('exclui a conta com confirmação EXCLUIR', async () => {
+  it('exclusão sem lock não derruba a sessão de outra aba e avisa que a local ficou pendente (#310)', async () => {
     fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+    renderWithAuth(
+      <Routes>
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/" element={<h1>Página inicial</h1>} />
+      </Routes>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const nav = navigator as unknown as { locks?: LockManager };
+    const original = nav.locks;
+    const request = vi.fn().mockRejectedValue(new Error('lock fora do ar'));
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: { request },
+    });
+
+    try {
+      fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), { target: { value: 'EXCLUIR' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
+
+      // A conta já não existe no servidor. Sem lock, remover o token seria uma
+      // corrida com outra aba: a tela avisa que a sessão local ficou pendente
+      // em vez de arriscar derrubar a conta nova (#310).
+      await waitFor(() => expect(calls('DELETE', '/me').length).toBe(1));
+      expect(
+        await screen.findByText(/Conta excluída, mas não foi possível encerrar a sessão/),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Página inicial' })).not.toBeInTheDocument();
+      expect(localStorage.getItem('token')).not.toBeNull();
+      // A mensagem não pode vir de um caminho que nem chegou a pedir o lock:
+      // 2 tentativas na primeira limpeza + 2 na nova tentativa.
+      expect(request).toHaveBeenCalledTimes(4);
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
+    }
+  });
+
+  it('exclusão com a sessão reaberta avisa em vez de ficar em silêncio (#310)', async () => {
+    let responderDelete: ((valor: Response) => void) | undefined;
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'DELETE') {
+        return new Promise<Response>((resolve) => {
+          responderDelete = resolve;
+        });
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+    renderWithAuth(
+      <Routes>
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/" element={<h1>Página inicial</h1>} />
+      </Routes>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+    fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), {
+      target: { value: 'EXCLUIR' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
+
+    // O DELETE está em voo; outra aba reabre a sessão com o mesmo token (nova
+    // geração). A limpeza não pode derrubar essa sessão, mas a exclusão já
+    // aconteceu no servidor — a tela precisa dizer isso (#310).
+    await waitFor(() => expect(responderDelete).toBeDefined());
+    localStorage.setItem('noiteboa-sessao-geracao', 'geracao-nova');
+    await act(async () => {
+      responderDelete?.(new Response(null, { status: 204 }));
+    });
+
+    expect(
+      await screen.findByText(/Conta excluída, mas não foi possível encerrar a sessão neste navegador/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Página inicial' })).not.toBeInTheDocument();
+    expect(localStorage.getItem('token')).not.toBeNull();
+  });
+
+  it('exclusão com outra conta aberta avisa que a sessão foi preservada (#310)', async () => {
+    let responderDelete: ((valor: Response) => void) | undefined;
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'DELETE') {
+        return new Promise<Response>((resolve) => {
+          responderDelete = resolve;
+        });
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+    renderWithAuth(
+      <Routes>
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/" element={<h1>Página inicial</h1>} />
+      </Routes>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+    fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), {
+      target: { value: 'EXCLUIR' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
+
+    // O DELETE da conta antiga está em voo quando outra aba entra em outra
+    // conta. A conta antiga é excluída no servidor, mas a sessão nova fica.
+    await waitFor(() => expect(responderDelete).toBeDefined());
+    localStorage.setItem('token', 'token-de-outra-conta');
+    await act(async () => {
+      responderDelete?.(new Response(null, { status: 204 }));
+    });
+
+    expect(
+      await screen.findByText(/Conta excluída\. A sessão local agora é de outra conta e foi preservada/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Página inicial' })).not.toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBe('token-de-outra-conta');
+  });
+
+  it('storage bloqueado na exclusão avisa que não conseguiu encerrar a sessão (#310)', async () => {
+    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
+      const path = String(url);
+      if (path.includes('/me') && options.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      if (path.includes('/me')) return jsonResponse(ME);
+      return jsonResponse(GOAL);
+    });
+    renderWithAuth(
+      <Routes>
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/" element={<h1>Página inicial</h1>} />
+      </Routes>,
+      { user: mockUser, route: '/configuracoes' },
+    );
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const remover = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+
+    fireEvent.change(await screen.findByPlaceholderText('seu@email.com ou EXCLUIR'), { target: { value: 'EXCLUIR' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }));
+
+    await waitFor(() => expect(calls('DELETE', '/me').length).toBe(1));
+    expect(
+      await screen.findByText(/Conta excluída, mas não foi possível encerrar a sessão/),
+    ).toBeInTheDocument();
+    // A mensagem tem de vir da falha de storage, não de um caminho que pulou
+    // a limpeza (#310).
+    expect(remover).toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: 'Página inicial' })).not.toBeInTheDocument();
+    expect(localStorage.getItem('token')).not.toBeNull();
+  });
+
+  it('exclui a conta com confirmação EXCLUIR', async () => {    fetchMock.mockImplementation(async (url: any, options: any = {}) => {
       const path = String(url);
       if (path.includes('/me') && options.method === 'DELETE') {
         return new Response(null, { status: 204 });
