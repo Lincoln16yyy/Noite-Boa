@@ -85,7 +85,7 @@ npm run build # typecheck + build de produção em frontend/dist
 
 ### O que a CI roda
 
-O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa, em cada PR: `mvn -B verify` (os testes sobem o PostgreSQL 16 efêmero via Testcontainers), `npm ci && npm run typecheck && npm run lint && npm test && npm run build` e um **teste de fumaça E2E** no navegador ([`tools/e2e`](tools/e2e)). **Só faça o merge com tudo verde.**
+O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa, em cada PR: `mvn -B verify` (os testes sobem o PostgreSQL 16 efêmero via Testcontainers), `npm ci && npm run lint && npm test && npm run build` (o `build` roda `tsc --noEmit`; os testes rodam em UTC e em `America/Sao_Paulo`) e um **teste de fumaça E2E** no navegador ([`tools/e2e`](tools/e2e)). **Só faça o merge com tudo verde.**
 
 ### Teste de fumaça E2E
 

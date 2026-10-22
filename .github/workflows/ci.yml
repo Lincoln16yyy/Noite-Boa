@@ -14,19 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Java 21
-        if: hashFiles('backend/pom.xml') != ''
         uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
       - name: Build e testes (backend)
-        if: hashFiles('backend/pom.xml') != ''
         working-directory: backend
         run: mvn -B verify
-      - name: Backend ainda não criado
-        if: hashFiles('backend/pom.xml') == ''
-        run: echo "backend/pom.xml não existe ainda, pulando."
 
   frontend:
     runs-on: ubuntu-latest
@@ -34,31 +29,22 @@ jobs:
       - uses: actions/checkout@v4
       # jsdom 30 (dependência do Vitest) exige Node ^22.22.2 || ^24.15.0 || >=26
       - name: Node 24
-        if: hashFiles('frontend/package-lock.json') != ''
         uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Instalar dependências
-        if: hashFiles('frontend/package-lock.json') != ''
         working-directory: frontend
         run: npm ci
       - name: Lint, testes e build (frontend)
-        if: hashFiles('frontend/package-lock.json') != ''
         working-directory: frontend
+        # `npm run build` já roda `tsc --noEmit` (typecheck) antes do Vite.
         run: |
-          npm run lint --if-present
-          TZ=UTC npm test --if-present
-          TZ=America/Sao_Paulo npm test --if-present
+          npm run lint
+          TZ=UTC npm test
+          TZ=America/Sao_Paulo npm test
           npm run build
-      - name: Typecheck (TypeScript)
-        if: hashFiles('frontend/package-lock.json') != ''
-        working-directory: frontend
-        run: npm run typecheck --if-present
-      - name: Frontend ainda não criado
-        if: hashFiles('frontend/package-lock.json') == ''
-        run: echo "frontend/package-lock.json não existe ainda, pulando."
 
   e2e:
     runs-on: ubuntu-latest
@@ -66,7 +52,6 @@ jobs:
       - uses: actions/checkout@v4
       # jsdom 30 (dependência do Vitest) exige Node ^22.22.2 || ^24.15.0 || >=26
       - name: Node 24
-        if: hashFiles('tools/e2e/package-lock.json') != ''
         uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -75,20 +60,14 @@ jobs:
             frontend/package-lock.json
             tools/e2e/package-lock.json
       - name: Compilar o front-end
-        if: hashFiles('tools/e2e/package-lock.json') != ''
         working-directory: frontend
         run: npm ci && npm run build
       - name: Instalar ferramentas de E2E
-        if: hashFiles('tools/e2e/package-lock.json') != ''
         working-directory: tools/e2e
         run: npm ci
       - name: Teste de fumaça (navegador)
-        if: hashFiles('tools/e2e/package-lock.json') != ''
         working-directory: tools/e2e
         # Usa o Chrome já presente no runner (fallback: Chromium do pacote)
         env:
           CHROME_PATH: /usr/bin/google-chrome
         run: npm run smoke
-      - name: E2E ainda não criado
-        if: hashFiles('tools/e2e/package-lock.json') == ''
-        run: echo "tools/e2e ainda não existe, pulando."
