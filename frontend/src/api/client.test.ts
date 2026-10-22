@@ -98,6 +98,45 @@ describe('api client', () => {
     }
   });
 
+  it('401 antigo não acusa a sessão nova de expirada quando o lock falha (#310)', async () => {
+    localStorage.setItem('token', 'token-A');
+    let responder: ((valor: Response) => void) | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          responder = resolve;
+        }),
+    );
+    const rejeitores: Array<(erro: unknown) => void> = [];
+    const request = vi.fn(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejeitores.push(reject);
+        }),
+    );
+    const nav = navigator as unknown as { locks?: LockManager };
+    const original = nav.locks;
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } });
+
+    try {
+      const requisicao = api.get('/sleep-logs');
+      responder?.(new Response('{}', { status: 401 }));
+
+      // A limpeza começa com o token A; outra aba assume B antes de o lock
+      // responder.
+      while (rejeitores.length < 1) await Promise.resolve();
+      localStorage.setItem('token', 'token-B');
+      rejeitores[0](new Error('lock fora do ar'));
+      while (rejeitores.length < 2) await Promise.resolve();
+      rejeitores[1](new Error('lock fora do ar'));
+
+      await expect(requisicao).rejects.toThrow('Erro 401');
+      expect(localStorage.getItem('token')).toBe('token-B');
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
+    }
+  });
+
   it('401 de uma sessão antiga não derruba a sessão nova (#292)', async () => {
     localStorage.setItem('token', 'token-A');
     let responder: ((valor: Response) => void) | undefined;
@@ -234,7 +273,7 @@ describe('escritas do token entre abas (#293)', () => {
     expect(localStorage.getItem('token')).toBe('token-B');
   });
 
-  it('falha ao gravar a geração não desfaz uma troca de token já aplicada (#310)', async () => {
+  it('falha ao gravar a geração não deixa troca de token pela metade (#310)', async () => {
     const setItemOriginal = Storage.prototype.setItem;
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
       this: Storage,
@@ -246,14 +285,34 @@ describe('escritas do token entre abas (#293)', () => {
     });
 
     try {
-      await expect(saveSession('token-A')).resolves.toBe(true);
-      expect(localStorage.getItem('token')).toBe('token-A');
-
-      await expect(clearSessionIfCurrent('token-A')).resolves.toBe(true);
+      // Geração primeiro: se ela não puder ser gravada, o login falha sem
+      // deixar um token que um pedido antigo poderia sobrescrever.
+      await expect(saveSession('token-A')).rejects.toThrow('storage cheio');
       expect(localStorage.getItem('token')).toBeNull();
+
+      localStorage.setItem('token', 'token-A');
+      await expect(clearSessionIfCurrent('token-A')).rejects.toThrow('storage cheio');
+      expect(localStorage.getItem('token')).toBe('token-A');
     } finally {
       vi.mocked(Storage.prototype.setItem).mockRestore();
     }
+  });
+
+  it('logout antigo não apaga a sessão reaberta com o mesmo token (#310)', async () => {
+    await saveSession('token-A');
+    const { dono, liberar } = segurarLock();
+    const limpeza = clearSessionIfCurrent('token-A');
+
+    // Outra aba saiu e entrou de novo com o MESMO token enquanto a limpeza
+    // esperava o lock: a geração mudou, então ela não pode apagar a sessão nova.
+    localStorage.removeItem('token');
+    localStorage.setItem('token', 'token-A');
+    localStorage.setItem('noiteboa-sessao-geracao', 'geracao-nova');
+    liberar();
+    await dono;
+
+    await expect(limpeza).resolves.toBe(false);
+    expect(localStorage.getItem('token')).toBe('token-A');
   });
 
   it('401 atrasado sem token não invalida o login em voo (#310)', async () => {

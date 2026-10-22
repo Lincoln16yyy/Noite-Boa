@@ -25,7 +25,12 @@ if (!('locks' in navigator)) {
   Object.defineProperty(navigator, 'locks', {
     configurable: true,
     value: {
-      request(nome: string, callback: () => unknown) {
+      request(nome: string, opcoesOuCallback: unknown, talvezCallback?: () => unknown) {
+        const callback =
+          typeof opcoesOuCallback === 'function'
+            ? (opcoesOuCallback as () => unknown)
+            : talvezCallback;
+        if (!callback) throw new Error('request sem callback');
         const anterior = filas.get(nome) ?? Promise.resolve();
         const atual = anterior.then(() => callback());
         // A fila não pode carregar a rejeição de uma operação para a próxima.

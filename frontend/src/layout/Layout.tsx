@@ -55,9 +55,10 @@ export default function Layout() {
   }, [sessao]);
 
   // Retry bem-sucedido da sessão também some com o erro do logout anterior.
+  // Se o retry falhar de novo, o aviso da saída continua: o token segue aqui.
   const handleRetry = async () => {
-    setErroLogout(null);
-    await tentarNovamente();
+    const restaurada = await tentarNovamente();
+    if (restaurada) setErroLogout(null);
   };
 
   // Falha no /me com token presente não é logout: avisa e deixa tentar de

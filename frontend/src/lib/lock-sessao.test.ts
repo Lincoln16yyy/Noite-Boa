@@ -47,7 +47,10 @@ describe('comLockDeSessao', () => {
     const request = vi
       .fn()
       .mockRejectedValueOnce(new Error('falha transitória'))
-      .mockImplementationOnce((_nome: string, callback: () => unknown) => Promise.resolve(callback()));
+      .mockImplementationOnce(
+        (_nome: string, _opcoes: { signal: AbortSignal }, callback: () => unknown) =>
+          Promise.resolve(callback()),
+      );
     const restaurar = comLocksFalsos({ request });
     let sobLock = false;
     const acao = vi.fn(() => {
@@ -61,6 +64,33 @@ describe('comLockDeSessao', () => {
       expect(sobLock).toBe(true);
     } finally {
       restaurar();
+    }
+  });
+
+  it('desiste quando o lock não é liberado no prazo, sem rodar a ação (review do #310)', async () => {
+    vi.useFakeTimers();
+    const request = vi.fn(
+      (_nome: string, opcoes: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          opcoes.signal.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          );
+        }),
+    );
+    const restaurar = comLocksFalsos({ request });
+    const acao = vi.fn(() => 'ok');
+
+    try {
+      const promessa = comLockDeSessao(acao);
+      const falha = expect(promessa).rejects.toThrow(/operação de sessão/);
+      await vi.advanceTimersByTimeAsync(5000);
+      await falha;
+      // Aba suspensa segurando o lock: não adianta pedir de novo no mesmo prazo.
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(acao).not.toHaveBeenCalled();
+    } finally {
+      restaurar();
+      vi.useRealTimers();
     }
   });
 

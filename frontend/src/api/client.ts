@@ -70,13 +70,7 @@ function avancarGeracao(): void {
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random()}`;
-  try {
-    localStorage.setItem(CHAVE_GERACAO, nova);
-  } catch {
-    // A geração só serve para descartar logins em voo. Se o storage recusar
-    // esta escrita, a troca de token que já deu certo não pode virar erro
-    // depois de aplicada (review do #310).
-  }
+  localStorage.setItem(CHAVE_GERACAO, nova);
 }
 
 /** Remove o token e esquece a sonda. Só usar já dentro do lock de sessão. */
@@ -84,10 +78,11 @@ function limparSessaoSemLock(): void {
   // Sem token não há troca de sessão: não avance a geração, senão um 401
   // atrasado descartaria o login que está em voo nesta aba (review do #310).
   const tinhaToken = getToken() !== null;
-  localStorage.removeItem('token');
-  // Toda saída invalida os logins que ainda estão em voo nesta ou em outras
-  // abas (review do #310).
+  // A geração vem antes da remoção: se ela não puder ser gravada, nada mudou.
+  // Depois de remover, uma falha deixaria a sessão sem a marca que invalida
+  // logins em voo (review do #310).
   if (tinhaToken) avancarGeracao();
+  localStorage.removeItem('token');
   // A sondagem do primeiro uso vale para a conta que estava logada. Toda saída
   // de sessão passa por aqui (logout, exclusão da conta, 401), então a próxima
   // conta desta aba é sondada de novo (#273).
@@ -110,8 +105,10 @@ export async function saveSession(
     if (geracaoEsperada !== undefined && getSessionGeneration() !== geracaoEsperada) {
       return false;
     }
-    localStorage.setItem('token', token);
+    // Geração antes do token: se ela não puder ser gravada, o login falha sem
+    // deixar um token que um pedido antigo poderia sobrescrever (review do #310).
     avancarGeracao();
+    localStorage.setItem('token', token);
     return true;
   });
 }
@@ -131,8 +128,14 @@ export async function clearSessionIfCurrent(
   token: string | null,
   aoLimpar?: () => void,
 ): Promise<boolean> {
+  // Lida antes de entrar na fila: se a sessão for reaberta com o MESMO token
+  // enquanto este pedido espera, a geração muda e o pedido antigo não apaga a
+  // sessão nova (review do #310).
+  const geracaoDoPedido = getSessionGeneration();
   return comLockDeSessao(() => {
-    if (getToken() !== token) return false;
+    if (getToken() !== token || getSessionGeneration() !== geracaoDoPedido) {
+      return false;
+    }
     limparSessaoSemLock();
     aoLimpar?.();
     return true;
@@ -222,7 +225,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
           try {
             limpou = await clearSessionIfCurrent(tokenAgora);
           } catch (erroLimpeza) {
-            // O 401 já provou que a sessão não vale. Se o lock falhou, a
+            // Outra aba pode ter trocado a conta enquanto este pedido esperava
+            // o lock: nesse caso o 401 é da sessão antiga e não pode acusar a
+            // nova de expirada (review do #310).
+            if (getToken() !== token) {
+              throw new Error(message || `Erro ${response.status}`, { cause: erroLimpeza });
+            }
+            // O 401 já provou que ESTA sessão não vale. Se o lock falhou, a
             // limpeza fica para a próxima operação: devolver o erro do lock
             // esconderia a sessão expirada e o contexto mostraria uma falha
             // genérica, sem o caminho de entrar de novo (review do #310).

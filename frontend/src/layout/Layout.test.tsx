@@ -327,6 +327,11 @@ describe('Layout — falha de sessão (#294)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
     expect(await screen.findByText('Não foi possível sair. Tente de novo.')).toBeInTheDocument();
 
+    // Retry que também falha: o aviso da saída continua, porque o token ficou.
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    await waitFor(() => expect(screen.getByText(/não foi possível carregar/i)).toBeInTheDocument());
+    expect(screen.getByText('Não foi possível sair. Tente de novo.')).toBeInTheDocument();
+
     // A sessão volta: o aviso daquele clique falho não pode ficar na tela nova.
     fetchSpy.mockResolvedValue(
       new Response(JSON.stringify(usuario), {

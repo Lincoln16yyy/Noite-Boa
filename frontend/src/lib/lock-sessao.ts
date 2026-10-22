@@ -4,8 +4,17 @@ export const LOCK_SESSAO = 'noiteboa-sessao';
 /** Quantas vezes pedimos o lock antes de abrir mão da serialização. */
 const TENTATIVAS_DE_LOCK = 2;
 
+/** Quanto esperamos o lock antes de desistir (aba presa segurando o lock). */
+const TEMPO_MAX_LOCK = 5000;
+
 type NavigatorComLocks = Navigator & {
-  locks?: { request: (nome: string, callback: () => unknown) => Promise<unknown> };
+  locks?: {
+    request: (
+      nome: string,
+      opcoes: { signal: AbortSignal },
+      callback: () => unknown,
+    ) => Promise<unknown>;
+  };
 };
 
 /**
@@ -30,6 +39,11 @@ type NavigatorComLocks = Navigator & {
  * módulo existe para fechar. Quem chama decide o que mostrar (a sessão fica
  * intacta para tentar de novo).
  *
+ * A espera é limitada: se a aba que segura o lock estiver suspensa, o pedido
+ * fica preso para sempre sem isto. Depois de `TEMPO_MAX_LOCK` desistimos sem
+ * rodar a ação (a sessão fica intacta), em vez de deixar login/logout/401
+ * pendurados sem mensagem (review do #310).
+ *
  * Limite conhecido: uma aba com bundle anterior ao #293 não pede este lock.
  * Como `localStorage` não tem compare-and-swap, não dá para serializar com
  * código que não coopera; resta ao evento `storage` alinhar a interface ao
@@ -52,8 +66,10 @@ export async function comLockDeSessao<T>(acao: () => T | Promise<T>): Promise<T>
   let ultimaFalha: unknown;
   for (let tentativa = 1; tentativa <= TENTATIVAS_DE_LOCK; tentativa += 1) {
     let entrou = false;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TEMPO_MAX_LOCK);
     try {
-      return (await locks.request(LOCK_SESSAO, () => {
+      return (await locks.request(LOCK_SESSAO, { signal: controller.signal }, () => {
         entrou = true;
         return acao();
       })) as T;
@@ -61,6 +77,10 @@ export async function comLockDeSessao<T>(acao: () => T | Promise<T>): Promise<T>
       // Se a ação já começou, o erro é dela: repetir duplicaria a escrita.
       if (entrou) throw erro;
       ultimaFalha = erro;
+      // Desistimos por tempo: repetir agora só esperaria mais um prazo.
+      if (controller.signal.aborted) break;
+    } finally {
+      clearTimeout(timer);
     }
   }
 

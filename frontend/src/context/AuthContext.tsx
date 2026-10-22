@@ -25,9 +25,9 @@ export interface AuthContextValue {
   login: (email: string, password: string) => Promise<LoginResult>;
   register: (displayName: string, email: string, password: string) => Promise<RegisterResult>;
   logout: () => Promise<ResultadoLogout>;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<boolean>;
   /** Reconsulta o `/me` depois de uma falha de sessão, com o `loading` ligado. */
-  tentarNovamente: () => Promise<void>;
+  tentarNovamente: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const refreshUser = useCallback(async () => {
+  const refreshUser = useCallback(async (): Promise<boolean> => {
     // O /me vale para a sessão que o pediu. Se o token mudar até a resposta
     // (outra conta logou), o resultado é de uma sessão que já saiu e não pode
     // sobrescrever o usuário atual. Mesmo com o token igual, só a consulta mais
@@ -84,7 +84,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // token e esta ainda não processou o `storage`, o retry carrega a
         // conta nova — a identidade da tela precisa acompanhar (#294).
         setSessao(tokenDaRequisicao);
+        return true;
       }
+      return false;
     } catch (erro) {
       if (atual()) {
         setUser(null);
@@ -103,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setErroSessao('Não foi possível carregar sua sessão. Tente de novo.');
         }
       }
+      return false;
     } finally {
       if (montado.current && geracao.current === minhaGeracao) {
         if (getToken() === tokenDaRequisicao) {
@@ -230,9 +233,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return 'saiu';
   }, [sessao]);
 
-  const tentarNovamente = useCallback(async () => {
+  const tentarNovamente = useCallback(async (): Promise<boolean> => {
     setLoading(true);
-    await refreshUser();
+    return refreshUser();
   }, [refreshUser]);
 
   return (
