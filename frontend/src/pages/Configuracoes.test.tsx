@@ -388,7 +388,7 @@ describe('tela de Configurações', () => {
     });
 
     expect(
-      await screen.findByText(/Conta excluída, mas a sessão local não foi encerrada/),
+      await screen.findByText(/Conta excluída, mas não foi possível encerrar a sessão neste navegador/),
     ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Página inicial' })).not.toBeInTheDocument();
     expect(localStorage.getItem('token')).not.toBeNull();

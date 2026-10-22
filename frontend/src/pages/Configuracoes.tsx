@@ -258,7 +258,7 @@ export default function Configuracoes() {
         // A conta foi excluída no servidor, mas a sessão local é outra (mesmo
         // token, nova geração): não derrubamos, mas também não fingimos
         // sucesso silencioso (#310).
-        setDeleteError('Conta excluída, mas a sessão local não foi encerrada. Recarregue a página.');
+        setDeleteError('Conta excluída, mas não foi possível encerrar a sessão neste navegador. Recarregue a página.');
         setDeleting(false);
         return;
       }
@@ -269,14 +269,24 @@ export default function Configuracoes() {
       if (contaExcluida) {
         console.error('[configuracoes] falha ao limpar a sessão depois de excluir a conta', err);
         try {
-          // A falha do lock pode ser transitória: tenta de novo, serializada.
-          // A geração é relida aqui (sem o valor do início): a tentativa que
-          // falhou pode tê-la avançado sem trocar o token.
-          if (await clearSessionIfCurrent(tokenDaExclusao, avisarExclusao)) return;
+          // A falha do lock pode ser transitória: tenta de novo, serializada,
+          // com a geração do INÍCIO do DELETE. Se outra aba reabriu a sessão
+          // com o mesmo token nesse meio-tempo, a nova tentativa não a apaga.
+          // (Se a tentativa anterior avançou a geração sem remover, a nova
+          // tentativa devolve `false` e a tela informa o que ficou pendente.)
+          if (
+            await clearSessionIfCurrent(
+              tokenDaExclusao,
+              avisarExclusao,
+              geracaoDaExclusao,
+            )
+          ) {
+            return;
+          }
           // A sessão é outra (mesmo token, nova geração) ou já era outra: a
           // conta foi excluída, mas a sessão local não foi encerrada por esta
           // tela. Dizer isso evita uma tela silenciosa com o token antigo.
-          setDeleteError('Conta excluída, mas a sessão local não foi encerrada. Recarregue a página.');
+          setDeleteError('Conta excluída, mas não foi possível encerrar a sessão neste navegador. Recarregue a página.');
           setDeleting(false);
           return;
         } catch {

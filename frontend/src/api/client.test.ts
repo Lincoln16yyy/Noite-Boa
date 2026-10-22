@@ -326,6 +326,10 @@ describe('escritas do token entre abas (#293)', () => {
       localStorage.setItem('token', 'token-A');
       await expect(clearSessionIfCurrent('token-A')).rejects.toThrow('storage cheio');
       expect(localStorage.getItem('token')).toBe('token-A');
+
+      // Um token anterior não pode ser trocado pela metade se a geração falhar.
+      await expect(saveSession('token-B')).rejects.toThrow('storage cheio');
+      expect(localStorage.getItem('token')).toBe('token-A');
     } finally {
       vi.mocked(Storage.prototype.setItem).mockRestore();
     }

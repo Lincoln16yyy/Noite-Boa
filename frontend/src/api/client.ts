@@ -121,15 +121,22 @@ export async function saveSession(
     if (geracaoEsperada !== undefined && getSessionGeneration() !== geracaoEsperada) {
       return false;
     }
-    const geracaoAnterior = getSessionGeneration();
-    // Geração antes do token: se ela não puder ser gravada, o login falha sem
-    // deixar um token que um pedido antigo poderia sobrescrever (review do #310).
-    avancarGeracao();
+    const tokenAnterior = getToken();
+    // Token antes da geração: uma requisição que comece entre as duas escritas
+    // (fora do lock) vê geração velha + token novo — combinação que nunca
+    // confere no 401 e por isso não apaga a sessão (review do #310).
+    localStorage.setItem('token', token);
     try {
-      localStorage.setItem('token', token);
+      avancarGeracao();
     } catch (erro) {
-      // Sem token gravado, a sessão não mudou: a geração também não pode mudar.
-      restaurarGeracao(geracaoAnterior);
+      // Sem a geração, a sessão não pode ficar trocada pela metade: volta o
+      // token anterior e falha (review do #310).
+      try {
+        if (tokenAnterior === null) localStorage.removeItem('token');
+        else localStorage.setItem('token', tokenAnterior);
+      } catch {
+        // Best-effort: o storage já recusou a escrita; o erro original sobe.
+      }
       throw erro;
     }
     return true;
