@@ -73,16 +73,32 @@ function avancarGeracao(): void {
   localStorage.setItem(CHAVE_GERACAO, nova);
 }
 
+/** Volta a geração ao valor anterior; o erro original é o que importa. */
+function restaurarGeracao(anterior: string | null): void {
+  try {
+    if (anterior === null) localStorage.removeItem(CHAVE_GERACAO);
+    else localStorage.setItem(CHAVE_GERACAO, anterior);
+  } catch {
+    // Best-effort: se nem o rollback couber no storage, a falha já vai subir.
+  }
+}
+
 /** Remove o token e esquece a sonda. Só usar já dentro do lock de sessão. */
 function limparSessaoSemLock(): void {
   // Sem token não há troca de sessão: não avance a geração, senão um 401
   // atrasado descartaria o login que está em voo nesta aba (review do #310).
   const tinhaToken = getToken() !== null;
+  const geracaoAnterior = tinhaToken ? getSessionGeneration() : null;
   // A geração vem antes da remoção: se ela não puder ser gravada, nada mudou.
-  // Depois de remover, uma falha deixaria a sessão sem a marca que invalida
-  // logins em voo (review do #310).
   if (tinhaToken) avancarGeracao();
-  localStorage.removeItem('token');
+  try {
+    localStorage.removeItem('token');
+  } catch (erro) {
+    // A remoção falhou e o token continua: a geração também tem de continuar,
+    // senão pedidos antigos seriam tratados como de outra sessão (review do #310).
+    if (tinhaToken) restaurarGeracao(geracaoAnterior);
+    throw erro;
+  }
   // A sondagem do primeiro uso vale para a conta que estava logada. Toda saída
   // de sessão passa por aqui (logout, exclusão da conta, 401), então a próxima
   // conta desta aba é sondada de novo (#273).
@@ -105,10 +121,17 @@ export async function saveSession(
     if (geracaoEsperada !== undefined && getSessionGeneration() !== geracaoEsperada) {
       return false;
     }
+    const geracaoAnterior = getSessionGeneration();
     // Geração antes do token: se ela não puder ser gravada, o login falha sem
     // deixar um token que um pedido antigo poderia sobrescrever (review do #310).
     avancarGeracao();
-    localStorage.setItem('token', token);
+    try {
+      localStorage.setItem('token', token);
+    } catch (erro) {
+      // Sem token gravado, a sessão não mudou: a geração também não pode mudar.
+      restaurarGeracao(geracaoAnterior);
+      throw erro;
+    }
     return true;
   });
 }
@@ -127,11 +150,14 @@ export async function saveSession(
 export async function clearSessionIfCurrent(
   token: string | null,
   aoLimpar?: () => void,
+  geracaoEsperada?: string | null,
 ): Promise<boolean> {
   // Lida antes de entrar na fila: se a sessão for reaberta com o MESMO token
   // enquanto este pedido espera, a geração muda e o pedido antigo não apaga a
-  // sessão nova (review do #310).
-  const geracaoDoPedido = getSessionGeneration();
+  // sessão nova (review do #310). Quem fez a requisição pode passar a geração
+  // que valia no INÍCIO dela, para um 401 atrasado não derrubar a sessão nova.
+  const geracaoDoPedido =
+    geracaoEsperada === undefined ? getSessionGeneration() : geracaoEsperada;
   return comLockDeSessao(() => {
     if (getToken() !== token || getSessionGeneration() !== geracaoDoPedido) {
       return false;
@@ -173,6 +199,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const { token: tokenExplicito, ...opcoesFetch } = options;
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...options.headers };
   const token = tokenExplicito !== undefined ? tokenExplicito : getToken();
+  // Geração da sessão que fez o pedido: um 401 que chega depois de a sessão ser
+  // reaberta com o mesmo token não pode derrubar a nova (review do #310).
+  const geracaoDoPedido = getSessionGeneration();
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
@@ -223,7 +252,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         if (tokenAgora === null || tokenAgora === token) {
           let limpou = false;
           try {
-            limpou = await clearSessionIfCurrent(tokenAgora);
+            limpou = await clearSessionIfCurrent(
+              tokenAgora,
+              undefined,
+              tokenAgora === null ? undefined : geracaoDoPedido,
+            );
           } catch (erroLimpeza) {
             // Outra aba pode ter trocado a conta enquanto este pedido esperava
             // o lock: nesse caso o 401 é da sessão antiga e não pode acusar a

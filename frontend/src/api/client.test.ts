@@ -93,6 +93,7 @@ describe('api client', () => {
       // A limpeza fica para a próxima operação com lock; o 401 não pode virar
       // erro de lock nem sumir com um token que ainda pode ser usado (#310).
       expect(localStorage.getItem('token')).toBe('abc');
+      expect((navigator as unknown as { locks: { request: { mock: { calls: unknown[] } } } }).locks.request.mock.calls).toHaveLength(2);
     } finally {
       Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
     }
@@ -134,6 +135,38 @@ describe('api client', () => {
       expect(localStorage.getItem('token')).toBe('token-B');
     } finally {
       Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
+    }
+  });
+
+  it('401 de requisição antiga não apaga a sessão reaberta com o mesmo token (#310)', async () => {
+    await saveSession('token-A');
+    const mudancas: string[] = [];
+    const ouvinte = () => {
+      mudancas.push('session-change');
+    };
+    window.addEventListener('noiteboa:session-change', ouvinte);
+    let responder: ((valor: Response) => void) | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          responder = resolve;
+        }),
+    );
+
+    try {
+      const requisicao = api.get('/sleep-logs'); // captura a geração desta sessão
+
+      // Outra aba saiu e entrou de novo com o MESMO token enquanto o pedido
+      // estava em voo: a sessão é outra, ainda que o token seja igual.
+      await clearSessionIfCurrent('token-A');
+      await saveSession('token-A');
+
+      responder?.(new Response('{}', { status: 401 }));
+      await expect(requisicao).rejects.toThrow('Erro 401');
+      expect(localStorage.getItem('token')).toBe('token-A');
+      expect(mudancas).toHaveLength(0);
+    } finally {
+      window.removeEventListener('noiteboa:session-change', ouvinte);
     }
   });
 
@@ -295,6 +328,46 @@ describe('escritas do token entre abas (#293)', () => {
       expect(localStorage.getItem('token')).toBe('token-A');
     } finally {
       vi.mocked(Storage.prototype.setItem).mockRestore();
+    }
+  });
+
+  it('token que não pôde ser gravado ou removido não avança a geração (#310)', async () => {
+    const geracaoInicial = getSessionGeneration();
+    const setItemOriginal = Storage.prototype.setItem;
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      chave: string,
+      valor: string,
+    ) {
+      if (chave === 'token') throw new Error('storage cheio');
+      return setItemOriginal.call(this, chave, valor);
+    });
+
+    try {
+      await expect(saveSession('token-A')).rejects.toThrow('storage cheio');
+      expect(localStorage.getItem('token')).toBeNull();
+      expect(getSessionGeneration()).toBe(geracaoInicial);
+    } finally {
+      setItem.mockRestore();
+    }
+
+    localStorage.setItem('token', 'token-A');
+    const geracaoComToken = getSessionGeneration();
+    const removeItemOriginal = Storage.prototype.removeItem;
+    const removeItem = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (
+      this: Storage,
+      chave: string,
+    ) {
+      // Só a remoção do token falha; o rollback da geração continua possível.
+      if (chave === 'token') throw new Error('storage bloqueado');
+      return removeItemOriginal.call(this, chave);
+    });
+    try {
+      await expect(clearSessionIfCurrent('token-A')).rejects.toThrow('storage bloqueado');
+      expect(localStorage.getItem('token')).toBe('token-A');
+      expect(getSessionGeneration()).toBe(geracaoComToken);
+    } finally {
+      removeItem.mockRestore();
     }
   });
 

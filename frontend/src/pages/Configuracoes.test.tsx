@@ -327,9 +327,10 @@ describe('tela de Configurações', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const nav = navigator as unknown as { locks?: LockManager };
     const original = nav.locks;
+    const request = vi.fn().mockRejectedValue(new Error('lock fora do ar'));
     Object.defineProperty(navigator, 'locks', {
       configurable: true,
-      value: { request: vi.fn().mockRejectedValue(new Error('lock fora do ar')) },
+      value: { request },
     });
 
     try {
@@ -345,6 +346,9 @@ describe('tela de Configurações', () => {
       ).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: 'Página inicial' })).not.toBeInTheDocument();
       expect(localStorage.getItem('token')).not.toBeNull();
+      // A mensagem não pode vir de um caminho que nem chegou a pedir o lock:
+      // 2 tentativas na primeira limpeza + 2 na nova tentativa.
+      expect(request).toHaveBeenCalledTimes(4);
     } finally {
       Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
     }

@@ -52,6 +52,25 @@ function TelaLogin() {
   );
 }
 
+/** Mostra como o logout terminou, para conferir o resultado (#310). */
+function BotaoSairComResultado() {
+  const { logout } = useAuth();
+  const [resultado, setResultado] = useState('');
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          void logout().then(setResultado, () => setResultado('rejeitou'));
+        }}
+      >
+        Sair
+      </button>
+      <p>{resultado}</p>
+    </>
+  );
+}
+
 /** Imita a guarda do `Layout`: sem usuário (e sem carregar), manda para o login. */
 function RotaProtegida() {
   const { user, loading } = useAuth();
@@ -580,5 +599,68 @@ describe('AuthProvider', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/sessão mudou durante o login/i);
     expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('falha de logout depois que a sessão mudou não vira erro na conta nova (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    const rejeitores: Array<(erro: unknown) => void> = [];
+    const request = vi.fn(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejeitores.push(reject);
+        }),
+    );
+    const nav = navigator as unknown as { locks?: LockManager };
+    const original = nav.locks;
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } });
+
+    try {
+      render(
+        <AuthProvider>
+          <MostraUsuario />
+          <BotaoSairComResultado />
+        </AuthProvider>,
+      );
+      expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+      // A limpeza começa com A; outra aba troca a conta antes de o lock falhar.
+      while (rejeitores.length < 1) await Promise.resolve();
+      localStorage.setItem('token', 'jwt-B');
+      rejeitores[0](new Error('lock fora do ar'));
+      while (rejeitores.length < 2) await Promise.resolve();
+      rejeitores[1](new Error('lock fora do ar'));
+
+      expect(await screen.findByText('sessao-mudou')).toBeInTheDocument();
+      expect(localStorage.getItem('token')).toBe('jwt-B');
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: original });
+    }
+  });
+
+  it('storage bloqueado na leitura devolve falha em vez de rejeitar o logout (#310)', async () => {
+    localStorage.setItem('token', 'jwt-A');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(usuarioA), { status: 200 }),
+    );
+    render(
+      <AuthProvider>
+        <MostraUsuario />
+        <BotaoSairComResultado />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('a@example.com')).toBeInTheDocument();
+
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage bloqueado');
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+
+    expect(await screen.findByText('falhou')).toBeInTheDocument();
   });
 });

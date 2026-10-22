@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, clearSessionIfCurrent, getToken } from '../api/client';
+import { api, clearSessionIfCurrent, getSessionGeneration, getToken } from '../api/client';
 import type { Goal, User } from '../api/types';
 import {
   agendarLembrete,
@@ -235,6 +235,9 @@ export default function Configuracoes() {
     // o DELETE está em voo, a sessão nova não pode ser derrubada nem levada
     // para /?deleted=true (review do PR #292).
     const tokenDaExclusao = tokenDaTela;
+    // Geração no início do DELETE: se a sessão for reaberta com o mesmo token
+    // enquanto o pedido está em voo, a limpeza não derruba a nova (#310).
+    const geracaoDaExclusao = getSessionGeneration();
     let contaExcluida = false;
     try {
       await api.delete('/me', { token: tokenDaExclusao });
@@ -246,7 +249,11 @@ export default function Configuracoes() {
       // A remoção confere o token de novo dentro do lock (#293). O aviso e a
       // navegação vão no callback do lock: se outra aba entrar ao soltar, ela
       // não recebe o aviso de exclusão da conta antiga (review do #310).
-      const avisou = await clearSessionIfCurrent(tokenDaExclusao, avisarExclusao);
+      const avisou = await clearSessionIfCurrent(
+        tokenDaExclusao,
+        avisarExclusao,
+        geracaoDaExclusao,
+      );
       if (!avisou) {
         setDeleting(false);
         return;
@@ -259,6 +266,8 @@ export default function Configuracoes() {
         console.error('[configuracoes] falha ao limpar a sessão depois de excluir a conta', err);
         try {
           // A falha do lock pode ser transitória: tenta de novo, serializada.
+          // A geração é relida aqui (sem o valor do início): a tentativa que
+          // falhou pode tê-la avançado sem trocar o token.
           if (await clearSessionIfCurrent(tokenDaExclusao, avisarExclusao)) return;
           // A sessão já era outra: esta tela não tem o que derrubar.
           setDeleting(false);

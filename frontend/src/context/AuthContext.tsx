@@ -194,7 +194,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async (): Promise<ResultadoLogout> => {
-    const token = getToken();
+    // Storage bloqueado já na leitura: sem isto o clique rejeitaria a promessa
+    // e a tela ficaria sem a mensagem de falha (review do #310).
+    let token: string | null;
+    try {
+      token = getToken();
+    } catch (erro) {
+      console.error('[auth] storage indisponível ao ler a sessão', erro);
+      return 'falhou';
+    }
     // Esta tela representa a sessão `sessao`. Se outra aba já trocou o token e
     // o evento `storage` ainda não chegou aqui, o clique de sair é da sessão
     // ANTIGA: derrubar o token levaria a conta nova junto (review do PR #292).
@@ -211,6 +219,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       limpou = await clearSessionIfCurrent(token);
     } catch (erro) {
+      // A sessão pode ter mudado enquanto o lock falhava: aí o clique era da
+      // sessão antiga e a tela nova não pode receber o erro de logout dela
+      // (review do #310).
+      let tokenAgora: string | null;
+      try {
+        tokenAgora = getToken();
+      } catch {
+        tokenAgora = token;
+      }
+      if (tokenAgora !== token) {
+        setSessao(tokenAgora);
+        setUser(null);
+        setErroSessao(null);
+        window.dispatchEvent(new CustomEvent('noiteboa:session-change'));
+        return tokenAgora === null ? 'saiu' : 'sessao-mudou';
+      }
       // Storage bloqueado ou lock indisponível: o token não saiu. Sair do
       // estado local deixaria a pessoa "deslogada" até recarregar e voltar
       // para a conta — pior que não sair. A tela que chamou mostra o erro.
