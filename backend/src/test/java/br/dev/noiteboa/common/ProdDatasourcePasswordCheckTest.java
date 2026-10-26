@@ -12,38 +12,38 @@ import org.springframework.mock.env.MockEnvironment;
 
 class ProdDatasourcePasswordCheckTest {
 
-    private static MockEnvironment prodCom(String senha) {
+    private static MockEnvironment prodWith(String password) {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("prod");
-        if (senha != null) {
-            environment.setProperty("spring.datasource.password", senha);
+        if (password != null) {
+            environment.setProperty("spring.datasource.password", password);
         }
         return environment;
     }
 
     @Test
-    void senhaDeDesenvolvimentoFalhaEmProd() {
-        IllegalStateException erro = assertThrows(IllegalStateException.class,
-            () -> ProdDatasourcePasswordCheck.validate(prodCom("sono_dev_only")));
+    void devPasswordFailsInProd() {
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+            () -> ProdDatasourcePasswordCheck.validate(prodWith("sono_dev_only")));
 
-        assertTrue(erro.getMessage().contains("SPRING_DATASOURCE_PASSWORD"), erro.getMessage());
+        assertTrue(error.getMessage().contains("SPRING_DATASOURCE_PASSWORD"), error.getMessage());
     }
 
     @Test
-    void senhaAusenteFalhaEmProd() {
-        IllegalStateException erro = assertThrows(IllegalStateException.class,
-            () -> ProdDatasourcePasswordCheck.validate(prodCom(null)));
+    void missingPasswordFailsInProd() {
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+            () -> ProdDatasourcePasswordCheck.validate(prodWith(null)));
 
-        assertTrue(erro.getMessage().contains("SPRING_DATASOURCE_PASSWORD"), erro.getMessage());
+        assertTrue(error.getMessage().contains("SPRING_DATASOURCE_PASSWORD"), error.getMessage());
     }
 
     @Test
-    void senhaFortePassaEmProd() {
-        assertDoesNotThrow(() -> ProdDatasourcePasswordCheck.validate(prodCom("senha-do-neon")));
+    void strongPasswordPassesInProd() {
+        assertDoesNotThrow(() -> ProdDatasourcePasswordCheck.validate(prodWith("senha-do-neon")));
     }
 
     @Test
-    void senhaDeDesenvolvimentoPassaForaDeProd() {
+    void devPasswordPassesOutsideProd() {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("dev");
         environment.setProperty("spring.datasource.password", "sono_dev_only");
@@ -52,21 +52,21 @@ class ProdDatasourcePasswordCheckTest {
     }
 
     @Test
-    void senhaDeDesenvolvimentoDerrubaBootEmProd() {
+    void devPasswordFailsBootInProd() {
         // O post-processor roda antes do Flyway/DataSource: não é preciso banco
         // para provar que o boot para com a mensagem certa.
-        RuntimeException erro = assertThrows(RuntimeException.class, () ->
+        RuntimeException error = assertThrows(RuntimeException.class, () ->
             new SpringApplicationBuilder(NoiteBoaApplication.class)
                 .web(WebApplicationType.NONE)
                 .profiles("prod")
                 .run("--JWT_SECRET=" + "a".repeat(48),
                     "--spring.datasource.password=sono_dev_only"));
 
-        Throwable raiz = erro;
-        while (raiz.getCause() != null && raiz.getCause() != raiz) {
-            raiz = raiz.getCause();
+        Throwable rootCause = error;
+        while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+            rootCause = rootCause.getCause();
         }
-        assertTrue(raiz.getMessage() != null && raiz.getMessage().contains("SPRING_DATASOURCE_PASSWORD"),
-            "causa raiz deveria citar SPRING_DATASOURCE_PASSWORD, mas foi: " + raiz);
+        assertTrue(rootCause.getMessage() != null && rootCause.getMessage().contains("SPRING_DATASOURCE_PASSWORD"),
+            "causa raiz deveria citar SPRING_DATASOURCE_PASSWORD, mas foi: " + rootCause);
     }
 }

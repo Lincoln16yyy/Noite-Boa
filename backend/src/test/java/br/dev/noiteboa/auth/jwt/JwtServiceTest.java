@@ -14,16 +14,16 @@ import org.junit.jupiter.api.Test;
 class JwtServiceTest {
 
     @Test
-    void segredoComMenosDe32BytesFalhaComMensagemClara() {
-        IllegalStateException erro = assertThrows(IllegalStateException.class,
+    void secretShorterThan32BytesFailsWithClearMessage() {
+        IllegalStateException error = assertThrows(IllegalStateException.class,
             () -> new JwtService("curto", 3600, false));
 
-        assertTrue(erro.getMessage() != null && erro.getMessage().contains("32 bytes"),
-            "mensagem deveria citar o mínimo de 32 bytes, mas foi: " + erro.getMessage());
+        assertTrue(error.getMessage() != null && error.getMessage().contains("32 bytes"),
+            "mensagem deveria citar o mínimo de 32 bytes, mas foi: " + error.getMessage());
     }
 
     @Test
-    void segredoCom32BytesEOMinimoAceito() {
+    void secretWith32BytesIsTheMinimumAccepted() {
         // 256 bits é o mínimo do HMAC-SHA256 usado pelo jjwt
         assertDoesNotThrow(() -> new JwtService("a".repeat(32), 3600, false));
     }

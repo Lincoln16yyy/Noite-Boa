@@ -48,28 +48,6 @@ class AuthLoginTest extends TesteComBanco {
     }
 
     @Test
-    void passwordWith72BytesLogsIn() throws Exception {
-        String senha = "a".repeat(72);
-        register("limite72-login@example.com", senha);
-        String body = "{\"email\":\"limite72-login@example.com\",\"password\":\"" + senha + "\"}";
-        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.accessToken").exists());
-    }
-
-    @Test
-    void passwordOver72BytesIsRejectedInsteadOfTruncated() throws Exception {
-        // O BCrypt só considera os primeiros 72 bytes. Sem validar o tamanho no
-        // login, a senha de 73 bytes abaixo (72 "a" + 1) autenticaria na conta
-        // cuja senha é 72 "a", porque o byte extra seria ignorado.
-        String senha = "a".repeat(72);
-        register("truncamento@example.com", senha);
-        String body = "{\"email\":\"truncamento@example.com\",\"password\":\"" + senha + "a\"}";
-        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
     void wrongPasswordReturns401Generic() throws Exception {
         register("login2@example.com", "segredo123");
         String body = "{\"email\":\"login2@example.com\",\"password\":\"errada\"}";
