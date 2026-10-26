@@ -31,6 +31,15 @@ public class JwtService {
                 "JWT_SECRET não configurada (perfil prod): defina a variável de ambiente JWT_SECRET "
                 + "no serviço da Render. O segredo de desenvolvimento não é aceito em produção.");
         }
+        int bytes = secret == null ? 0 : secret.getBytes(StandardCharsets.UTF_8).length;
+        if (bytes < 32) {
+            // O jjwt também recusaria (WeakKeyException), mas a mensagem dele
+            // fala em bits e não diz o que fazer. Validamos antes para o boot
+            // falhar com uma mensagem acionável (issue #323).
+            throw new IllegalStateException(
+                "JWT_SECRET deve ter pelo menos 32 bytes (256 bits) para assinar tokens com HMAC-SHA256; "
+                + "o valor configurado tem " + bytes + " byte(s). Defina um segredo aleatório com 32 bytes ou mais.");
+        }
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationSeconds = expirationSeconds;
     }

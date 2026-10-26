@@ -1,5 +1,6 @@
 package br.dev.noiteboa.auth.dto;
 
+import br.dev.noiteboa.common.validation.MaxBytes;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -15,7 +16,8 @@ public class RegisterRequest {
     private String email;
 
     @NotBlank
-    @Size(min = 8, max = 128)
+    @Size(min = 8, message = "A senha deve ter pelo menos 8 caracteres")
+    @MaxBytes(value = 72, message = "A senha deve ter no máximo 72 bytes")
     private String password;
 
     public String getDisplayName() {

@@ -1,5 +1,6 @@
 package br.dev.noiteboa;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -57,6 +58,44 @@ class AuthRegisterTest extends TesteComBanco {
         String body = "{\"displayName\":\"Lincoln\",\"email\":\"curto@example.com\",\"password\":\"123\"}";
         mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void passwordWith72BytesIsAccepted() throws Exception {
+        // 72 bytes é o limite do BCrypt: o último byte aceito não pode ser barrado
+        String senha = "a".repeat(72);
+        String body = "{\"displayName\":\"Lincoln\",\"email\":\"limite72@example.com\",\"password\":\"" + senha + "\"}";
+        mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isCreated());
+    }
+
+    @Test
+    void passwordWith73BytesReturns400() throws Exception {
+        // 73 bytes: o BCrypt ignoraria o último byte (truncamento silencioso)
+        String senha = "a".repeat(73);
+        String body = "{\"displayName\":\"Lincoln\",\"email\":\"limite73@example.com\",\"password\":\"" + senha + "\"}";
+        mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.detail", containsString("72 bytes")));
+    }
+
+    @Test
+    void passwordWith72BytesOfMultibyteCharsIsAccepted() throws Exception {
+        // 36 caracteres "á" = 72 bytes em UTF-8; o limite é em bytes, não em chars
+        String senha = "á".repeat(36);
+        String body = "{\"displayName\":\"Lincoln\",\"email\":\"multibyte72@example.com\",\"password\":\"" + senha + "\"}";
+        mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isCreated());
+    }
+
+    @Test
+    void passwordWithMoreThan72BytesOfMultibyteCharsReturns400() throws Exception {
+        // 37 caracteres "á" = 74 bytes: passa em @Size (37 chars), mas não em bytes
+        String senha = "á".repeat(37);
+        String body = "{\"displayName\":\"Lincoln\",\"email\":\"multibyte74@example.com\",\"password\":\"" + senha + "\"}";
+        mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.detail", containsString("72 bytes")));
     }
 
     @Test

@@ -30,7 +30,7 @@ de como fazer. Valores entre `<chaves>` são placeholders — substitua pelos se
 |---|---|---|
 | `SPRING_PROFILES_ACTIVE` | `prod` | já vem fixa do `render.yaml` |
 | `DB_POOL_SIZE` | `5` | já vem fixa do `render.yaml` |
-| `JWT_SECRET` | gere um: `openssl rand -base64 48` | você gera; guarde no gerenciador de senhas |
+| `JWT_SECRET` | gere um: `openssl rand -base64 48` (mínimo 32 bytes) | você gera; guarde no gerenciador de senhas |
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://<host-do-neon>/<banco>?sslmode=require` | Neon → Connect (veja formato abaixo) |
 | `SPRING_DATASOURCE_USERNAME` | usuário do Neon | Neon → Connect |
 | `SPRING_DATASOURCE_PASSWORD` | senha do Neon | Neon → Connect |
@@ -53,11 +53,16 @@ jdbc:postgresql://ep-exemplo-abc123.aws.neon.tech/neondb?sslmode=require
 
 > **Se a Render falhar no boot** com `IllegalStateException: JWT_SECRET não
 > configurada (perfil prod)...` (o log mostra `Application run failed` com essa
-> causa): a variável `JWT_SECRET` não foi definida, está vazia ou é igual ao
-> valor de desenvolvimento. Defina-a no dashboard e faça redeploy. A proteção
-> vive no `JwtService` e é ligada por `JWT_SECRET_REQUIRED: true` no
-> `application-prod.yml` — **não** remova essa linha para "consertar": liberaria
-> o segredo de desenvolvimento em produção.
+> causa): a variável `JWT_SECRET` não foi definida, está vazia, é igual ao
+> valor de desenvolvimento **ou tem menos de 32 bytes**. Defina-a no dashboard
+> e faça redeploy. A proteção vive no `JwtService` e é ligada por
+> `JWT_SECRET_REQUIRED: true` no `application-prod.yml` — **não** remova essa
+> linha para "consertar": liberaria o segredo de desenvolvimento em produção.
+
+> **Se falhar** com `A senha de desenvolvimento do banco (sono_dev_only) não é
+> aceita em produção`: o `SPRING_DATASOURCE_PASSWORD` não foi definido (e o
+> `application.yml` caiu no default local) ou foi copiado do `docker-compose.yml`.
+> Use a senha real do Neon; a checagem roda antes do Flyway e derruba o boot.
 
 ## Passo 3 — Apontar o front-end para a API (Vercel)
 
