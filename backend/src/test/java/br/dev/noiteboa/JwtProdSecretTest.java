@@ -62,17 +62,40 @@ class JwtProdSecretTest extends TesteComBanco {
                     "--spring.datasource.username=" + POSTGRES.getUsername(),
                     "--spring.datasource.password=" + POSTGRES.getPassword()));
 
-        Throwable raiz = erro;
-        while (raiz.getCause() != null && raiz.getCause() != raiz) {
-            raiz = raiz.getCause();
-        }
-        assertTrue(raiz.getMessage() != null && raiz.getMessage().contains("JWT_SECRET"),
-            "causa raiz deveria citar JWT_SECRET, mas foi: " + raiz);
+        Throwable root = rootCause(erro);
+        assertTrue(root.getMessage() != null && root.getMessage().contains("JWT_SECRET"),
+            "causa raiz deveria citar JWT_SECRET, mas foi: " + root);
+    }
+
+    @Test
+    void shortSecretFailsBootInProd() {
+        // 5 bytes: o jjwt até recusaria por conta própria, mas a mensagem precisa
+        // dizer o mínimo em bytes para ser acionável (e o JwtService é quem valida).
+        RuntimeException error = assertThrows(RuntimeException.class, () ->
+            new SpringApplicationBuilder(NoiteBoaApplication.class)
+                .web(WebApplicationType.NONE)
+                .profiles("prod")
+                .run("--JWT_SECRET=curto",
+                    "--spring.datasource.url=" + POSTGRES.getJdbcUrl(),
+                    "--spring.datasource.username=" + POSTGRES.getUsername(),
+                    "--spring.datasource.password=" + POSTGRES.getPassword()));
+
+        Throwable root = rootCause(error);
+        assertTrue(root.getMessage() != null && root.getMessage().contains("32 bytes"),
+            "causa raiz deveria citar o mínimo de 32 bytes, mas foi: " + root);
     }
 
     @Test
     void segredoDeDesenvolvimentoERejeitadoComExigenciaAtiva() {
         assertThrows(IllegalStateException.class,
             () -> new JwtService(JwtService.DEV_ONLY_SECRET, 3600, true));
+    }
+
+    private static Throwable rootCause(Throwable error) {
+        Throwable cause = error;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause;
     }
 }
